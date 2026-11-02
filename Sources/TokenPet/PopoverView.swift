@@ -81,10 +81,6 @@ struct PopoverView: View {
                 Text(L.t("At this pace: about \(Int(p.rounded()))% by the reset", "이 속도면 리셋 때 약 \(Int(p.rounded()))%"))
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
-            if s.state == .resting {
-                // Zhisou, the clever neighbour of the tale, never misses a chance
-                Text(L.t("Zhisou next door: “Told you so!”", "옆집 지수 영감: “거봐, 내 뭐랬나!”")).font(.caption.italic()).foregroundColor(.secondary)
-            }
             note(s.demo ? L.t("Simulated state for preview.", "미리보기용 가상 상태입니다.") : source(main, s.known ? s.captured : nil))
             if !s.demo {
                 Text(L.t("Shovel speed: \(Int(model.pace.smoothed.rounded())) output tokens/min (last 3 min, this Mac)",
@@ -175,11 +171,13 @@ struct PopoverView: View {
                                                          ?? (t / 7).truncatingRemainder(dividingBy: 1)) : nil)
         i.tempo = model.tempo
         i.son = fill(.son); i.boy = fill(.boy)
+        i.visitor = model.visitor
         return i
     }
 
     @ViewBuilder private func scene(_ s: Snapshot) -> some View {
         let night = !model.cutsceneDue && (s.state == .resting || model.night)   // the cutscene sky is always golden
+        let visit = model.visitor.map(Visitors.lines)
         ZStack(alignment: .topTrailing) {
             Group {
                 if let t = fixedT {
@@ -191,13 +189,15 @@ struct PopoverView: View {
                     }
                 }
             }
-            Text(model.cutsceneDue ? cutsceneLine : speech(s))
-                .font(.system(size: model.cutsceneDue ? 12 : 13, weight: .semibold, design: .rounded))
-                .foregroundColor(night ? .white : Color(red: 0.16, green: 0.13, blue: 0.11))
-                .padding(.horizontal, 9).padding(.vertical, 6)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(night ? 0.14 : 0.82)))
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: model.cutsceneDue ? 250 : 150, alignment: .trailing)   // the cutscene line stays above his head
+            if let visit {
+                // the visitor's bubble over her (his) head at the left; Grandpa answers in his
+                bubble(visit.0, size: 11, night: night)
+                    .frame(maxWidth: 108, alignment: .leading)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            bubble(model.cutsceneDue ? cutsceneLine : visit?.1 ?? speech(s), size: model.cutsceneDue || visit != nil ? 12 : 13, night: night)
+                .frame(maxWidth: model.cutsceneDue ? 250 : visit != nil ? 158 : 150, alignment: .trailing)   // the cutscene line stays above his head
                 .padding(10)
             if model.cutsceneDue {
                 Button { model.finishCutscene() } label: {
@@ -213,6 +213,15 @@ struct PopoverView: View {
         }
         .frame(width: Self.sceneSize.width, height: Self.sceneSize.height)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func bubble(_ text: String, size: CGFloat, night: Bool) -> some View {
+        Text(text)
+            .font(.system(size: size, weight: .semibold, design: .rounded))
+            .foregroundColor(night ? .white : Color(red: 0.16, green: 0.13, blue: 0.11))
+            .padding(.horizontal, 9).padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(night ? 0.14 : 0.82)))
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func sceneImage(_ s: Snapshot, t: Double) -> some View {
@@ -243,8 +252,8 @@ struct PopoverView: View {
     }
 
     private var cutsceneLine: String {
-        L.t("Heaven was moved by his stubbornness, and had the mountain carried away!",
-            "하늘이 할아버지의 끈기에 감동해 산을 옮겨 주었어요!")
+        L.t("Heaven was moved, and sent Kua'e's two sons to carry the mountain away!",
+            "하늘이 감동해 과아씨의 두 아들을 보내 산을 업어 가게 했어요!")
     }
 
     private func stateTitle(_ st: PetState) -> String {

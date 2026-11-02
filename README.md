@@ -15,7 +15,11 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
 - **His pace** (RunCat-style): he digs faster when tokens flow faster on this Mac, leans on his
   shovel and chats with his magpie when it is quiet, and strains when you are heading for the limit.
 - **The mountain** wears down with every token you have ever used (kept on this Mac). Carry a
-  whole mountain away and heaven is moved: a short cutscene, then the next mountain.
+  whole mountain away and heaven is moved: Kua'e's two giant sons carry it off, then the next
+  mountain.
+- **The rest of the tale.** His wife drops by when you change plans and at a new week to ask
+  where all that earth will go (and cheers once half the mountain is gone); Zhisou comes to laugh
+  when the limit runs out, and Grandpa answers him as in the Liezi.
 - **The family.** You pick which AI Grandpa watches (Claude by default). His son, his grandson
   and the neighbour's boy can each watch another one: Codex, Gemini CLI, or the OpenAI or
   DeepSeek API (a monthly budget instead of a limit). The grandson watches Codex by default.
@@ -93,13 +97,13 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 ## For development
 
 `swift run -c release TokenPet` with flags: `--demo lively|steady|straining|resting|morning|cutscene|cycle`,
-`--tempo idle|low|high|veryHigh`, `--weekly-only`, `--lang en|ko`,
+`--tempo idle|low|high|veryHigh`, `--visitor wifeDoubting|wifeCheering|zhisou`, `--weekly-only`, `--lang en|ko`,
 `--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,
 `--settings`, `--guide`, `--pretend-hidden` (try the mini-window fallback),
 `--render <dir>` (PNG stills), `--icon-set <dir>`, `--scan-report` (prints what it read),
 `--anim-stats`. `TOKENPET_PREFS=<domain>` keeps a test run out of your settings.
 
-Character sheets: `swift run -c release YugongSheet <dir> [--scenes]`.
+Character sheets: `swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors]`.
 
 ## License
 

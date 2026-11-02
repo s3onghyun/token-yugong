@@ -6,8 +6,12 @@
 - The family: pick which AI Grandpa watches, and give his son, his grandson and the neighbour's
   boy one each (Settings › Family). Two new pixel characters: the son, breaking rock with a
   pickaxe, and the neighbour's seven-year-old with 색동 sleeves and a little basket
-  (`YugongSheet --family` draws their sheet). Zhisou, the mocking neighbour, has a word when
-  Grandpa runs out.
+  (`YugongSheet --family` draws their sheet).
+- The rest of the tale, three more pixel characters (`YugongSheet --visitors` draws their sheet):
+  Yugong's wife, who comes when the plan or the family changes and at a new week to ask where all
+  that earth will go, and cheers once half the mountain is gone; Zhisou, who comes to laugh when
+  the limit runs out and gets Grandpa's 子子孫孫 answer; and Kua'e's two giant sons, who now carry
+  the mountain off in the milestone cutscene. `--visitor` shows one in a demo.
 - Gemini CLI: its tokens count for the shovel speed and the mountain; its meter says "don't know"
   because Gemini CLI keeps no limits on the Mac.
 - API budgets: the OpenAI API's spend this month against a monthly budget (Costs API, Admin key);

@@ -13,6 +13,7 @@ extension YugongArt {
         let kid = info.grandson.map { kidLayer($0, t: t, grid: 24) }
         let son = info.son.map { sonLayer(sonPose(t, fill: $0), fill: $0) }
         let boy = info.boy.map { boyLayer(boyPose(t, fill: $0), fill: $0) }
+        let guest = info.cutscene == nil ? info.visitor.map { visitorLayer($0, t: t) } : nil
         let ground = gh - 6
         return NSImage(size: size, flipped: false) { r in
             guard let c = NSGraphicsContext.current?.cgContext else { return false }
@@ -25,6 +26,7 @@ extension YugongArt {
             let fx = Int(CGFloat(gw) * 0.42), fy = ground + 2 - 38
             if let fig { c.draw(fig, in: cellRect(fx, fy, 40, 40, gh: gh, cell: cell)) }
             if let kid, let k = kid { c.draw(k, in: cellRect(gw - 27, ground + 2 - 23, 24, 24, gh: gh, cell: cell)) }
+            if let (img, n) = guest, let g = img { c.draw(g, in: cellRect(0, ground + 2 - n, n, n, gh: gh, cell: cell)) }
             return true
         }
     }
@@ -135,8 +137,21 @@ extension YugongArt {
             c.fill(CGRect(x: CGFloat(x), y: floor(y), width: 1, height: g - floor(y)))
         }
         // the mountain in stepped pixels with a lit and a shaded face
-        let lift: CGFloat = info.cutscene.map { CGFloat(min(1, max(0, ($0 - 0.15) / 0.7))) * (g + 14) } ?? 0
-        let pts = ridge(w: W, g: g, left: info.mountainLeft).map { CGPoint(x: $0.x, y: $0.y - lift) }
+        let move = info.cutscene.map { cutsceneMotion($0, width: w) }
+        let lift = move?.lift ?? 0, dx = move?.dx ?? 0
+        if let move {
+            // Kua'e's two sons, behind the mountain: they rise out of the earth holding it up, then carry it off
+            for (b, cx) in [(0, 0.12), (1, 0.38)] {
+                let img = giantLayer(move.pose, brother: b)
+                let r = CGRect(x: floor(W * cx) - 18 + dx, y: g - lift - 2, width: 36, height: 36)
+                c.saveGState(); c.translateBy(x: 0, y: r.minY + r.maxY); c.scaleBy(x: 1, y: -1)   // the layer is y-up
+                if let img { c.draw(img, in: r) }
+                c.restoreGState()
+            }
+        }
+        // in the cutscene what is left is drawn at least 30% high, so the sons have a mountain to carry
+        let left = info.cutscene == nil ? info.mountainLeft : max(0.3, info.mountainLeft)
+        let pts = ridge(w: W, g: g, left: left).map { CGPoint(x: $0.x + dx, y: $0.y - lift) }
         let peakX = pts.min(by: { $0.y < $1.y })?.x ?? W * 0.2
         let rock = sk.night ? NSColor(srgbRed: 0.24, green: 0.30, blue: 0.36, alpha: 1) : NSColor(srgbRed: 0.42, green: 0.60, blue: 0.42, alpha: 1)
         let shade = sk.night ? NSColor(srgbRed: 0.17, green: 0.21, blue: 0.27, alpha: 1) : NSColor(srgbRed: 0.30, green: 0.46, blue: 0.34, alpha: 1)
@@ -152,14 +167,14 @@ extension YugongArt {
         // pines and dug ledges
         c.setFillColor(edge.cgColor)
         for f in [0.1, 0.17, 0.27, 0.33] as [CGFloat] {
-            let x = floor(W * f)
+            let x = floor(W * f) + dx
             guard let y = ridgeY(pts, x) else { continue }
             let yy = floor(y) + 2
             c.fill(CGRect(x: x, y: yy - 3, width: 1, height: 4)); c.fill(CGRect(x: x - 1, y: yy - 2, width: 3, height: 2))
         }
-        if info.cutscene != nil {
+        if let cs = info.cutscene, cs > 0.05, cs < 0.45 {   // dust as the earth gives up the mountain
             c.setFillColor(NSColor.white.cgColor)
-            for i in 0..<7 { c.fillEllipse(in: CGRect(x: CGFloat(i) * W / 7 - 3, y: g - lift - 4 + CGFloat(i % 2) * 2, width: 20, height: 7)) }
+            for i in 0..<4 { c.fillEllipse(in: CGRect(x: CGFloat(i) * W / 7 - 3, y: g - 4 + CGFloat(i % 2) * 2, width: 20, height: 7)) }
         }
         // ground
         c.setFillColor(sk.ground.cgColor); c.fill(CGRect(x: 0, y: g, width: W, height: H - g))

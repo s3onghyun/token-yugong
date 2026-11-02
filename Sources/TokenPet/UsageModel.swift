@@ -131,6 +131,10 @@ final class UsageModel: ObservableObject {
     var demoPace: Pace.Level?
     /// When the cutscene began playing (demo recording); nil = loop it.
     var cutsceneStart: Date?
+    /// Demo: someone from the tale at the left of the scene (`--visitor`).
+    var demoVisitor: Visitor?
+    /// When the plan or the family last changed (the wife comes to ask about it).
+    private(set) var changedAt: Date?
 
     var demo: PetState?
     var demoCycle = false
@@ -250,6 +254,16 @@ final class UsageModel: ObservableObject {
         var others: [Role: Reading?] = [:]
         for (role, p) in family.roles where role != .grandpa { others[role] = reading(p) }
         snap = Logic.evaluate(main: family.roles[.grandpa].flatMap(reading), members: others, now: now)
+        if let p = Visitors.plan(family, snap) {
+            if let old = Prefs.store.string(forKey: "visitors.plan"), old != p { changedAt = now }
+            Prefs.store.set(p, forKey: "visitors.plan")
+        }
+    }
+
+    /// Who from the tale is in the scene right now (nobody during the cutscene).
+    var visitor: Visitor? {
+        if cutsceneDue { return nil }
+        return demoVisitor ?? Visitors.who(snap, changedAt: changedAt, carried: 1 - mountainLeft, mountain: mountain.index, now: Date())
     }
 
     static func demoSnapshot(_ st: PetState, now: Date, weeklyOnly: Bool = false, family: Family = .standard) -> Snapshot {
