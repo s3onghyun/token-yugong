@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Changed
+- Weekly-only accounts: Grandpa naps only when the weekly limit is used up, never just because
+  today's share (1/7 of the week) is spent. Weekly use is bursty, and a nap on day one was too
+  strict. The carrier and the menu bar now show the weekly %; today's share sets his pace (past it
+  he sweats: "ahead of today's share, take it slow"), and the popover says when the week resets.
+  Codex's basket follows the same rule.
+
 ### Removed
 - The ink-wash style. Grandpa Yugong, and every character after him, is pixel art only: the
   style picker in the popover, the `--style` flag and the ink drawing code are gone.

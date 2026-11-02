@@ -52,16 +52,17 @@ struct PopoverView: View {
             mountainRow
             Text(L.t("Claude · Grandpa's carrier", "Claude · 할아버지 지게")).font(.caption.weight(.bold)).foregroundColor(.secondary)
             if let d = s.daily {
-                // no 5-hour window on this account: show today's share of the week instead, never a fake 5-hour meter
-                meterRow(L.t("Today's share (1/7 of the week)", "오늘 몫 (주간의 1/7)"), Meter(pct: d.fill * 100, resetsAt: d.dayEnd))
-                Text(L.t("This account has no 5-hour limit, only weekly ones. The carrier fills with today's fair share.",
-                         "이 계정은 5시간 한도 없이 주간 한도만 있어요. 지게는 오늘 몫(주간의 1/7)만큼 찹니다."))
+                // no 5-hour window on this account: the weekly limit is the carrier, today's share only sets the pace
+                meterRow(L.t("Weekly (the carrier)", "주간 (지게)"), s.week)
+                meterRow(L.t("Today's share: pace (1/7 of the week)", "오늘 몫: 속도 (주간의 1/7)"), Meter(pct: d.fill * 100, resetsAt: d.dayEnd), pace: true)
+                Text(L.t("No 5-hour limit on this account, only weekly. Grandpa naps only when the weekly limit runs out\(weeklyReset(s)); going past today's share just makes him sweat.",
+                         "이 계정은 5시간 한도 없이 주간 한도만 있어요. 할아버지는 주간 한도를 다 쓸 때만 쉬어요\(weeklyReset(s)). 오늘 몫을 넘으면 땀만 흘려요."))
                     .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 meterRow(L.t("5-hour", "5시간"), s.five)
+                meterRow(L.t("Weekly", "주간"), s.week)
             }
-            meterRow(L.t("Weekly", "주간"), s.week)
-            if let p = s.projected, s.known, s.state != .resting {
+            if let p = s.projected, s.known, s.state != .resting, s.daily == nil {
                 Text(L.t("At this pace: about \(Int(p.rounded()))% by the reset", "이 속도면 리셋 때 약 \(Int(p.rounded()))%"))
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
@@ -227,7 +228,8 @@ struct PopoverView: View {
         switch st {
         case .lively:    return L.t("Grandpa is digging happily", "할아버지 신나게 파는 중")
         case .steady:    return L.t("Steady digging", "꾸준히 파는 중")
-        case .straining: return L.t("Grandpa is straining", "할아버지 힘에 부쳐요")
+        case .straining: return model.snap.daily != nil ? L.t("Ahead of today's share: take it slow", "오늘 몫 넘음 · 천천히")
+                                                        : L.t("Grandpa is straining", "할아버지 힘에 부쳐요")
         case .resting:   return L.t("Carrier full: resting", "지게 가득 · 쉬는 중")
         case .morning:   return L.t("Morning! Fresh carrier", "아침이에요 · 지게 비움")
         }
@@ -240,18 +242,18 @@ struct PopoverView: View {
             return model.night ? L.t("Yawn… still digging this late?", "하암… 밤이 깊었구먼")
                                : L.t("One shovel, one shovel less mountain!", "한 삽이면 한 삽만큼 줄지, 허허!")
         case .steady:    return L.t("Steady now, steady.", "쉬엄쉬엄, 꾸준히 가세.")
-        case .straining: return L.t("Oof, my back… slow down a bit?", "어이구 허리야… 좀 천천히 퍼세")
+        case .straining:
+            return s.daily != nil ? L.t("Past today's share. Easy, the week is long.", "오늘 몫은 넘었구먼. 천천히 하세, 한 주는 길어")
+                                  : L.t("Oof, my back… slow down a bit?", "어이구 허리야… 좀 천천히 퍼세")
         case .resting:
             let w = s.wakeAt.map { Fmt.clock($0, now: clockNow) } ?? "?"
-            if s.restReason == "daily" {
-                return L.t("That's today's share.\nBack to digging at \(w)", "오늘 몫은 다 퍼냈구먼.\n\(w)에 다시 퍼요")
-            }
             return L.t("Carrier's full.\nBack to digging at \(w)", "지게가 꽉 찼구먼.\n\(w)에 다시 퍼요")
         case .morning:   return L.t("Morning! Shovel's waiting.", "에헴, 아침이구먼! 다시 퍼 볼까")
         }
     }
 
-    @ViewBuilder private func meterRow(_ label: String, _ m: Meter?) -> some View {
+    /// `pace`: a pace guide, not a limit, so 100% and over is not drawn as "full, resting".
+    @ViewBuilder private func meterRow(_ label: String, _ m: Meter?, pace: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(label).font(.subheadline.weight(.semibold))
@@ -266,7 +268,7 @@ struct PopoverView: View {
                 let p = min(1, max(0, (m?.pct ?? 0) / 100))
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.primary.opacity(0.08))
-                    Capsule().fill(barColor(m?.pct ?? 0)).frame(width: max(p > 0 ? 8 : 0, g.size.width * p))
+                    Capsule().fill(barColor(pace ? min(m?.pct ?? 0, 99) : m?.pct ?? 0)).frame(width: max(p > 0 ? 8 : 0, g.size.width * p))
                 }
             }
             .frame(height: 8)
@@ -276,6 +278,12 @@ struct PopoverView: View {
 
     private func barColor(_ p: Double) -> Color {
         p >= 100 ? Color(red: 0.42, green: 0.45, blue: 0.85) : p >= 80 ? Color(red: 0.96, green: 0.45, blue: 0.35) : Color(red: 0.30, green: 0.72, blue: 0.52)
+    }
+
+    /// " (resets Mon 04:00)", or nothing while the weekly reset time is unknown.
+    private func weeklyReset(_ s: Snapshot) -> String {
+        guard let r = s.week?.resetsAt else { return "" }
+        return L.t(" (resets \(Fmt.clock(r, now: clockNow)))", "(\(Fmt.clock(r, now: clockNow)) 리셋)")
     }
 
     private func resetText(_ m: Meter?) -> String {

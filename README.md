@@ -9,8 +9,9 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
 
 - **The carrier (지게) is your 5-hour limit.** Earth heaps up in his A-frame carrier. When it is
   full he sits down and naps, and the menu bar shows when he starts again.
-- **Accounts with only a weekly limit** (verified Ultra): the carrier fills with today's fair share
-  of the week (1/7, unused days carry over). No 5-hour meter is ever invented.
+- **Accounts with only a weekly limit** (verified Ultra): the carrier is the weekly limit, and he naps
+  only when it runs out. Today's fair share (1/7 of the week, unused days carry over) sets his pace:
+  past it he sweats and asks you to take it slow. No 5-hour meter is ever invented.
 - **His pace** (RunCat-style): he digs faster when tokens flow faster on this Mac, leans on his
   shovel and chats with his magpie when it is quiet, and strains when you are heading for the limit.
 - **The mountain** wears down with every token you have ever used (kept on this Mac). Carry a

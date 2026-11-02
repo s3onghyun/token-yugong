@@ -101,8 +101,8 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L.t("What you are looking at", "무엇을 보여 주나요")).font(.title2.bold())
             row(figure(.straining, carrier: 0.8), L.t("The carrier (지게)", "지게"),
-                L.t("Earth in his A-frame carrier is your Claude 5-hour limit. Full = he sits down and naps until it resets, and the menu bar shows when he starts again. Accounts with only a weekly limit fill it with today's fair share (1/7 of the week).",
-                    "등에 진 지게의 흙이 Claude 5시간 한도예요. 가득 차면 리셋까지 쉬고, 메뉴바에 다시 퍼는 시각이 나와요. 주간 한도만 있는 계정은 오늘 몫(주간의 1/7)만큼 찹니다."))
+                L.t("Earth in his A-frame carrier is your Claude 5-hour limit. Full = he sits down and naps until it resets, and the menu bar shows when he starts again. Accounts with only a weekly limit fill it with the week; going past today's fair share (1/7 of the week) only makes him sweat.",
+                    "등에 진 지게의 흙이 Claude 5시간 한도예요. 가득 차면 리셋까지 쉬고, 메뉴바에 다시 퍼는 시각이 나와요. 주간 한도만 있는 계정은 주간 한도만큼 차고, 오늘 몫(주간의 1/7)을 넘으면 땀만 흘려요."))
             row(figure(.lively, carrier: 0.3), L.t("His pace", "삽질 속도"),
                 L.t("He digs faster when tokens flow faster on this Mac, leans on his shovel when it is quiet, and strains when you are heading for the limit before the reset.",
                     "이 Mac에서 토큰이 빨리 나오면 빨리 파고, 조용하면 삽에 기대 쉬어요. 리셋 전에 한도에 닿을 속도면 힘에 부쳐 해요."))

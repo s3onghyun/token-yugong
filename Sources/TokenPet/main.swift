@@ -34,7 +34,7 @@ if args.contains("--scan-report") {
     if let f = s.five { print("5h: \(Int(f.pct.rounded()))% resets \(t(f.resetsAt))") }
     if let w = s.week { print("week: \(Int(w.pct.rounded()))% resets \(t(w.resetsAt))") }
     if let d = s.daily { print(String(format: "no 5-hour window: today's share %.0f%%, day %@ - %@", d.fill * 100, t(d.dayStart), t(d.dayEnd))) }
-    if s.resting { print("resting (\(s.restReason)) until \(s.wakeAt.map { Fmt.clock($0) } ?? "?")") }
+    if s.resting { print("resting until \(s.wakeAt.map { Fmt.clock($0) } ?? "?")") }
     if let p = s.projected { print(String(format: "projected by reset: %.0f%%", p)) }
     if let c = s.codex { print("codex: 5h=\(c.five.map { "\(Int($0.pct.rounded()))%" } ?? "-") week=\(c.week.map { "\(Int($0.pct.rounded()))% resets \(t($0.resetsAt))" } ?? "-") (log line \(t(c.at)))") }
     let paceNow = Date(), settled = paceNow.addingTimeInterval(-300)   // 5 minutes ago: every log line is written
@@ -63,7 +63,7 @@ if args.contains("--scan-report") {
         if let img = r.nsImage { png(img, "popover-yugong-pixel-\(st.rawValue)\(ko).png") }
     }
     model.demoWeeklyOnly = true
-    for st in [PetState.lively, .resting] {
+    for st in [PetState.lively, .straining, .resting] {
         model.setDemo(st)
         let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now).background(Color(nsColor: .windowBackgroundColor)))
         r.scale = 2
@@ -420,7 +420,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if model.cutsceneDue { title = " ✨" }
         else if !s.known { title = " ?" }
         else if s.resting { title = " " + (s.wakeAt.map { Fmt.clock($0) } ?? "?") }
-        else if let d = s.daily { title = " \(Int((d.fill * 100).rounded()))%" }
         else if let m = s.five ?? s.week { title = " \(Int(m.pct.rounded()))%" }
         else { title = "" }
         if title != lastTitle {

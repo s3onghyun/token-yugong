@@ -245,21 +245,21 @@ final class UsageModel: ObservableObject {
         case .steady:    s.five = Meter(pct: 48, resetsAt: now.addingTimeInterval(2 * 3600)); s.week = Meter(pct: 40, resetsAt: weekly)
         case .straining: s.five = Meter(pct: 91, resetsAt: now.addingTimeInterval(48 * 60)); s.week = Meter(pct: 63, resetsAt: weekly)
         case .resting:   let w = at(9); s.five = Meter(pct: 100, resetsAt: w); s.week = Meter(pct: 72, resetsAt: weekly)
-                         s.resting = true; s.wakeAt = w; s.restReason = "limit"
+                         s.resting = true; s.wakeAt = w
         case .morning:   s.five = Meter(pct: 0, resetsAt: nil); s.week = Meter(pct: 72, resetsAt: weekly); s.justReset = now
         }
         s.projected = s.five.flatMap { Logic.projection($0, window: Limits.fiveLength, now: now) }
         s.codexFill = (s.codex?.week?.pct ?? 0) / 100
         if weeklyOnly {
-            // an account without a 5-hour window: the carrier is today's share of the week
-            let fills: [PetState: Double] = [.lively: 0.3, .steady: 0.62, .straining: 0.9, .resting: 1.0, .morning: 0]
+            // an account without a 5-hour window: the carrier is the week, today's share sets the pace
+            let fills: [PetState: Double] = [.lively: 0.3, .steady: 0.8, .straining: 1.4, .resting: 1.6, .morning: 0]
             let dayStart = cal.date(bySettingHour: 4, minute: 0, second: 0, of: now).map { $0 > now ? $0.addingTimeInterval(-86400) : $0 } ?? now
             let f = fills[st] ?? 0.3
             s.daily = Daily(fill: f, dayStart: dayStart, dayEnd: dayStart.addingTimeInterval(86400))
             s.five = nil
-            s.week = Meter(pct: [.lively: 31, .steady: 44, .straining: 58, .resting: 61, .morning: 61][st] ?? 31, resetsAt: weekly)
+            s.week = Meter(pct: [.lively: 31, .steady: 44, .straining: 58, .resting: 100, .morning: 61][st] ?? 31, resetsAt: weekly)
             s.projected = s.week.flatMap { Logic.projection($0, window: Limits.weekLength, now: now) }
-            if st == .resting { s.wakeAt = s.daily?.dayEnd; s.restReason = "daily" }
+            if st == .resting { s.wakeAt = weekly }
         }
         return s
     }
