@@ -16,8 +16,12 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
   shovel and chats with his magpie when it is quiet, and strains when you are heading for the limit.
 - **The mountain** wears down with every token you have ever used (kept on this Mac). Carry a
   whole mountain away and heaven is moved: a short cutscene, then the next mountain.
-- **The grandson is Codex.** If you use Codex CLI, he carries a second basket.
-- **No data, no guessing.** Until Claude Code reports your limits, he says he doesn't know.
+- **The family.** You pick which AI Grandpa watches (Claude by default). His son, his grandson
+  and the neighbour's boy can each watch another one: Codex, Gemini CLI, or the OpenAI or
+  DeepSeek API (a monthly budget instead of a limit). The grandson watches Codex by default.
+- **No data, no guessing.** Until an AI reports its limits, whoever watches it says he doesn't
+  know. Gemini CLI keeps no limits on the Mac and DeepSeek reports only a balance, so for those
+  he always says so.
 
 All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
@@ -57,7 +61,14 @@ Already have a status line? Keep it and make its first line
 then read the JSON from `$input`.
 
 The bridge uses `jq` when present (built into macOS 15+) and `plutil` otherwise.
-Codex needs no setup: its own logs (`~/.codex/sessions`) carry its limits.
+Codex needs no setup: its own logs (`~/.codex/sessions`) carry its limits. Gemini CLI needs none
+either (its tokens are read from `~/.gemini/tmp`).
+
+**API budgets.** For the OpenAI API, give a member OpenAI in Settings › Family, type a monthly
+budget in USD and paste an **Admin key** (OpenAI reports costs only to Admin keys). The meter is
+this month's spend ÷ the budget, asked every 15 minutes. For DeepSeek, paste an API key to see the
+balance; DeepSeek does not report spend, so its meter says "don't know". Keys go into the login
+Keychain only. These two are the only times the app uses the network.
 
 ## When the menu bar is full
 
@@ -69,8 +80,8 @@ Grandpa notices, tells you once with a notification, and moves into a small floa
 ## Settings
 
 Gear button in the popover: language (system, 한국어, English), the menu-bar number (percent used,
-time to reset, reset time or none) and whether Grandpa is shown next to it, show the grandson
-(Codex), mini window, open at login (off by default, opt-in only), and the guide. Everything is stored in the
+time to reset, reset time or none) and whether Grandpa is shown next to it, the family (which AI
+each member watches, the OpenAI budget, API keys), mini window, open at login (off by default, opt-in only), and the guide. Everything is stored in the
 UserDefaults domain `TokenPet`; `defaults delete TokenPet` resets it, including the mountain.
 
 ## How the numbers become a pet

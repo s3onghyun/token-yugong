@@ -3,11 +3,23 @@
 ## Unreleased
 
 ### Added
+- The family: pick which AI Grandpa watches, and give his son, his grandson and the neighbour's
+  boy one each (Settings › Family). Two new pixel characters: the son, breaking rock with a
+  pickaxe, and the neighbour's seven-year-old with 색동 sleeves and a little basket
+  (`YugongSheet --family` draws their sheet). Zhisou, the mocking neighbour, has a word when
+  Grandpa runs out.
+- Gemini CLI: its tokens count for the shovel speed and the mountain; its meter says "don't know"
+  because Gemini CLI keeps no limits on the Mac.
+- API budgets: the OpenAI API's spend this month against a monthly budget (Costs API, Admin key);
+  the DeepSeek API's balance (it reports no spend, so its meter says "don't know"). Keys are kept
+  in the login Keychain; these are the app's only network requests.
+- Codex and Gemini CLI tokens now also wear down the mountain.
 - Menu-bar number setting: percent used (default, `24%`), time to reset (`3h 12m`), reset time
   (`Mon 04:00`) or none; and Grandpa on or off beside it (the item is never left empty). The
   number is the 5-hour window, else the weekly one. The popover header shows it as `24% · Mon 04:00`.
 
 ### Changed
+- "Show the grandson (Codex)" became Settings › Family; turning it off before carries over.
 - Weekly-only accounts: Grandpa naps only when the weekly limit is used up, never just because
   today's share (1/7 of the week) is spent. Weekly use is bursty, and a nap on day one was too
   strict. The carrier and the menu bar now show the weekly %; today's share sets his pace (past it
