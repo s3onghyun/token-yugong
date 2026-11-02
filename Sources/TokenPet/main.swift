@@ -191,6 +191,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         snapSink = model.$snap.sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } }
         watchVisibility()
         scheduleAnim()
+        sinks.append(model.$barText.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } })
+        sinks.append(model.$barGrandpa.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } })
         sinks.append(model.$miniMode.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.miniForced = false; self?.updateMini() } })
         sinks.append(model.$mountain.sink { m in DispatchQueue.main.async { AppDelegate.milestoneNotice(m) } })
         let demoRun = arg("--demo") != nil || args.contains("--stage")
@@ -254,7 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     // follows the tempo (the animation clock's speed). Nothing is drawn while the bar is hidden.
     var paused = false
     private var loops: [String: (runs: [(img: NSImage, end: Double)], period: Double)] = [:]
-    private var lastImage: NSImage?, lastTitle = ""
+    private var lastImage: NSImage?, lastTitle = "", barShowsImage = true
 
     private var screensAsleep = false, sessionAway = false
 
@@ -291,7 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if args.contains("--pretend-hidden") { hidden = true }   // demo and testing of the fallback
         if hidden != barHidden || !barChecked { print("menu bar item \(hidden ? "hidden" : "visible"): \(f)") }
         barChecked = true
-        if barHidden && !hidden { item.button?.image = lastImage }   // back in view: show the current frame
+        if barHidden && !hidden { item.button?.image = barShowsImage ? lastImage : nil }   // back in view: show the current frame
         barHidden = hidden
         if hidden && !Prefs.store.bool(forKey: "barHiddenWarned") {
             Prefs.store.set(true, forKey: "barHiddenWarned")
@@ -408,20 +410,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let now = Date.timeIntervalSinceReferenceDate
         let p = l.period.isFinite ? model.phase(at: now).truncatingRemainder(dividingBy: l.period) : 0
         let run = l.runs.first { p < $0.end } ?? l.runs[l.runs.count - 1]
-        if run.img !== lastImage {
+        let (showImage, title) = BarText.item(model.barText.text(s, cutscene: model.cutsceneDue, now: Date()), grandpa: model.barGrandpa)
+        if run.img !== lastImage || showImage != barShowsImage {
+            if showImage || showImage != barShowsImage {   // % only: the item has no picture to change
+                // a hidden bar item still costs a redraw per frame (measured 3% CPU at "high"): skip it
+                if !barHidden || args.contains("--anim-stats") { item.button?.image = showImage ? run.img : nil }
+                bar.image = showImage ? run.img : NSImage()
+            }
+            barShowsImage = showImage
             lastImage = run.img
-            // a hidden bar item still costs a redraw per frame (measured 3% CPU at "high"): skip it
-            if !barHidden || args.contains("--anim-stats") { item.button?.image = run.img }
-            bar.image = run.img
             if mini?.isVisible == true { mini?.pet.image = run.img }
             drawCount += 1
         }
-        let title: String
-        if model.cutsceneDue { title = " ✨" }
-        else if !s.known { title = " ?" }
-        else if s.resting { title = " " + (s.wakeAt.map { Fmt.clock($0) } ?? "?") }
-        else if let m = s.five ?? s.week { title = " \(Int(m.pct.rounded()))%" }
-        else { title = "" }
         if title != lastTitle {
             lastTitle = title
             bar.title = title
@@ -431,7 +431,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             mini?.update(image: run.img, title: title)
         }
         // wake again when this picture ends, at the current speed (at least 1/30 s, at most 30 s)
-        let wait = l.period.isFinite ? min(30, max(1.0 / 30, (run.end - p) / max(0.3, model.animSpeed))) : 30
+        // nothing animated on show (number only, no mini window): wake twice a minute for the time styles; a new snapshot ticks anyway
+        let animating = showImage || mini?.isVisible == true || args.contains("--stage") || args.contains("--anim-stats")
+        let wait = l.period.isFinite && animating ? min(30, max(1.0 / 30, (run.end - p) / max(0.3, model.animSpeed))) : 30
         animTimer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { [weak self] _ in self?.tick() }
         animTimer?.tolerance = wait * 0.1
     }

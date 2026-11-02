@@ -262,16 +262,12 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         #expect(Set(out).count == 1)
     }
 
-    @Test func clockTextFollowsTheTimeZone() {
-        let saved = L.korean
-        defer { L.korean = saved }
-        L.korean = false
+    @Test func clockTextFollowsTheTimeZone() {   // the language is passed in: tests run in parallel, so none flips L.korean
         let now = reset - 2 * day
-        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "Asia/Seoul")!) == "Mon 04:00")
-        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "UTC")!) == "Sun 19:00")
-        #expect(Fmt.clock(reset, now: reset - hour, tz: TimeZone(identifier: "Asia/Seoul")!) == "04:00")  // same day: time only
-        L.korean = true
-        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "Asia/Seoul")!) == "월 04:00")
+        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "Asia/Seoul")!, korean: false) == "Mon 04:00")
+        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "UTC")!, korean: false) == "Sun 19:00")
+        #expect(Fmt.clock(reset, now: reset - hour, tz: TimeZone(identifier: "Asia/Seoul")!, korean: false) == "04:00")  // same day: time only
+        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "Asia/Seoul")!, korean: true) == "월 04:00")
     }
 
     @Test func codexLogsOlderThanTheWindow() {

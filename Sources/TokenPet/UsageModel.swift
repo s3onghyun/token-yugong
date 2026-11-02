@@ -277,6 +277,13 @@ final class UsageModel: ObservableObject {
     @Published var showCodex: Bool = Prefs.store.object(forKey: "showCodex") as? Bool ?? true {
         didSet { Prefs.store.set(showCodex, forKey: "showCodex") }
     }
+    /// The menu-bar item: Grandpa on or off, and which number beside him (percent by default).
+    @Published var barGrandpa: Bool = Prefs.store.object(forKey: "barGrandpa") as? Bool ?? true {
+        didSet { Prefs.store.set(barGrandpa, forKey: "barGrandpa") }
+    }
+    @Published var barText: BarText = BarText(rawValue: Prefs.store.string(forKey: "barText") ?? "") ?? .percent {
+        didSet { Prefs.store.set(barText.rawValue, forKey: "barText") }
+    }
     /// The floating mini window: only while the menu-bar item is hidden (default), always, or never.
     @Published var miniMode: MiniMode = MiniMode(rawValue: Prefs.store.string(forKey: "miniWindow") ?? "") ?? .auto {
         didSet { Prefs.store.set(miniMode.rawValue, forKey: "miniWindow") }

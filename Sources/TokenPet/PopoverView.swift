@@ -11,11 +11,11 @@ enum L {
 }
 
 enum Fmt {
-    static func clock(_ d: Date, now: Date = Date(), tz: TimeZone = .current) -> String {
+    static func clock(_ d: Date, now: Date = Date(), tz: TimeZone = .current, korean: Bool = L.korean) -> String {
         var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
         let f = DateFormatter()
-        f.locale = Locale(identifier: L.korean ? "ko_KR" : "en_US"); f.timeZone = tz
-        f.dateFormat = cal.isDate(d, inSameDayAs: now) ? "HH:mm" : (L.korean ? "E HH:mm" : "EEE HH:mm")
+        f.locale = Locale(identifier: korean ? "ko_KR" : "en_US"); f.timeZone = tz
+        f.dateFormat = cal.isDate(d, inSameDayAs: now) ? "HH:mm" : (korean ? "E HH:mm" : "EEE HH:mm")
         return f.string(from: d)
     }
     static func until(_ d: Date, now: Date = Date()) -> String {
@@ -23,6 +23,13 @@ enum Fmt {
         if m >= 24 * 60 { return L.t("in \(m / 1440)d \((m % 1440) / 60)h", "\(m / 1440)일 \((m % 1440) / 60)시간 뒤") }
         if m >= 60 { return L.t("in \(m / 60)h \(m % 60)m", "\(m / 60)시간 \(m % 60)분 뒤") }
         return L.t("in \(m)m", "\(m)분 뒤")
+    }
+    /// Compact time left for the menu bar: "5d 2h", "3h 12m", "12m".
+    static func left(_ d: Date, now: Date = Date()) -> String {
+        let m = max(0, Int(d.timeIntervalSince(now) / 60))
+        if m >= 24 * 60 { return "\(m / 1440)d \((m % 1440) / 60)h" }
+        if m >= 60 { return "\(m / 60)h \(m % 60)m" }
+        return "\(m)m"
     }
     static func tokens(_ n: Int) -> String {
         if L.korean {
@@ -47,8 +54,14 @@ struct PopoverView: View {
         let s = model.snap
         VStack(alignment: .leading, spacing: 10) {
             scene(s)
-            Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!") : stateTitle(s.state))
-                .font(.system(.headline, design: .rounded))
+            HStack(alignment: .firstTextBaseline) {
+                Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!") : stateTitle(s.state))
+                    .font(.system(.headline, design: .rounded))
+                Spacer()
+                if let d = BarText.detail(s, now: clockNow) {
+                    Text(d).font(.subheadline.monospacedDigit().weight(.semibold)).foregroundColor(.secondary)
+                }
+            }
             mountainRow
             Text(L.t("Claude · Grandpa's carrier", "Claude · 할아버지 지게")).font(.caption.weight(.bold)).foregroundColor(.secondary)
             if let d = s.daily {
@@ -123,6 +136,13 @@ struct PopoverView: View {
                 Text(L.t("System", "시스템")).tag("auto")
                 Text("한국어").tag("ko")
                 Text("English").tag("en")
+            }
+            Toggle(L.t("Grandpa in the menu bar", "메뉴바에 할아버지"), isOn: $model.barGrandpa)
+            Picker(L.t("Menu bar number", "메뉴바 숫자"), selection: $model.barText) {
+                Text(L.t("Percent used (24%)", "사용한 % (24%)")).tag(BarText.percent)
+                Text(L.t("Time to reset (3h 12m)", "리셋까지 (3h 12m)")).tag(BarText.timeLeft)
+                Text(L.t("Reset time (Mon 04:00)", "리셋 시각 (월 04:00)")).tag(BarText.resetClock)
+                Text(L.t("None", "없음")).tag(BarText.none)
             }
             Picker(L.t("Mini window", "작은 창"), selection: $model.miniMode) {
                 Text(L.t("When the menu bar is full", "메뉴바가 꽉 찼을 때")).tag(MiniMode.auto)

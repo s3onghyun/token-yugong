@@ -68,8 +68,9 @@ Grandpa notices, tells you once with a notification, and moves into a small floa
 
 ## Settings
 
-Gear button in the popover: language (system, 한국어, English), show the grandson (Codex), mini
-window, open at login (off by default, opt-in only), and the guide. Everything is stored in the
+Gear button in the popover: language (system, 한국어, English), the menu-bar number (percent used,
+time to reset, reset time or none) and whether Grandpa is shown next to it, show the grandson
+(Codex), mini window, open at login (off by default, opt-in only), and the guide. Everything is stored in the
 UserDefaults domain `TokenPet`; `defaults delete TokenPet` resets it, including the mountain.
 
 ## How the numbers become a pet

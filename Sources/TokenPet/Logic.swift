@@ -93,8 +93,11 @@ struct Snapshot {
     var codexFill: Double?   // the grandson's basket
     var demo = false
 
-    /// Earth in Grandpa's carrier: the limit that makes him rest, the 5-hour window, else the week.
-    var carrier: Double { Logic.fill(five: five, week: week) ?? 0 }
+    /// The limit that matters most: the 5-hour window, else the week. It is the carrier, the
+    /// menu-bar number and the popover header.
+    var headline: Meter? { five ?? week }
+    /// Earth in Grandpa's carrier.
+    var carrier: Double { headline.map { $0.pct / 100 } ?? 0 }
 }
 
 enum Logic {

@@ -68,6 +68,22 @@ weekly limit itself runs out (row 3), and the popover says when it resets. It ne
 
 ## Menu bar
 
+The item shows Grandpa and a number beside him. The number is the **headline** window (the
+5-hour window, else the weekly one; also the carrier), in the style chosen in Settings:
+
+| Setting | Shows (5-hour 24%, resets in 3 h 12 m at 04:40) |
+|---|---|
+| Percent used (default) | `24%` |
+| Time to reset | `3h 12m` (`5d 2h` over a day, `12m` under an hour) |
+| Reset time | `04:40` (`Mon 04:00` on another day) |
+| None | nothing |
+
+Before the style: `✨` while a mountain's cutscene is due, `?` without data, and while he rests
+the time he starts again (as time left in the *time to reset* style). The time styles show the
+percent when the reset time is unknown. **Grandpa in the menu bar** can be turned off; with no
+number as well, Grandpa stays, so the item is never empty. The text is redrawn only when it
+changes. The popover header shows the headline as `24% · 04:40`.
+
 | When | Then |
 |---|---|
 | Less than half of the item's width lies on any screen (macOS pushed it off a full menu bar; measured here at x = −4316 on a 1728-point screen) | **Hidden** |
@@ -90,6 +106,8 @@ item nor the mini window is on screen.
 |---|---|
 | Language | System (Korean if the first preferred language is Korean, else English); or pinned 한국어 / English |
 | Show the grandson (Codex) | On. Off hides him and his meters; his tokens still count toward the shovel speed |
+| Menu bar number | Percent used |
+| Grandpa in the menu bar | On |
 | Mini window | When the menu bar is full |
 | Open at login | **Off.** Only the user can turn it on (SMAppService, app bundle only); the app never registers itself |
 | Hide from screen sharing | On |
