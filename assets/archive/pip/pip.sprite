@@ -1,0 +1,238 @@
+# Pip — TokenPet character, style B (pixel mochi with a sprout).
+# Hand-placed pixels. Licensed separately from the app code: see assets/LICENSE.md.
+# Format: "palette" lines map one char to an sRGB hex; "." is transparent.
+# Each "frame <state> <n>" block is followed by exactly <height> rows of <width> chars.
+name Pip
+size 17 16
+
+palette o 3B2A33
+palette k 3B2A33
+palette w FBF6EC
+palette s E6D6C8
+palette h FFFFFF
+palette p FFA3B1
+palette P FF6A84
+palette g 7DCB6E
+palette G 3E8C4F
+palette r B8344A
+palette t FF8197
+palette b 9AD8FF
+palette B 4A8FD6
+palette z 7C82E6
+palette y FFC83D
+
+frame lively 0
+.................
+.................
+.....gg...gg.....
+....gGGgGgGGg....
+........G........
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+.owwkkwwwwwkkwwo.
+owwwkkwwwwwkkwwwo
+owppwwkwkwkwwppwo
+owwwwwwkwkwwwwwwo
+oswwwwwwwwwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+
+frame lively 1
+.....gg...gg...y.
+....gGGgGgGGg.yyy
+........G......y.
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+.owwkkwwwwwkkwwo.
+owwwkkwwwwwkkwwwo
+owppwwwkkkwwwppwo
+owwwwwwkrkwwwwwwo
+oswwwwwwkwwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+.................
+.......sssss.....
+
+frame lively 2
+.................
+.................
+.................
+...ggg.....ggg...
+....gGGgGgGGg....
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+.owwwwwwwwwwwwwo.
+owwwkkwwwwwkkwwwo
+owppwwkwkwkwwppwo
+owwwwwwkwkwwwwwwo
+oswwwwwwwwwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+
+frame full 0
+.................
+.................
+.................
+.....gggGggg.....
+....gg..G..gg..B.
+.....ooooooo..BbB
+...oowwwwwwwoo.B.
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+.owwkwwwwwwwkwwo.
+owwwwkwwwwwkwwwwo
+owPPkwwkkkwwkPPwo
+owwwwwwkrkwwwwwwo
+oswwwwwkkkwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+
+frame full 1
+.................
+.................
+.................
+.....gggGggg.....
+....gg..G..gg....
+.....ooooooo...B.
+...oowwwwwwwooBbB
+..owwwwwwwwwwwo.B
+.owwwwwwwwwwwwwo.
+.owwkwwwwwwwkwwo.
+owwwwkwwwwwkwwwwo
+owPPkwwkkkwwkPPwo
+owwwwwwkrkwwwwwwo
+oswwwwwktkwwwwwso
+.osswwwkkkwwwsso.
+..ooooooooooooo..
+
+frame full 2
+.................
+.................
+.................
+.....gggGggg.....
+....gg..G..gg....
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+.owwkwwwwwwwkwwo.
+owwwwkwwwwwkwwwwo
+owPPkwwkkkwwkPPwo
+owwwwwwkrkwwwwwwo
+oswwwwwkkkwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+
+frame asleep 0
+.................
+............zzz..
+..............z..
+.............z...
+............zzz..
+......ggGgg......
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+owwkwwkwwwkwwkwwo
+owwwkkwwwwwkkwwwo
+owppwwwwkwwwwppwo
+oswwwwwwwwwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+
+frame asleep 1
+.............zzz.
+...............z.
+..............z..
+.............zzz.
+.................
+......ggGgg......
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+owwkwwkwwwkwwkwwo
+owwwkkwwwwwkkwwwo
+owppwwwwkbwwwppwo
+oswwwwwwwwwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+
+frame asleep 2
+..............zzz
+................z
+...............z.
+..............zzz
+............z....
+......ggGgg......
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+owwkwwkwwwkwwkwwo
+owwwkkwwwwwkkwwwo
+owppwwwwkbbwwppwo
+oswwwwwwwbbwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+
+frame stretch 0
+.................
+.................
+.................
+.................
+....gGGgGgGGg....
+........G........
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+owwwkkwwwwwkkwwwo
+owppwwkwkwkwwppwo
+owwwwwwkwkwwwwwwo
+oswwwwwwwwwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..
+
+frame stretch 1
+....gg.....gg....
+.....gg.G.gg.....
+........G........
+......ooooo......
+.oo..owwwwwo..oo.
+.owo.owwwwwo.owo.
+..owoowwwwwoowo..
+...owwwwwwwwwo...
+...owwkwwwkwwo...
+..owwkwkwkwkwwo..
+..owpwwkkkwwpwo..
+..owwwkrrrkwwwo..
+..owwwkrtrkwwwo..
+..owwwwkkkwwwwo..
+...osswwwwwsso...
+....ooooooooo....
+
+frame stretch 2
+..y..............
+.yyy.............
+..y..gg...gg...y.
+....gGGgGgGGg.yyy
+........G......y.
+.....ooooooo.....
+...oowwwwwwwoo...
+..owwwwwwwwwwwo..
+.owwwwwwwwwwwwwo.
+.owwkkwwwwwkkwwo.
+owwwkkwwwwwkkwwwo
+owppwwkwwwkwwppwo
+owwwwwwkkkwwwwwwo
+oswwwwwwwwwwwwwso
+.osswwwwwwwwwsso.
+..ooooooooooooo..

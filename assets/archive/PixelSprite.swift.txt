@@ -1,0 +1,81 @@
+import AppKit
+
+/// Parser and crisp renderer for the plain-text `.sprite` format used by pixel characters.
+/// Character packs are data files, so a new character needs no code.
+struct PixelSprite {
+    let name: String
+    let width: Int
+    let height: Int
+    let palette: [Character: NSColor]
+    let frames: [String: [[Character]]]   // "state/n" -> rows
+
+    enum LoadError: Error, CustomStringConvertible {
+        case bad(String)
+        var description: String { if case .bad(let s) = self { return s }; return "" }
+    }
+
+    static func load(_ url: URL) throws -> PixelSprite {
+        let text = try String(contentsOf: url, encoding: .utf8)
+        var name = url.deletingPathExtension().lastPathComponent
+        var w = 0, h = 0
+        var palette: [Character: NSColor] = [:]
+        var frames: [String: [[Character]]] = [:]
+        var current: String?
+        var rows: [[Character]] = []
+
+        func close() throws {
+            guard let key = current else { return }
+            guard rows.count == h else { throw LoadError.bad("frame \(key): \(rows.count) rows, want \(h)") }
+            frames[key] = rows
+            current = nil; rows = []
+        }
+
+        for (i, raw) in text.components(separatedBy: "\n").enumerated() {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty || line.hasPrefix("#") { continue }
+            let parts = line.split(separator: " ").map(String.init)
+            switch parts.first {
+            case "name": name = parts.dropFirst().joined(separator: " ")
+            case "size":
+                guard parts.count == 3, let a = Int(parts[1]), let b = Int(parts[2]) else { throw LoadError.bad("line \(i + 1): bad size") }
+                w = a; h = b
+            case "palette":
+                guard parts.count == 3, parts[1].count == 1, let c = color(hex: parts[2]) else { throw LoadError.bad("line \(i + 1): bad palette") }
+                palette[Character(parts[1])] = c
+            case "frame":
+                try close()
+                guard parts.count == 3 else { throw LoadError.bad("line \(i + 1): bad frame header") }
+                current = "\(parts[1])/\(parts[2])"
+            default:
+                guard current != nil else { throw LoadError.bad("line \(i + 1): pixels outside a frame") }
+                let row = Array(line)
+                guard row.count == w else { throw LoadError.bad("line \(i + 1) (\(current!)): \(row.count) cols, want \(w)") }
+                for ch in row where ch != "." && palette[ch] == nil { throw LoadError.bad("line \(i + 1): unknown color '\(ch)'") }
+                rows.append(row)
+            }
+        }
+        try close()
+        return PixelSprite(name: name, width: w, height: h, palette: palette, frames: frames)
+    }
+
+    /// Renders with whole-point cells, so pixels stay sharp at 1x/2x/3x (no interpolation).
+    func image(state: String, frame: Int, cell: CGFloat) -> NSImage {
+        let rows = frames["\(state)/\(((frame % 3) + 3) % 3)"] ?? frames["\(state)/0"] ?? []
+        let size = NSSize(width: CGFloat(width) * cell, height: CGFloat(height) * cell)
+        return NSImage(size: size, flipped: true) { _ in
+            for (y, row) in rows.enumerated() {
+                for (x, ch) in row.enumerated() where ch != "." {
+                    palette[ch]?.setFill()
+                    NSRect(x: CGFloat(x) * cell, y: CGFloat(y) * cell, width: cell, height: cell).fill()
+                }
+            }
+            return true
+        }
+    }
+
+    private static func color(hex: String) -> NSColor? {
+        guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return nil }
+        return NSColor(srgbRed: CGFloat((v >> 16) & 0xFF) / 255, green: CGFloat((v >> 8) & 0xFF) / 255,
+                       blue: CGFloat(v & 0xFF) / 255, alpha: 1)
+    }
+}
