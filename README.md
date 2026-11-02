@@ -18,7 +18,7 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
 - **The grandson is Codex.** If you use Codex CLI, he carries a second basket.
 - **No data, no guessing.** Until Claude Code reports your limits, he says he doesn't know.
 
-Pixel style by default; an ink-wash style of the same poses is one click away.
+All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
 ## Install
 
@@ -80,7 +80,7 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 ## For development
 
 `swift run -c release TokenPet` with flags: `--demo lively|steady|straining|resting|morning|cutscene|cycle`,
-`--tempo idle|low|high|veryHigh`, `--weekly-only`, `--style pixel|ink`, `--lang en|ko`,
+`--tempo idle|low|high|veryHigh`, `--weekly-only`, `--lang en|ko`,
 `--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,
 `--settings`, `--guide`, `--pretend-hidden` (try the mini-window fallback),
 `--render <dir>` (PNG stills), `--icon-set <dir>`, `--scan-report` (prints what it read),

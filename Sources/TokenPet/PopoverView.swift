@@ -47,27 +47,8 @@ struct PopoverView: View {
         let s = model.snap
         VStack(alignment: .leading, spacing: 10) {
             scene(s)
-            HStack {
-                Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!") : stateTitle(s.state))
-                    .font(.system(.headline, design: .rounded))
-                Spacer()
-                HStack(spacing: 4) {
-                    ForEach(CharacterStyle.allCases) { c in
-                        Button { model.style = c; Prefs.store.set(c.rawValue, forKey: "style") } label: {
-                            HStack(spacing: 4) {
-                                Image(nsImage: c.image(.lively, t: 0, size: 18, menuBar: true))
-                                    .interpolation(c.crisp ? .none : .high)
-                                Text(c.styleLabel).font(.caption.weight(.semibold))
-                            }
-                            .padding(.horizontal, 7).padding(.vertical, 4)
-                            .background(Capsule().fill(model.style == c ? Color.primary.opacity(0.12) : Color.clear))
-                            .overlay(Capsule().stroke(Color.primary.opacity(0.15)))
-                        }
-                        .buttonStyle(.plain)
-                        .help(c.name)
-                    }
-                }
-            }
+            Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!") : stateTitle(s.state))
+                .font(.system(.headline, design: .rounded))
             mountainRow
             Text(L.t("Claude · Grandpa's carrier", "Claude · 할아버지 지게")).font(.caption.weight(.bold)).foregroundColor(.secondary)
             if let d = s.daily {
@@ -180,7 +161,7 @@ struct PopoverView: View {
                     sceneImage(s, t: t)
                 } else {
                     // SwiftUI pauses this while the popover is closed, so it costs nothing then.
-                    TimelineView(.animation(minimumInterval: model.style.crisp ? 1.0 / 8 : 1.0 / 15)) { ctx in
+                    TimelineView(.animation(minimumInterval: 1.0 / 8)) { ctx in
                         sceneImage(s, t: model.phase(at: ctx.date.timeIntervalSinceReferenceDate))
                     }
                 }
@@ -210,8 +191,8 @@ struct PopoverView: View {
     }
 
     private func sceneImage(_ s: Snapshot, t: Double) -> some View {
-        Image(nsImage: model.style.scene(info(s, t: t), t: t, size: Self.sceneSize))
-            .interpolation(model.style.crisp ? .none : .high)
+        Image(nsImage: Yugong.scene(info(s, t: t), t: t, size: Self.sceneSize))
+            .interpolation(.none)
             .frame(width: Self.sceneSize.width, height: Self.sceneSize.height)
     }
 

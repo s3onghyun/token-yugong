@@ -118,7 +118,6 @@ struct MountainLedger {
 final class UsageModel: ObservableObject {
     @Published private(set) var snap = Snapshot()
     @Published private(set) var pace = Pace()
-    @Published var style: CharacterStyle   // saved only by an explicit pick (see PopoverView)
     @Published private(set) var scanning = false
     @Published private(set) var mountain = MountainLedger.load()
     /// Demo override for the mountain (fraction left) and the cutscene.
@@ -140,10 +139,9 @@ final class UsageModel: ObservableObject {
     private var claude: Reading?
     private var timer: Timer?
 
-    init(bridgeURL: URL, logsRoot: URL, style: CharacterStyle?) {
+    init(bridgeURL: URL, logsRoot: URL) {
         self.bridgeURL = bridgeURL
         self.scanner = LogScanner(root: logsRoot)
-        self.style = style ?? CharacterStyle(rawValue: Prefs.store.string(forKey: "style") ?? "") ?? .pixel
     }
 
     func start() {

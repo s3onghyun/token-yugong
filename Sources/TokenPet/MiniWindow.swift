@@ -26,8 +26,8 @@ final class MiniWindow: NSPanel {
         setFrameAutosaveName("TokenPetMini")
     }
 
-    func update(image: NSImage?, title: String, crisp: Bool) {
-        pet.image = image; pet.crisp = crisp
+    func update(image: NSImage?, title: String) {
+        pet.image = image
         guard title != pet.title else { return }
         pet.title = title
         var f = frame
@@ -56,7 +56,6 @@ final class MiniView: NSView {
             needsLayout = true
         }
     }
-    var crisp = true { didSet { sprite.magnificationFilter = crisp ? .nearest : .linear } }
     var onClick: ((NSView) -> Void)?
     var onHide: (() -> Void)?
     private var dragged = false

@@ -1,7 +1,6 @@
 import AppKit
 
-// Grandpa Yugong's pose rig. One set of key poses drives both art styles, so the pixel and
-// the ink versions always act out exactly the same routine.
+// Grandpa Yugong's pose rig: the key poses of every routine, drawn by the pixel art.
 //
 // Canvas: 100 x 100 units, y grows downward, ground at y = 94, Grandpa faces LEFT (toward
 // the mountain). Original design written for this project from the Liezi tale (public domain).
@@ -34,23 +33,6 @@ struct YPose {
     var fx = FX.none
     var beard: CGFloat = 0           // beard sway, units
     var sq: CGFloat = 1              // squash (<1) and stretch (>1), volume kept
-
-    static func mix(_ a: YPose, _ b: YPose, _ u: CGFloat) -> YPose {
-        func l(_ x: CGFloat, _ y: CGFloat) -> CGFloat { x + (y - x) * u }
-        func p(_ x: CGPoint, _ y: CGPoint) -> CGPoint { CGPoint(x: l(x.x, y.x), y: l(x.y, y.y)) }
-        func h(_ x: CGPoint?, _ y: CGPoint?, _ tx: CGPoint, _ ty: CGPoint) -> CGPoint? {
-            if x == nil && y == nil { return nil }
-            return p(x ?? tx, y ?? ty)
-        }
-        var r = u < 0.5 ? a : b
-        r.hip = p(a.hip, b.hip); r.lean = l(a.lean, b.lean); r.head = l(a.head, b.head)
-        r.footF = p(a.footF, b.footF); r.footB = p(a.footB, b.footB)
-        r.toolTop = p(a.toolTop, b.toolTop); r.toolAng = l(a.toolAng, b.toolAng)
-        r.handF = h(a.handF, b.handF, a.gripLow, b.gripLow)
-        r.handB = h(a.handB, b.handB, a.gripTop, b.gripTop)
-        r.hatTip = l(a.hatTip, b.hatTip); r.beard = l(a.beard, b.beard); r.sq = l(a.sq, b.sq)
-        return r
-    }
 
     var toolDir: CGPoint {
         let a = toolAng * .pi / 180
@@ -189,9 +171,9 @@ enum YugongRig {
 
     static func period(_ s: PetState, night: Bool, tempo: Tempo = .working) -> Double { keys(s, night: night, tempo: tempo).reduce(0) { $0 + $1.dur } }
 
-    /// The pose at time `t`. `stepped` snaps from key to key (pixel art); otherwise it eases.
+    /// The pose at time `t`, snapping from key to key (pixel art has no in-betweens).
     /// Also returns progress 0...1 through the current key, for effects that travel.
-    static func pose(_ s: PetState, t: Double, night: Bool, stepped: Bool, tempo: Tempo = .working) -> (YPose, CGFloat) {
+    static func pose(_ s: PetState, t: Double, night: Bool, tempo: Tempo = .working) -> (YPose, CGFloat) {
         let ks = keys(s, night: night, tempo: tempo)
         let per = ks.reduce(0) { $0 + $1.dur }
         var p = t.truncatingRemainder(dividingBy: per)
@@ -199,11 +181,7 @@ enum YugongRig {
         for (i, k) in ks.enumerated() {
             if p < k.dur || i == ks.count - 1 {
                 let k01 = CGFloat(min(1, max(0, p / k.dur)))
-                if stepped { return (k.pose, k01) }
-                let prev = ks[(i + ks.count - 1) % ks.count].pose
-                let ease = min(0.22, k.dur * 0.6)
-                let u = CGFloat(min(1, p / ease))
-                return (YPose.mix(prev, k.pose, u * u * (3 - 2 * u)), k01)
+                return (k.pose, k01)
             }
             p -= k.dur
         }
@@ -212,9 +190,9 @@ enum YugongRig {
 
     /// Same signature = same picture (used to skip menu-bar redraws). Travelling effects are
     /// quantized the same way the renderers quantize them.
-    static func signature(_ s: PetState, t: Double, night: Bool, stepped: Bool, tempo: Tempo = .working) -> String {
-        let (p, k) = pose(s, t: t, night: night, stepped: stepped, tempo: tempo)
-        let q = stepped ? Int(k * 3) : Int(k * 12)
+    static func signature(_ s: PetState, t: Double, night: Bool, tempo: Tempo = .working) -> String {
+        let (p, k) = pose(s, t: t, night: night, tempo: tempo)
+        let q = Int(k * 3)
         return String(format: "%.1f %.1f %.1f %.1f %.1f %.1f %.1f ", p.hip.x, p.hip.y, p.lean, p.toolTop.x, p.toolAng,
                       p.handFront.y, p.handBack.y) + "\(p.sweat) \(p.eyes) \(p.mouth) \(p.fx) \(p.bird) \(p.clump) \(q)"
     }

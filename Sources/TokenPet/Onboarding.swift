@@ -82,7 +82,7 @@ struct OnboardingView: View {
 
     private var story: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Image(nsImage: CharacterStyle.pixel.scene(SceneInfo(state: .lively, carrier: 0.5, mountainLeft: 0.7, grandson: 0.3, night: false),
+            Image(nsImage: Yugong.scene(SceneInfo(state: .lively, carrier: 0.5, mountainLeft: 0.7, grandson: 0.3, night: false),
                                                      t: 0, size: PopoverView.sceneSize))
                 .interpolation(.none)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -165,7 +165,7 @@ struct OnboardingView: View {
 
     private func figure(_ st: PetState, carrier: Double) -> some View {
         // the same 20-pixel sprite as in the menu bar, enlarged
-        Image(nsImage: CharacterStyle.pixel.image(st, t: 0.2, size: 20, menuBar: true, carrier: carrier))
+        Image(nsImage: Yugong.image(st, t: 0.2, size: 20, menuBar: true, carrier: carrier))
             .resizable().interpolation(.none).frame(width: 40, height: 40)
     }
 

@@ -329,13 +329,13 @@ func json(_ s: String) -> Data { Data(s.utf8) }
 
     @Test func idleLeansAndSweatingSweats() {
         let t = 0.1
-        #expect(TokenPetAssets.signature(.pixel, .lively, t: t, night: false, tempo: .idle)
-                != TokenPetAssets.signature(.pixel, .lively, t: t, night: false, tempo: .working))
-        #expect(TokenPetAssets.signature(.pixel, .lively, t: t, night: false, tempo: .sweating).contains(" true "))
+        #expect(TokenPetAssets.signature(.lively, t: t, night: false, tempo: .idle)
+                != TokenPetAssets.signature(.lively, t: t, night: false, tempo: .working))
+        #expect(TokenPetAssets.signature(.lively, t: t, night: false, tempo: .sweating).contains(" true "))
         // resting and morning ignore the tempo: a tired Grandpa does not dig faster
         for st in [PetState.resting, .morning] {
-            #expect(TokenPetAssets.signature(.pixel, st, t: t, night: false, tempo: .sweating)
-                    == TokenPetAssets.signature(.pixel, st, t: t, night: false, tempo: .idle))
+            #expect(TokenPetAssets.signature(st, t: t, night: false, tempo: .sweating)
+                    == TokenPetAssets.signature(st, t: t, night: false, tempo: .idle))
         }
     }
 }

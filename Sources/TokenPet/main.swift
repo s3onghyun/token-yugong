@@ -5,7 +5,7 @@ import TokenPetAssets
 import UserNotifications
 
 // Usage:
-//   TokenPet [--style pixel|ink] [--lang en|ko] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
+//   TokenPet [--lang en|ko] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
 //            [--bridge <limits.json>] [--logs <dir>] [--tempo idle|low|high|veryHigh]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
 //   TokenPet --scan-report      scan local logs once, print what the pet would show, then exit
@@ -23,11 +23,7 @@ let bridgeURL = URL(fileURLWithPath: arg("--bridge")
     ?? (ProcessInfo.processInfo.environment["TOKENPET_DIR"].map { $0 + "/limits.json" }
         ?? home.appendingPathComponent(".claude/token-pet/limits.json").path))
 let logsRoot = URL(fileURLWithPath: arg("--logs") ?? home.appendingPathComponent(".claude/projects").path)
-let model = UsageModel(bridgeURL: bridgeURL, logsRoot: logsRoot, style: arg("--style").flatMap(CharacterStyle.init(rawValue:)))
-
-if let problem = CharacterStyle.validateAssets() {
-    FileHandle.standardError.write("asset error: \(problem)\n".data(using: .utf8)!)
-}
+let model = UsageModel(bridgeURL: bridgeURL, logsRoot: logsRoot)
 
 if args.contains("--scan-report") {
     model.scanNow()
@@ -60,47 +56,41 @@ if args.contains("--scan-report") {
     let now = Date()
     let ko = L.korean ? "-ko" : ""
     model.demoMountainLeft = 0.62
-    for style in CharacterStyle.allCases {
-        model.style = style
-        for st in PetState.allCases {
-            model.setDemo(st)
-            let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now).background(Color(nsColor: .windowBackgroundColor)))
-            r.scale = 2
-            if let img = r.nsImage { png(img, "popover-yugong-\(style.rawValue)-\(st.rawValue)\(ko).png") }
-        }
-        if style == .pixel {
-            model.demoWeeklyOnly = true
-            for st in [PetState.lively, .resting] {
-                model.setDemo(st)
-                let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now).background(Color(nsColor: .windowBackgroundColor)))
-                r.scale = 2
-                if let img = r.nsImage { png(img, "popover-yugong-pixel-weekly-only-\(st.rawValue)\(ko).png") }
-            }
-            model.demoWeeklyOnly = false
-        }
-        model.demoCutscene = true; model.setDemo(.morning)
-        let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now, cutsceneT: 0.55).background(Color(nsColor: .windowBackgroundColor)))
+    for st in PetState.allCases {
+        model.setDemo(st)
+        let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now).background(Color(nsColor: .windowBackgroundColor)))
         r.scale = 2
-        if let img = r.nsImage { png(img, "popover-yugong-\(style.rawValue)-cutscene\(ko).png") }
-        model.demoCutscene = false
-        // menu-bar strip: every state at actual size (1x) and 4x, on light and dark bars
-        let states = PetState.allCases
-        let strip = NSImage(size: NSSize(width: CGFloat(states.count) * 110 + 20, height: 230), flipped: true) { _ in
-            for (row, bg) in [NSColor(white: 0.93, alpha: 1), NSColor(white: 0.16, alpha: 1)].enumerated() {
-                bg.setFill(); NSRect(x: 0, y: CGFloat(row) * 115, width: CGFloat(states.count) * 110 + 20, height: 115).fill()
-                for (i, st) in states.enumerated() {
-                    let img = style.image(st, t: 0.5, size: 20, menuBar: true, carrier: st == .resting ? 1 : 0.5)
-                    NSGraphicsContext.current?.imageInterpolation = .none
-                    img.draw(in: NSRect(x: 20 + CGFloat(i) * 110, y: CGFloat(row) * 115 + 10, width: 20, height: 20))
-                    img.draw(in: NSRect(x: 20 + CGFloat(i) * 110, y: CGFloat(row) * 115 + 34, width: 80, height: 80))
-                }
-            }
-            return true
-        }
-        png(strip, "menubar-yugong-\(style.rawValue).png")
+        if let img = r.nsImage { png(img, "popover-yugong-pixel-\(st.rawValue)\(ko).png") }
     }
+    model.demoWeeklyOnly = true
+    for st in [PetState.lively, .resting] {
+        model.setDemo(st)
+        let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now).background(Color(nsColor: .windowBackgroundColor)))
+        r.scale = 2
+        if let img = r.nsImage { png(img, "popover-yugong-pixel-weekly-only-\(st.rawValue)\(ko).png") }
+    }
+    model.demoWeeklyOnly = false
+    model.demoCutscene = true; model.setDemo(.morning)
+    let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now, cutsceneT: 0.55).background(Color(nsColor: .windowBackgroundColor)))
+    r.scale = 2
+    if let img = r.nsImage { png(img, "popover-yugong-pixel-cutscene\(ko).png") }
+    model.demoCutscene = false
+    // menu-bar strip: every state at actual size (1x) and 4x, on light and dark bars
+    let states = PetState.allCases
+    let strip = NSImage(size: NSSize(width: CGFloat(states.count) * 110 + 20, height: 230), flipped: true) { _ in
+        for (row, bg) in [NSColor(white: 0.93, alpha: 1), NSColor(white: 0.16, alpha: 1)].enumerated() {
+            bg.setFill(); NSRect(x: 0, y: CGFloat(row) * 115, width: CGFloat(states.count) * 110 + 20, height: 115).fill()
+            for (i, st) in states.enumerated() {
+                let img = Yugong.image(st, t: 0.5, size: 20, menuBar: true, carrier: st == .resting ? 1 : 0.5)
+                NSGraphicsContext.current?.imageInterpolation = .none
+                img.draw(in: NSRect(x: 20 + CGFloat(i) * 110, y: CGFloat(row) * 115 + 10, width: 20, height: 20))
+                img.draw(in: NSRect(x: 20 + CGFloat(i) * 110, y: CGFloat(row) * 115 + 34, width: 80, height: 80))
+            }
+        }
+        return true
+    }
+    png(strip, "menubar-yugong-pixel.png")
     model.demoMountainLeft = nil
-    model.style = .pixel
     for page in 0..<3 {
         let r = ImageRenderer(content: OnboardingView(model: model, done: {}, page: page).background(Color(nsColor: .windowBackgroundColor)))
         r.scale = 2
@@ -148,7 +138,7 @@ struct StageView: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
             HStack(spacing: 2) {
-                Image(nsImage: bar.image).interpolation(model.style.crisp ? .none : .high)
+                Image(nsImage: bar.image).interpolation(.none)
                 Text(bar.title).font(.system(size: 12, weight: .medium).monospacedDigit())
             }
             .padding(.horizontal, 8).frame(height: 24)
@@ -234,17 +224,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func startCycle() {
-        // pixel Yugong (the default) through every state and the milestone, then a glimpse of the ink style
-        typealias Beat = (CharacterStyle, PetState, cutscene: Bool, mountain: Double, secs: Double)
-        let seq: [Beat] = [(.pixel, .lively, false, 0.62, 4.2), (.pixel, .steady, false, 0.6, 3.4), (.pixel, .straining, false, 0.58, 3.4),
-                           (.pixel, .resting, false, 0.57, 3.4), (.pixel, .morning, false, 0.57, 3.4), (.pixel, .morning, true, 0.0, 5.0),
-                           (.ink, .lively, false, 0.62, 3.0), (.ink, .resting, false, 0.57, 2.6)]
+        // Yugong through every state and the milestone
+        typealias Beat = (PetState, cutscene: Bool, mountain: Double, secs: Double)
+        let seq: [Beat] = [(.lively, false, 0.62, 4.2), (.steady, false, 0.6, 3.4), (.straining, false, 0.58, 3.4),
+                           (.resting, false, 0.57, 3.4), (.morning, false, 0.57, 3.4), (.morning, true, 0.0, 5.0)]
         var i = 0
         func apply() {
             let b = seq[i % seq.count]
-            model.style = b.0; model.demoMountainLeft = b.mountain
+            model.demoMountainLeft = b.mountain
             model.demoCutscene = b.cutscene; model.cutsceneStart = b.cutscene ? Date() : nil
-            model.setDemo(b.1); scheduleAnim()
+            model.setDemo(b.0); scheduleAnim()
             cycleTimer = Timer.scheduledTimer(withTimeInterval: b.secs, repeats: false) { _ in i += 1; apply() }
         }
         apply()
@@ -323,7 +312,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             let m = MiniWindow()
             m.pet.onClick = { [weak self] v in self?.toggle(from: v) }
             m.pet.onHide = { [weak self] in self?.miniForced = false; model.miniMode = .off }
-            m.update(image: lastImage, title: lastTitle, crisp: model.style.crisp)
+            m.update(image: lastImage, title: lastTitle)
             mini = m
         }
         if want { mini?.orderFrontRegardless() } else { mini?.orderOut(nil) }
@@ -376,9 +365,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if !paused { tick() }
     }
 
-    private func loop(_ style: CharacterStyle, _ st: PetState, _ tempo: Tempo, night: Bool, carrier: Double) -> (runs: [(img: NSImage, end: Double)], period: Double) {
+    private func loop(_ st: PetState, _ tempo: Tempo, night: Bool, carrier: Double) -> (runs: [(img: NSImage, end: Double)], period: Double) {
         let fill = (carrier * 4).rounded() / 4          // the basket changes in quarter steps
-        let key = "\(style.rawValue)/\(st.rawValue)/\(tempo.rawValue)/\(night)/\(fill)"
+        let key = "\(st.rawValue)/\(tempo.rawValue)/\(night)/\(fill)"
         if let l = loops[key] { return l }
         let period = Motion.period(st, night: night, tempo: tempo)
         let step = 1.0 / 8
@@ -386,9 +375,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         var runs: [(img: NSImage, end: Double)] = [], prev = ""
         for i in 0..<n {
             let t = Double(i) * step
-            let sig = TokenPetAssets.signature(style.art, st, t: t, night: night, tempo: tempo)
+            let sig = TokenPetAssets.signature(st, t: t, night: night, tempo: tempo)
             if sig == prev, !runs.isEmpty { runs[runs.count - 1].end = t + step; continue }
-            runs.append((raster(style.image(st, t: t, size: 20, menuBar: true, carrier: fill, night: night, tempo: tempo)), t + step))
+            runs.append((raster(Yugong.image(st, t: t, size: 20, menuBar: true, carrier: fill, night: night, tempo: tempo)), t + step))
             prev = sig
         }
         if loops.count > 24 { loops.removeAll() }
@@ -415,7 +404,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func tick() {
         wakeCount += 1
         let s = model.snap
-        let l = loop(model.style, s.state, model.tempo, night: model.night, carrier: s.carrier)
+        let l = loop(s.state, model.tempo, night: model.night, carrier: s.carrier)
         let now = Date.timeIntervalSinceReferenceDate
         let p = l.period.isFinite ? model.phase(at: now).truncatingRemainder(dividingBy: l.period) : 0
         let run = l.runs.first { p < $0.end } ?? l.runs[l.runs.count - 1]
@@ -440,7 +429,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             item.button?.attributedTitle = NSAttributedString(string: title, attributes: [
                 .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
             ])
-            mini?.update(image: run.img, title: title, crisp: model.style.crisp)
+            mini?.update(image: run.img, title: title)
         }
         // wake again when this picture ends, at the current speed (at least 1/30 s, at most 30 s)
         let wait = l.period.isFinite ? min(30, max(1.0 / 30, (run.end - p) / max(0.3, model.animSpeed))) : 30

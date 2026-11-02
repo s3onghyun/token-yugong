@@ -10,7 +10,7 @@ extension YugongArt {
     static func iconPixels(t: Double) -> CGImage? {
         let n = iconGrid
         let info = SceneInfo(state: .lively, carrier: 0.85, mountainLeft: 0.8, grandson: nil, night: false)
-        let (pose, k) = YugongRig.pose(.lively, t: t, night: false, stepped: true)
+        let (pose, k) = YugongRig.pose(.lively, t: t, night: false)
         guard let bg = pixelLayer(n, n, outline: false, { c in pixelBackdrop(c, info, t: t, w: n, h: n) }),
               let fig = pixelFigure(pose, k: k, fill: 0.85, grid: 40, menuBar: false, bird: true),
               let c = CGContext(data: nil, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,

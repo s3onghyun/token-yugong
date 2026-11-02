@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+- The ink-wash style. Grandpa Yugong, and every character after him, is pixel art only: the
+  style picker in the popover, the `--style` flag and the ink drawing code are gone.
+
 ## 0.1.0 (2026-11-02)
 
 First version meant for daily use.
