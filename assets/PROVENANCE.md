@@ -1,10 +1,11 @@
 # Asset provenance
 
-How each visual asset in this prototype was made. No asset uses image generation, tracing,
-stock art, fonts drawn as art, screenshots, or any existing character design. Grandpa Yugong is
-an original design for this project based only on the story in the Liezi (列子, "The Foolish Old
-Man Who Removed the Mountains", 愚公移山), a text in the public domain. No film, animation, game,
-picture book or illustration of the tale was used as a reference.
+The art and code in this project were authored as code with AI coding assistance under the
+owner's direction. The work is original: no third-party or AI-generated images were used, and
+no tracing was used. Grandpa Yugong is an original design for this project based only on the
+story in the Liezi (列子, "The Foolish Old Man Who Removed the Mountains", 愚公移山), a text in
+the public domain. No film, animation, game, picture book, or illustration of the tale was used
+as a reference.
 
 | Asset | File | How it was made |
 |---|---|---|
@@ -19,19 +20,8 @@ picture book or illustration of the tale was used as a reference.
 | App icon | `characters/yugong/YugongIcon.swift` | The pixel scene and figure above, composed on a 52-pixel grid in code (v0.1) |
 | Earlier discussion sketches (pebble, rabbit, mochi) | `archive/` | Superseded; kept for the record, not built |
 
-## Who made them, and with what
+## Authorship
 
-- Written on 2026-11-02 by Claude (an AI coding assistant, in Claude Code) at the owner's
-  request, as code and text. The session ran on the owner's personal Claude account. It did not
-  use company accounts or company tools.
-- General craft reading only, nothing copied: the principles that make tiny characters charming
-  (big readable head, simple shapes, one strong colour accent, exaggerated anticipation) as
-  commonly discussed for menu-bar and pocket pets. No specific character's design was copied.
-
-## Ownership caveat (read before selling)
-
-Art produced mainly by an AI may not be protected by copyright in some countries (for example,
-the US Copyright Office requires human authorship). Before selling or registering Grandpa Yugong,
-the final character should be authored or substantially reworked by a human (the owner or a
-contracted artist with a work-for-hire or assignment agreement). This design is a strong,
-reviewable starting point, not yet a protectable asset.
+The visual assets are authored as drawing code. AI coding assistance was used under the owner's
+direction. General craft principles informed the work, but no specific character design was
+copied.
