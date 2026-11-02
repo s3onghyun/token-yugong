@@ -7,10 +7,11 @@ enum L {
 }
 
 enum Fmt {
-    static func clock(_ d: Date, now: Date = Date()) -> String {
+    static func clock(_ d: Date, now: Date = Date(), tz: TimeZone = .current) -> String {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
         let f = DateFormatter()
-        f.locale = Locale(identifier: L.korean ? "ko_KR" : "en_US")
-        f.dateFormat = Calendar.current.isDate(d, inSameDayAs: now) ? "HH:mm" : (L.korean ? "E HH:mm" : "EEE HH:mm")
+        f.locale = Locale(identifier: L.korean ? "ko_KR" : "en_US"); f.timeZone = tz
+        f.dateFormat = cal.isDate(d, inSameDayAs: now) ? "HH:mm" : (L.korean ? "E HH:mm" : "EEE HH:mm")
         return f.string(from: d)
     }
     static func until(_ d: Date, now: Date = Date()) -> String {
@@ -74,11 +75,16 @@ struct PopoverView: View {
                 meterRow(L.t("5-hour", "5시간"), s.five)
             }
             meterRow(L.t("Weekly", "주간"), s.week)
-            if let p = s.projected, s.state != .resting {
+            if let p = s.projected, s.known, s.state != .resting {
                 Text(L.t("At this pace: about \(Int(p.rounded()))% by the reset", "이 속도면 리셋 때 약 \(Int(p.rounded()))%"))
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
             sourceNote(s)
+            if !s.demo {
+                Text(L.t("Shovel speed: \(Int(model.pace.smoothed.rounded())) output tokens/min (last 3 min, this Mac)",
+                         "삽질 속도: 분당 출력 토큰 \(Int(model.pace.smoothed.rounded())) (최근 3분, 이 Mac)"))
+                    .font(.caption).foregroundColor(.secondary)
+            }
             if let c = s.codex {
                 Divider()
                 HStack {
@@ -120,10 +126,12 @@ struct PopoverView: View {
     private var clockNow: Date { now ?? Date() }
 
     private func info(_ s: Snapshot, t: Double) -> SceneInfo {
-        SceneInfo(state: s.state, carrier: s.carrier, mountainLeft: model.mountainLeft, grandson: s.codexFill,
-                  night: s.state == .resting || model.night,
-                  cutscene: model.cutsceneDue ? (cutsceneT ?? model.cutsceneStart.map { min(1, Date().timeIntervalSince($0) / 4.5) }
-                                                 ?? (t / 7).truncatingRemainder(dividingBy: 1)) : nil)
+        var i = SceneInfo(state: s.state, carrier: s.carrier, mountainLeft: model.mountainLeft, grandson: s.codexFill,
+                          night: s.state == .resting || model.night,
+                          cutscene: model.cutsceneDue ? (cutsceneT ?? model.cutsceneStart.map { min(1, Date().timeIntervalSince($0) / 4.5) }
+                                                         ?? (t / 7).truncatingRemainder(dividingBy: 1)) : nil)
+        i.tempo = model.tempo
+        return i
     }
 
     @ViewBuilder private func scene(_ s: Snapshot) -> some View {
@@ -135,7 +143,7 @@ struct PopoverView: View {
                 } else {
                     // SwiftUI pauses this while the popover is closed, so it costs nothing then.
                     TimelineView(.animation(minimumInterval: model.style.crisp ? 1.0 / 8 : 1.0 / 15)) { ctx in
-                        sceneImage(s, t: ctx.date.timeIntervalSinceReferenceDate)
+                        sceneImage(s, t: model.phase(at: ctx.date.timeIntervalSinceReferenceDate))
                     }
                 }
             }
@@ -196,6 +204,7 @@ struct PopoverView: View {
     }
 
     private func stateTitle(_ st: PetState) -> String {
+        if !model.snap.known { return L.t("Grandpa doesn't know your limits", "할아버지도 한도를 몰라요") }
         switch st {
         case .lively:    return L.t("Grandpa is digging happily", "할아버지 신나게 파는 중")
         case .steady:    return L.t("Steady digging", "꾸준히 파는 중")
@@ -206,6 +215,7 @@ struct PopoverView: View {
     }
 
     private func speech(_ s: Snapshot) -> String {
+        if !s.known { return L.t("Don't know how full the carrier is.", "지게가 얼마나 찼는지 모르겠구먼.") }
         switch s.state {
         case .lively:
             return model.night ? L.t("Yawn… still digging this late?", "하암… 밤이 깊었구먼")
@@ -213,8 +223,8 @@ struct PopoverView: View {
         case .steady:    return L.t("Steady now, steady.", "쉬엄쉬엄, 꾸준히 가세.")
         case .straining: return L.t("Oof, my back… slow down a bit?", "어이구 허리야… 좀 천천히 퍼세")
         case .resting:
-            let w = s.sleepUntil.map { Fmt.clock($0, now: clockNow) } ?? "?"
-            if s.sleepReason == "daily" {
+            let w = s.wakeAt.map { Fmt.clock($0, now: clockNow) } ?? "?"
+            if s.restReason == "daily" {
                 return L.t("That's today's share.\nBack to digging at \(w)", "오늘 몫은 다 퍼냈구먼.\n\(w)에 다시 퍼요")
             }
             return L.t("Carrier's full.\nBack to digging at \(w)", "지게가 꽉 찼구먼.\n\(w)에 다시 퍼요")
@@ -229,9 +239,8 @@ struct PopoverView: View {
                 Spacer()
                 if let m {
                     Text("\(Int(m.pct.rounded()))%").font(.subheadline.monospacedDigit().weight(.semibold))
-                    if let t = m.tokens { Text("· \(Fmt.tokens(t))").font(.caption).foregroundColor(.secondary) }
                 } else {
-                    Text(L.t("no data yet", "데이터 없음")).font(.caption).foregroundColor(.secondary)
+                    Text(L.t("don't know", "모름")).font(.caption).foregroundColor(.secondary)
                 }
             }
             GeometryReader { g in
@@ -252,41 +261,20 @@ struct PopoverView: View {
 
     private func resetText(_ m: Meter?) -> String {
         guard let m else { return " " }
-        if m.rolling { return L.t("rolling last 7 days", "최근 7일 누적") }
         guard let r = m.resetsAt else { return L.t("fresh window — starts with your next message", "새 구간 — 다음 메시지부터 시작") }
         return L.t("resets \(Fmt.clock(r, now: clockNow)) (\(Fmt.until(r, now: clockNow)))", "\(Fmt.clock(r, now: clockNow)) 리셋 (\(Fmt.until(r, now: clockNow)))")
     }
 
-    @ViewBuilder private func sourceNote(_ s: Snapshot) -> some View {
-        switch s.source {
-        case .official(let cap):
-            Text(L.t("Limits from Claude Code's status line · updated \(Fmt.clock(cap, now: clockNow))",
-                     "Claude Code 상태줄의 공식 한도 · \(Fmt.clock(cap, now: clockNow)) 갱신"))
-                .font(.caption).foregroundColor(.secondary)
-        case .demo:
-            Text(L.t("Simulated state for preview.", "미리보기용 가상 상태입니다."))
-                .font(.caption).foregroundColor(.secondary)
-        case .measured:
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L.t("Claude's true limit isn't readable here, so this is tokens measured from local Claude Code logs vs a budget you set.",
-                         "실제 한도를 읽을 수 없어, 로컬 Claude Code 기록에서 잰 토큰을 직접 정한 예산과 비교합니다."))
-                    .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 8) {
-                    budgetField(L.t("5h budget", "5시간 예산"), Binding(get: { model.budget5h ?? 4_000_000 },
-                                                                    set: { model.budget5h = $0 }))
-                    budgetField(L.t("Week budget", "주간 예산"), $model.budgetWeek)
-                }
-            }
+    private func sourceNote(_ s: Snapshot) -> some View {
+        let text: String
+        if s.demo { text = L.t("Simulated state for preview.", "미리보기용 가상 상태입니다.") }
+        else if let cap = s.captured {
+            text = L.t("Limits from Claude Code's status line, as of \(Fmt.clock(cap, now: clockNow)) (they can only have grown since).",
+                       "Claude Code 상태줄의 공식 한도 · \(Fmt.clock(cap, now: clockNow)) 기준 (그 뒤로는 늘었을 수만 있어요)")
+        } else {
+            text = L.t("No limits from Claude Code yet. Point its status line at bridge/statusline-bridge.sh; until then Grandpa says he doesn't know.",
+                       "아직 Claude Code 한도 정보가 없어요. 상태줄을 bridge/statusline-bridge.sh에 연결하면 보여요. 그 전에는 모른다고 말해요.")
         }
-    }
-
-    private func budgetField(_ label: String, _ v: Binding<Double>) -> some View {
-        HStack(spacing: 4) {
-            Text(label).font(.caption)
-            TextField("", value: Binding(get: { v.wrappedValue / 1e6 }, set: { v.wrappedValue = max(0.1, $0) * 1e6 }),
-                      format: .number.precision(.fractionLength(0...1)))
-                .frame(width: 44).textFieldStyle(.roundedBorder).font(.caption)
-            Text("M").font(.caption)
-        }
+        return Text(text).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 }

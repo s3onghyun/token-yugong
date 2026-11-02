@@ -160,8 +160,8 @@ enum YugongArt {
     // MARK: - figure
 
     static func figure(_ style: ArtStyle, _ state: PetState, t: Double, carrier: Double, night: Bool,
-                       size: CGFloat, menuBar: Bool) -> NSImage {
-        let (pose, k) = YugongRig.pose(state, t: t, night: night, stepped: style == .pixel)
+                       size: CGFloat, menuBar: Bool, tempo: Tempo = .working) -> NSImage {
+        let (pose, k) = YugongRig.pose(state, t: t, night: night, stepped: style == .pixel, tempo: tempo)
         let fill = CGFloat(min(1.2, max(0, carrier)))
         switch style {
         case .ink:

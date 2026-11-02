@@ -14,5 +14,6 @@ let package = Package(
         ),
         .executableTarget(name: "YugongSheet", dependencies: ["TokenPetAssets"], path: "Sources/YugongSheet"),
         .executableTarget(name: "TokenPet", dependencies: ["TokenPetAssets"], path: "Sources/TokenPet"),
+        .testTarget(name: "TokenPetTests", dependencies: ["TokenPet", "TokenPetAssets"], path: "Tests/TokenPetTests"),
     ]
 )

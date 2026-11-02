@@ -18,6 +18,13 @@ public enum PetState: String, CaseIterable {
     }
 }
 
+/// How fast tokens are flowing right now (RunCat-style live pace). The caller sets the speed
+/// of the clock it passes as `t`; this only picks the routine: idle = leaning on the shovel and
+/// chatting, working = digging, sweating = digging with sweat flying.
+public enum Tempo: String, CaseIterable {
+    case idle, working, sweating
+}
+
 /// The two finished art styles of the same poses.
 public enum ArtStyle: String, CaseIterable {
     case pixel, ink
@@ -31,6 +38,7 @@ public struct SceneInfo {
     public var grandson: Double?         // Codex usage 0...1; nil hides the grandson
     public var night: Bool
     public var cutscene: Double?         // 0...1 progress of the milestone cutscene placeholder; nil = none
+    public var tempo: Tempo = .working
 
     public init(state: PetState, carrier: Double, mountainLeft: Double, grandson: Double?, night: Bool, cutscene: Double? = nil) {
         self.state = state; self.carrier = carrier; self.mountainLeft = mountainLeft
@@ -42,8 +50,8 @@ public struct SceneInfo {
 public enum TokenPetAssets {
     /// The character alone, feet on the bottom edge, inside a `size` square.
     public static func figure(_ style: ArtStyle, _ state: PetState, t: Double, carrier: Double, night: Bool,
-                              size: CGFloat, menuBar: Bool) -> NSImage {
-        YugongArt.figure(style, state, t: t, carrier: carrier, night: night, size: size, menuBar: menuBar)
+                              size: CGFloat, menuBar: Bool, tempo: Tempo = .working) -> NSImage {
+        YugongArt.figure(style, state, t: t, carrier: carrier, night: night, size: size, menuBar: menuBar, tempo: tempo)
     }
 
     /// The whole popover scene: sky, the mountain, Grandpa, the magpie and the grandson.
@@ -52,10 +60,10 @@ public enum TokenPetAssets {
     }
 
     /// A pose signature, so a caller can tell when two moments draw the same picture.
-    public static func signature(_ style: ArtStyle, _ state: PetState, t: Double, night: Bool) -> String {
-        YugongRig.signature(state, t: t, night: night, stepped: style == .pixel)
+    public static func signature(_ style: ArtStyle, _ state: PetState, t: Double, night: Bool, tempo: Tempo = .working) -> String {
+        YugongRig.signature(state, t: t, night: night, stepped: style == .pixel, tempo: tempo)
     }
 
     /// Length of one seamless loop of the character's routine in this state.
-    public static func period(_ state: PetState, night: Bool) -> Double { YugongRig.period(state, night: night) }
+    public static func period(_ state: PetState, night: Bool, tempo: Tempo = .working) -> Double { YugongRig.period(state, night: night, tempo: tempo) }
 }

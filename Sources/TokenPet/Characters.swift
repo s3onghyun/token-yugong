@@ -15,8 +15,8 @@ enum CharacterStyle: String, CaseIterable, Identifiable {
     static func validateAssets() -> String? { nil }
 
     /// The character alone (menu bar and picker), at time `t`.
-    func image(_ state: PetState, t: TimeInterval, size: CGFloat, menuBar: Bool = false, carrier: Double = 0.4, night: Bool = false) -> NSImage {
-        TokenPetAssets.figure(art, state, t: Motion.reduce ? 0 : t, carrier: carrier, night: night, size: size, menuBar: menuBar)
+    func image(_ state: PetState, t: TimeInterval, size: CGFloat, menuBar: Bool = false, carrier: Double = 0.4, night: Bool = false, tempo: Tempo = .working) -> NSImage {
+        TokenPetAssets.figure(art, state, t: Motion.reduce ? 0 : t, carrier: carrier, night: night, size: size, menuBar: menuBar, tempo: tempo)
     }
 
     /// The popover scene.
@@ -29,5 +29,5 @@ enum Motion {
     /// Respect "Reduce motion": the character holds one pose.
     static var reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
 
-    static func period(_ s: PetState, night: Bool) -> Double { TokenPetAssets.period(s, night: night) }
+    static func period(_ s: PetState, night: Bool, tempo: Tempo = .working) -> Double { TokenPetAssets.period(s, night: night, tempo: tempo) }
 }

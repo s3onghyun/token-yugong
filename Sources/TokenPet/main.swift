@@ -5,7 +5,7 @@ import TokenPetAssets
 
 // Usage:
 //   TokenPet [--style pixel|ink] [--lang en|ko] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
-//            [--bridge <limits.json>] [--logs <dir>]
+//            [--bridge <limits.json>] [--logs <dir>] [--tempo idle|low|high|veryHigh]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
 //   TokenPet --scan-report      scan local logs once, print what the pet would show, then exit
 
@@ -31,16 +31,20 @@ if let problem = CharacterStyle.validateAssets() {
 if args.contains("--scan-report") {
     model.scanNow()
     let s = model.snap, sc = model.scanner
-    print(String(format: "scanned %.1f MB in %.2fs; %d usage events, %d limit hits", Double(sc.bytesRead) / 1e6, sc.lastScanSeconds, sc.events.count, sc.hits.count))
-    print("source: \(s.source)")
-    if let f = s.five { print("5h: \(Int(f.pct))% tokens=\(f.tokens.map(String.init) ?? "-") resets=\(f.resetsAt.map { Fmt.clock($0) } ?? "-")") }
-    if let w = s.week { print("week: \(Int(w.pct))% tokens=\(w.tokens.map(String.init) ?? "-") rolling=\(w.rolling)") }
-    if let l = s.learned5h { print("learned 5h ceiling: \(l) tokens") }
-    if let h = sc.hits.last { print("last limit hit: \(h.time) kind=\(h.kind) wake=\(h.wake.map { Fmt.clock($0) } ?? "-")") }
-    if let c = s.codex { print("codex: 5h=\(c.five.map { "\(Int($0.pct))%" } ?? "-") week=\(c.week.map { "\(Int($0.pct))% resets \($0.resetsAt.map { Fmt.clock($0) } ?? "-")" } ?? "-") (from log at \(c.at))") }
-    if let d = s.daily { print(String(format: "no 5-hour window: today's share used %.0f%% (%.1f of %.1f weekly points), day ends %@%@", d.fill * 100, d.usedToday, d.share, Fmt.clock(d.dayEnd), d.estimated ? " (day start estimated)" : "")) }
+    func t(_ d: Date?) -> String { d.map { Fmt.clock($0) } ?? "-" }
+    print(String(format: "scanned %.1f MB in %.2fs; %d usage events", Double(sc.bytesRead) / 1e6, sc.lastScanSeconds, sc.events.count))
+    print("claude: " + (s.known ? "official, captured \(t(s.captured))" : "don't know (no usable status-line reading)"))
+    if let f = s.five { print("5h: \(Int(f.pct.rounded()))% resets \(t(f.resetsAt))") }
+    if let w = s.week { print("week: \(Int(w.pct.rounded()))% resets \(t(w.resetsAt))") }
+    if let d = s.daily { print(String(format: "no 5-hour window: today's share %.0f%%, day %@ - %@", d.fill * 100, t(d.dayStart), t(d.dayEnd))) }
+    if s.resting { print("resting (\(s.restReason)) until \(s.wakeAt.map { Fmt.clock($0) } ?? "?")") }
+    if let p = s.projected { print(String(format: "projected by reset: %.0f%%", p)) }
+    if let c = s.codex { print("codex: 5h=\(c.five.map { "\(Int($0.pct.rounded()))%" } ?? "-") week=\(c.week.map { "\(Int($0.pct.rounded()))% resets \(t($0.resetsAt))" } ?? "-") (log line \(t(c.at)))") }
+    let paceNow = Date(), settled = paceNow.addingTimeInterval(-300)   // 5 minutes ago: every log line is written
+    print(String(format: "pace: %.0f output tokens/min (last 3 min) -> %@ at %.0f; %.0f at %.0f", model.liveRate(now: paceNow), "\(model.pace.level)",
+                 paceNow.timeIntervalSince1970, model.liveRate(now: settled), settled.timeIntervalSince1970))
     print("carrier: \(Int((s.carrier * 100).rounded()))%  mountain: \(model.mountain.name) \(Int(((1 - model.mountain.left) * 100).rounded()))% carried (\(Int(model.mountain.tokens)) tokens)")
-    print("state: \(s.state)")
+    print("state: \(s.known ? "\(s.state)" : "unknown")")
     exit(0)
 }
 
@@ -132,9 +136,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let bar = BarMirror()
     var stage: NSPanel?
     var sharingSink: AnyCancellable?
+    var snapSink: AnyCancellable?
     var item: NSStatusItem!
     let popover = NSPopover()
-    var frame = 0
     var animTimer: Timer?
     var cycleTimer: Timer?
 
@@ -147,6 +151,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = NSHostingController(rootView: PopoverView(model: model))
 
         model.captureAllowedForDemo = args.contains("--allow-capture")
+        model.demoPace = arg("--tempo").flatMap { a in Pace.Level.allCases.first { "\($0)" == a } }
         if let d = arg("--demo") {
             model.demoMountainLeft = 0.62
             model.demoWeeklyOnly = args.contains("--weekly-only")
@@ -155,6 +160,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             else { model.setDemo(PetState(flag: d)) }
         }
         model.start()
+        snapSink = model.$snap.sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } }
+        watchVisibility()
         scheduleAnim()
         sharingSink = model.$hideFromCapture.sink { [weak self] _ in DispatchQueue.main.async { self?.applySharing() } }
         if args.contains("--stage") {
@@ -171,6 +178,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             print("status item window frame: \(self.item.button?.window?.frame ?? .zero), visible=\(self.item.isVisible)")
+        }
+        if args.contains("--anim-stats") {   // measurement: menu-bar wakes and redraws per 30 s, drawn even if the bar hides the icon
+            Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+                print("anim: \(self.wakeCount) wakes, \(self.drawCount) redraws, paused=\(self.paused), state=\(model.snap.state), tempo=\(model.tempo), speed=\(String(format: "%.2f", model.animSpeed))")
+                self.wakeCount = 0; self.drawCount = 0
+            }
         }
         if args.contains("--open") {
             popover.behavior = .applicationDefined
@@ -204,33 +217,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         stage?.sharingType = t
     }
 
-    func scheduleAnim() {
-        animTimer?.invalidate()
-        animTimer = Timer.scheduledTimer(withTimeInterval: 1 / model.menuBarFPS, repeats: true) { [weak self] _ in self?.tick() }
-        animTimer?.tolerance = 0.2 / model.menuBarFPS
-        tick()
+    // RunCat-style menu bar: each routine loop is drawn once into bitmaps, merged into runs of the
+    // same picture, and a one-shot timer wakes only when the picture changes. The timer's interval
+    // follows the tempo (the animation clock's speed). Nothing is drawn while the bar is hidden.
+    var paused = false
+    private var loops: [String: (runs: [(img: NSImage, end: Double)], period: Double)] = [:]
+    private var lastImage: NSImage?, lastTitle = ""
+
+    func watchVisibility() {
+        let ws = NSWorkspace.shared.notificationCenter
+        var screensAsleep = false, sessionAway = false
+        let update = { [weak self] in
+            guard let self else { return }
+            let offScreen = !(self.item.button?.window?.occlusionState.contains(.visible) ?? true) && !args.contains("--anim-stats")
+            let hidden = screensAsleep || sessionAway || offScreen
+            if hidden != self.paused { self.paused = hidden; self.scheduleAnim() }
+        }
+        ws.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { _ in screensAsleep = true; update() }
+        ws.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { _ in screensAsleep = false; update() }
+        ws.addObserver(forName: NSWorkspace.sessionDidResignActiveNotification, object: nil, queue: .main) { _ in sessionAway = true; update() }
+        ws.addObserver(forName: NSWorkspace.sessionDidBecomeActiveNotification, object: nil, queue: .main) { _ in sessionAway = false; update() }
+        NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: item.button?.window, queue: .main) { _ in update() }
     }
 
-    private var lastState: PetState?
-    private var loops: [String: [NSImage]] = [:]
-    private var lastIndex = -1, lastTitle = ""
+    func scheduleAnim() {
+        animTimer?.invalidate()
+        animTimer = nil
+        if !paused { tick() }
+    }
 
-    /// One routine loop per (style, state, night, carrier level), drawn once into bitmaps and then replayed.
-    private func loop(_ style: CharacterStyle, _ st: PetState, fps: Double, night: Bool, carrier: Double) -> [NSImage] {
+    private func loop(_ style: CharacterStyle, _ st: PetState, _ tempo: Tempo, night: Bool, carrier: Double) -> (runs: [(img: NSImage, end: Double)], period: Double) {
         let fill = (carrier * 4).rounded() / 4          // the basket changes in quarter steps
-        let key = "\(style.rawValue)/\(st.rawValue)/\(fps)/\(night)/\(fill)"
+        let key = "\(style.rawValue)/\(st.rawValue)/\(tempo.rawValue)/\(night)/\(fill)"
         if let l = loops[key] { return l }
-        let n = Motion.reduce ? 1 : max(1, Int((Motion.period(st, night: night) * fps).rounded()))
-        // identical consecutive poses share one image, so tick() can skip the redraw
-        var l: [NSImage] = [], prev = ""
+        let period = Motion.period(st, night: night, tempo: tempo)
+        let step = 1.0 / 8
+        let n = Motion.reduce ? 1 : max(1, Int((period / step).rounded()))
+        var runs: [(img: NSImage, end: Double)] = [], prev = ""
         for i in 0..<n {
-            let t = Double(i) / fps
-            let sig = TokenPetAssets.signature(style.art, st, t: t, night: night)
-            if sig == prev, let last = l.last { l.append(last) }
-            else { l.append(raster(style.image(st, t: t, size: 20, menuBar: true, carrier: fill, night: night))) }
+            let t = Double(i) * step
+            let sig = TokenPetAssets.signature(style.art, st, t: t, night: night, tempo: tempo)
+            if sig == prev, !runs.isEmpty { runs[runs.count - 1].end = t + step; continue }
+            runs.append((raster(style.image(st, t: t, size: 20, menuBar: true, carrier: fill, night: night, tempo: tempo)), t + step))
             prev = sig
         }
         if loops.count > 24 { loops.removeAll() }
+        let l = (runs: runs, period: Motion.reduce ? .infinity : Double(n) * step)
         loops[key] = l
         return l
     }
@@ -248,29 +280,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return out
     }
 
+    var wakeCount = 0, drawCount = 0
+
     func tick() {
-        frame += 1
+        wakeCount += 1
         let s = model.snap
-        if s.state != lastState { lastState = s.state; lastIndex = -1; scheduleAnim(); return }
-        let fps = model.menuBarFPS
-        let frames = loop(model.style, s.state, fps: fps, night: model.night, carrier: s.carrier)
-        let idx = Int(Date.timeIntervalSinceReferenceDate * fps) % frames.count
-        if idx != lastIndex && item.button?.image !== frames[idx] {
-            lastIndex = idx
-            item.button?.image = frames[idx]
-            bar.image = frames[idx]
+        let l = loop(model.style, s.state, model.tempo, night: model.night, carrier: s.carrier)
+        let now = Date.timeIntervalSinceReferenceDate
+        let p = l.period.isFinite ? model.phase(at: now).truncatingRemainder(dividingBy: l.period) : 0
+        let run = l.runs.first { p < $0.end } ?? l.runs[l.runs.count - 1]
+        if run.img !== lastImage {
+            lastImage = run.img
+            item.button?.image = run.img
+            bar.image = run.img
+            drawCount += 1
         }
         let title: String
-        if s.state == .resting, let w = s.sleepUntil { title = " " + Fmt.clock(w) }
+        if !s.known { title = " ?" }
+        else if s.resting { title = " " + (s.wakeAt.map { Fmt.clock($0) } ?? "?") }
         else if let d = s.daily { title = " \(Int((d.fill * 100).rounded()))%" }
-        else if let f = s.five { title = " \(Int(f.pct.rounded()))%" }
+        else if let m = s.five ?? s.week { title = " \(Int(m.pct.rounded()))%" }
         else { title = "" }
-        guard title != lastTitle else { return }
-        lastTitle = title
-        bar.title = title
-        item.button?.attributedTitle = NSAttributedString(string: title, attributes: [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
-        ])
+        if title != lastTitle {
+            lastTitle = title
+            bar.title = title
+            item.button?.attributedTitle = NSAttributedString(string: title, attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
+            ])
+        }
+        // wake again when this picture ends, at the current speed (at least 1/30 s, at most 30 s)
+        let wait = l.period.isFinite ? min(30, max(1.0 / 30, (run.end - p) / max(0.3, model.animSpeed))) : 30
+        animTimer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { [weak self] _ in self?.tick() }
+        animTimer?.tolerance = wait * 0.1
     }
 
     @objc func toggle() { popover.isShown ? popover.performClose(nil) : show() }

@@ -149,7 +149,16 @@ enum YugongRig {
 
     // MARK: - routines per state
 
-    static func keys(_ s: PetState, night: Bool) -> [Key] {
+    static func keys(_ s: PetState, night: Bool, tempo: Tempo = .working) -> [Key] {
+        let working = s == .lively || s == .steady || s == .straining
+        if working && tempo == .idle {
+            // no tokens flowing: he leans on the shovel and chats with the magpie (yawns at night)
+            return night ? [Key(pose: yawn(), dur: 1.6), Key(pose: leanOnShovel(talk: false), dur: 2.4)]
+                         : [Key(pose: leanOnShovel(talk: true), dur: 1.4), Key(pose: leanOnShovel(talk: false), dur: 2.0)]
+        }
+        if working && tempo == .sweating {
+            return keys(s, night: night).map { var k = $0; k.pose.sweat = true; return k }
+        }
         func digKeys(_ beats: [YPose], _ d: [Double]) -> [Key] { zip(beats, d).map { Key(pose: $0, dur: $1) } }
         switch s {
         case .lively:
@@ -178,12 +187,12 @@ enum YugongRig {
         }
     }
 
-    static func period(_ s: PetState, night: Bool) -> Double { keys(s, night: night).reduce(0) { $0 + $1.dur } }
+    static func period(_ s: PetState, night: Bool, tempo: Tempo = .working) -> Double { keys(s, night: night, tempo: tempo).reduce(0) { $0 + $1.dur } }
 
     /// The pose at time `t`. `stepped` snaps from key to key (pixel art); otherwise it eases.
     /// Also returns progress 0...1 through the current key, for effects that travel.
-    static func pose(_ s: PetState, t: Double, night: Bool, stepped: Bool) -> (YPose, CGFloat) {
-        let ks = keys(s, night: night)
+    static func pose(_ s: PetState, t: Double, night: Bool, stepped: Bool, tempo: Tempo = .working) -> (YPose, CGFloat) {
+        let ks = keys(s, night: night, tempo: tempo)
         let per = ks.reduce(0) { $0 + $1.dur }
         var p = t.truncatingRemainder(dividingBy: per)
         if p < 0 { p += per }
@@ -203,10 +212,10 @@ enum YugongRig {
 
     /// Same signature = same picture (used to skip menu-bar redraws). Travelling effects are
     /// quantized the same way the renderers quantize them.
-    static func signature(_ s: PetState, t: Double, night: Bool, stepped: Bool) -> String {
-        let (p, k) = pose(s, t: t, night: night, stepped: stepped)
+    static func signature(_ s: PetState, t: Double, night: Bool, stepped: Bool, tempo: Tempo = .working) -> String {
+        let (p, k) = pose(s, t: t, night: night, stepped: stepped, tempo: tempo)
         let q = stepped ? Int(k * 3) : Int(k * 12)
         return String(format: "%.1f %.1f %.1f %.1f %.1f %.1f %.1f ", p.hip.x, p.hip.y, p.lean, p.toolTop.x, p.toolAng,
-                      p.handFront.y, p.handBack.y) + "\(p.eyes) \(p.mouth) \(p.fx) \(p.bird) \(p.clump) \(q)"
+                      p.handFront.y, p.handBack.y) + "\(p.sweat) \(p.eyes) \(p.mouth) \(p.fx) \(p.bird) \(p.clump) \(q)"
     }
 }

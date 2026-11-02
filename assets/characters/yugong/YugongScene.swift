@@ -40,7 +40,7 @@ extension YugongArt {
 
     static func scenePose(_ info: SceneInfo, t: Double, stepped: Bool) -> (YPose, CGFloat) {
         if let c = info.cutscene { return (YugongRig.morning(c < 0.5 ? 0 : 1), CGFloat((t * 0.7).truncatingRemainder(dividingBy: 1))) }
-        return YugongRig.pose(info.state, t: t, night: info.night, stepped: stepped)
+        return YugongRig.pose(info.state, t: t, night: info.night, stepped: stepped, tempo: info.tempo)
     }
 
     private static func figureLayer(_ info: SceneInfo, t: Double, grid: Int) -> CGImage? {
