@@ -64,7 +64,8 @@ enum FamilyHeads {
     static let boyAnchor = (x: 5, y: 7)
 
     /// Stamps `rows` with its anchor at canvas point `c` (units 0...100) on an n-pixel grid.
-    static func stamp(_ ctx: CGContext, _ rows: [[Character]], anchor: (x: Int, y: Int), at c: CGPoint, grid n: Int, mirror: Bool) {
+    static func stamp(_ ctx: CGContext, _ rows: [[Character]], anchor: (x: Int, y: Int), at c: CGPoint, grid n: Int, mirror: Bool,
+                      colors: [Character: NSColor] = colors) {
         let w = rows.first?.count ?? 0
         let ox = Int((c.x * CGFloat(n) / 100).rounded()) - (mirror ? w - 1 - anchor.x : anchor.x)
         let oy = Int((c.y * CGFloat(n) / 100).rounded()) - anchor.y

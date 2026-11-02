@@ -48,9 +48,22 @@ budget %. The menu bar shows the same %.
 | An AI is given to a member who already has one, and another member had that AI | The two members swap: an AI is watched by one member at a time |
 | Grandpa is set to nobody | Ignored: Grandpa always watches one AI |
 | The son, the grandson or the neighbour's boy watches an AI | He stands in the scene with his own meter (heap of stone, basket, little basket): that AI's 5-hour %, else weekly %, else month's budget %, row 2 applies. Full = he sits down. Nothing to read = "don't know" and an empty meter |
-| Grandpa rests (row 3) | Zhisou, the mocking neighbour of the tale, says "Told you so!" under the scene |
 
 Only Grandpa's AI sets his state and the menu bar; the others never stand in for him.
+
+## Visitors (from the tale)
+
+One at a time, at the left of the scene, with a speech bubble; Grandpa answers in his. Checked top
+to bottom. Nobody comes while he doesn't know, or during the cutscene.
+
+| When | Who | Says | Grandpa answers |
+|---|---|---|---|
+| Grandpa rests (row 3) | Zhisou, the clever old man of the river bend | "Told you so, ho ho! Not one blade of grass moved." | "Sons, then grandsons, on and on for ever. The mountain won't grow!" (子子孫孫無窮匱) |
+| Within 10 minutes of a change of plan (who watches which AI, or which windows Grandpa's AI has), or in the first 6 hours of a new weekly window | His wife, doubting, until half the first mountain is gone | "And where will you dump all that earth?" | "Off the tail of the Bohai Sea, ho ho!" |
+| The same, once half the first mountain is gone (or from the second mountain on) | His wife, cheering | "It really is shrinking! Go on, dear!" | "See? One shovel at a time." |
+
+The plan is remembered in the settings, so the first run and a restart are not a change; a missing
+reading is not a change either.
 
 Row 4 in words: by the end of day *d* the fair use is (*d*+1)/7 of the week. Days you used less
 carry over; days you used more make him sweat, but weekly use is bursty, so he naps only when the
@@ -84,7 +97,7 @@ weekly limit itself runs out (row 3), and the popover says when it resets. It ne
 |---|---|
 | A log event newer than the last one counted | Its tokens (input + output + cache writes) are added once; the count and the newest counted time are saved, so a restart neither loses nor double-counts |
 | First run | The week of logs already on disk is counted |
-| Tokens reach the mountain's size (1 billion) | The cutscene is due (saved, survives a restart): the menu bar shows ✨, one notification per mountain, and the popover plays the cutscene once from the start when opened |
+| Tokens reach the mountain's size (1 billion) | The cutscene is due (saved, survives a restart): the menu bar shows ✨, one notification per mountain, and the popover plays the cutscene once from the start when opened: Kua'e's two sons, sent by the Heavenly Emperor, rise out of the earth holding the mountain up and carry it off to the left (4.5 s) |
 | "On to the next mountain" | The next mountain starts with the tokens beyond the size (Taihang, then Wangwu, then numbered) |
 
 ## Menu bar

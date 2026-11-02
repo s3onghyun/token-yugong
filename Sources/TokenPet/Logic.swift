@@ -94,6 +94,7 @@ struct Snapshot {
     var resting = false      // a window is at 100%
     var wakeAt: Date?        // nil while resting = the reset time is not known
     var justReset: Date?
+    var weekStart: Date?     // when the current weekly window began
     var projected: Double?   // % this pace reaches by the reset
     var state: PetState = .lively
     var month: Meter?
@@ -118,6 +119,7 @@ enum Logic {
         s.known = true
         s.captured = c.at
         var resets: [Date] = []
+        if let r = c.week?.resetsAt { s.weekStart = r <= now ? r : r.addingTimeInterval(-Limits.weekLength) }
         s.five = roll(c.five, now, &resets)            // rule 2
         s.week = roll(c.week, now, &resets)
         s.month = roll(c.month, now, &resets)
@@ -174,6 +176,47 @@ enum Logic {
         if top >= 80 || pace >= 110 { return .straining }
         if pace >= 75 { return .steady }
         return .lively
+    }
+}
+
+// MARK: - Visitors from the tale (LOGIC.md "Visitors")
+
+enum Visitors {
+    static let afterChange: TimeInterval = 600        // the wife asks for 10 minutes after the plan or the family changes
+    static let newWeek: TimeInterval = 6 * 3600       // and for the first 6 hours of a new week
+
+    /// Who stands at the left of the scene. Zhisou while Grandpa's limit is used up; otherwise the wife
+    /// after a change or at a new week, doubting until half the first mountain is gone, cheering after.
+    static func who(_ s: Snapshot, changedAt: Date?, carried: Double, mountain: Int, now: Date) -> Visitor? {
+        guard s.known else { return nil }
+        if s.resting { return .zhisou }
+        func within(_ d: Date?, _ span: TimeInterval) -> Bool { d.map { now >= $0 && now.timeIntervalSince($0) < span } ?? false }
+        guard within(changedAt, afterChange) || within(s.weekStart, newWeek) else { return nil }
+        return mountain > 0 || carried >= 0.5 ? .wifeCheering : .wifeDoubting
+    }
+
+    /// What the wife's question is about: who watches which AI, and which windows Grandpa's AI has.
+    /// nil while there is no reading (a missing reading is not a change of plan).
+    static func plan(_ f: Family, _ s: Snapshot) -> String? {
+        guard s.known else { return nil }
+        let roles = Role.allCases.compactMap { r in f.roles[r].map { "\(r.rawValue)=\($0.rawValue)" } }
+        return (roles + [s.five != nil ? "5h" : "", s.week != nil ? "week" : "", s.month != nil ? "month" : ""]).joined(separator: ",")
+    }
+
+    /// (the visitor's line, Grandpa's answer)
+    static func lines(_ v: Visitor) -> (String, String) {
+        switch v {
+        case .wifeDoubting:
+            return (L.t("Grandma\nAnd where will you dump all that earth?", "할머니\n그 흙은 다 어디다 버리려고?"),
+                    L.t("Off the tail of the Bohai Sea, ho ho!", "발해 끝에 버리면 되지, 허허!"))
+        case .wifeCheering:
+            return (L.t("Grandma\nIt really is shrinking! Go on, dear!", "할머니\n어머, 정말 줄었네! 힘내요, 영감!"),
+                    L.t("See? One shovel at a time.", "거봐요, 한 삽씩이면 된다니까."))
+        case .zhisou:
+            return (L.t("Zhisou\nTold you so, ho ho! Not one blade of grass moved.", "지수 영감\n거봐라, 허허! 풀 한 포기도 못 뽑겠구먼."),
+                    L.t("Sons, then grandsons, on and on for ever. The mountain won't grow!",
+                        "아들, 손자, 자자손손 끝이 없지. 산은 더 자라지 않는다네!"))
+        }
     }
 }
 

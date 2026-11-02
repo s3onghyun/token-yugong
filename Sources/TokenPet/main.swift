@@ -6,7 +6,7 @@ import UserNotifications
 
 // Usage:
 //   TokenPet [--lang en|ko] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
-//            [--bridge <limits.json>] [--logs <dir>] [--tempo idle|low|high|veryHigh]
+//            [--bridge <limits.json>] [--logs <dir>] [--tempo idle|low|high|veryHigh] [--visitor wifeDoubting|wifeCheering|zhisou]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
 //   TokenPet --scan-report      scan local logs once, print what the pet would show, then exit
 
@@ -73,6 +73,13 @@ if args.contains("--scan-report") {
         if let img = r.nsImage { png(img, "popover-yugong-pixel-weekly-only-\(st.rawValue)\(ko).png") }
     }
     model.demoWeeklyOnly = false
+    for (v, st) in [(Visitor.wifeDoubting, PetState.morning), (.wifeCheering, .lively), (.zhisou, .resting)] {
+        model.demoVisitor = v; model.setDemo(st)
+        let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now).background(Color(nsColor: .windowBackgroundColor)))
+        r.scale = 2
+        if let img = r.nsImage { png(img, "popover-yugong-pixel-visitor-\(v.rawValue)\(ko).png") }
+    }
+    model.demoVisitor = nil
     model.demoCutscene = true; model.setDemo(.morning)
     let r = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now, cutsceneT: 0.55).background(Color(nsColor: .windowBackgroundColor)))
     r.scale = 2
@@ -183,6 +190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
         model.captureAllowedForDemo = args.contains("--allow-capture")
         model.demoPace = arg("--tempo").flatMap { a in Pace.Level.allCases.first { "\($0)" == a } }
+        model.demoVisitor = arg("--visitor").flatMap(Visitor.init(rawValue:))
         if let d = arg("--demo") {
             model.demoMountainLeft = 0.62
             model.demoWeeklyOnly = args.contains("--weekly-only")

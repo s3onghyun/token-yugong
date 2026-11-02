@@ -15,7 +15,10 @@ Claude Code 사용량을 보여 줍니다.
 - **삽질 속도**(RunCat식): 이 Mac에서 토큰이 빨리 나오면 빨리 파고, 조용하면 삽에 기대
   까치와 수다를 떨고, 리셋 전에 한도에 닿을 속도면 힘에 부쳐 합니다.
 - **산**은 지금까지 쓴 모든 토큰만큼 깎입니다(이 Mac에만 저장). 산 하나를 다 옮기면 하늘이
-  감동해 산을 옮겨 주는 짧은 장면이 나오고 다음 산이 나타납니다.
+  감동해 과아씨의 두 아들이 산을 업어 가는 짧은 장면이 나오고 다음 산이 나타납니다.
+- **이야기 속 사람들.** 요금제를 바꾸거나 새 주가 시작되면 할머니가 와서 "그 흙은 다 어디다
+  버리려고?" 하고 묻고(산이 절반 넘게 줄면 응원합니다), 한도를 다 쓰면 지수 영감이 와서 비웃고
+  할아버지가 열자의 대답으로 받아칩니다.
 - **식구.** 할아버지가 맡을 AI를 고릅니다(기본 Claude). 아들, 손주, 이웃집 아이도 다른 AI를
   하나씩 맡을 수 있습니다: Codex, Gemini CLI, OpenAI·DeepSeek API(한도 대신 월 예산). 기본으로
   손주가 Codex를 맡습니다. Gemini CLI는 Mac에 한도를 남기지 않고 DeepSeek은 잔액만 알려 줘서,
@@ -93,7 +96,7 @@ macOS는 메뉴바에 자리가 없는 아이콘을 말없이 숨기거나 카�
 ## 개발용
 
 `swift run -c release TokenPet`의 플래그와 `TOKENPET_PREFS`는 [README.md](README.md#for-development)에 있습니다.
-캐릭터 시트: `swift run -c release YugongSheet <폴더> [--scenes]`.
+캐릭터 시트: `swift run -c release YugongSheet <폴더> [--scenes] [--family] [--visitors]`.
 
 ## 라이선스
 

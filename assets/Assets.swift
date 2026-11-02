@@ -25,6 +25,11 @@ public enum Tempo: String, CaseIterable {
     case idle, working, sweating
 }
 
+/// Someone from the tale who drops by (LOGIC.md "Visitors"): the wife doubting or cheering, or Zhisou mocking.
+public enum Visitor: String, CaseIterable {
+    case wifeDoubting, wifeCheering, zhisou
+}
+
 /// Everything the popover scene needs besides the clock.
 public struct SceneInfo {
     public var state: PetState
@@ -34,7 +39,8 @@ public struct SceneInfo {
     public var son: Double? = nil        // the son's AI (his heap of stone); nil hides him
     public var boy: Double? = nil        // the neighbour's boy's AI (his basket); nil hides him
     public var night: Bool
-    public var cutscene: Double?         // 0...1 progress of the milestone cutscene placeholder; nil = none
+    public var cutscene: Double?         // 0...1 progress of the milestone cutscene (Kua'e's sons carry the mountain off); nil = none
+    public var visitor: Visitor? = nil   // someone from the tale standing at the left; nil = nobody
     public var tempo: Tempo = .working
 
     public init(state: PetState, carrier: Double, mountainLeft: Double, grandson: Double?, night: Bool, cutscene: Double? = nil) {
