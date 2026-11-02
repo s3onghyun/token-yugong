@@ -173,7 +173,7 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private func scene(_ s: Snapshot) -> some View {
-        let night = s.state == .resting || model.night
+        let night = !model.cutsceneDue && (s.state == .resting || model.night)   // the cutscene sky is always golden
         ZStack(alignment: .topTrailing) {
             Group {
                 if let t = fixedT {
@@ -185,25 +185,25 @@ struct PopoverView: View {
                     }
                 }
             }
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(model.cutsceneDue ? cutsceneLine : speech(s))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundColor(night ? .white : Color(red: 0.16, green: 0.13, blue: 0.11))
-                    .padding(.horizontal, 9).padding(.vertical, 6)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(night ? 0.14 : 0.82)))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 150, alignment: .trailing)
-                if model.cutsceneDue {
-                    Button { model.finishCutscene() } label: {
-                        Text(L.t("On to the next mountain", "다음 산으로"))
-                            .font(.caption.weight(.bold)).foregroundColor(.white)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(Capsule().fill(Color(red: 0.75, green: 0.28, blue: 0.23)))
-                    }
-                    .buttonStyle(.plain)
+            Text(model.cutsceneDue ? cutsceneLine : speech(s))
+                .font(.system(size: model.cutsceneDue ? 12 : 13, weight: .semibold, design: .rounded))
+                .foregroundColor(night ? .white : Color(red: 0.16, green: 0.13, blue: 0.11))
+                .padding(.horizontal, 9).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(night ? 0.14 : 0.82)))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: model.cutsceneDue ? 250 : 150, alignment: .trailing)   // the cutscene line stays above his head
+                .padding(10)
+            if model.cutsceneDue {
+                Button { model.finishCutscene() } label: {
+                    Text(L.t("On to the next mountain", "다음 산으로"))
+                        .font(.caption.weight(.bold)).foregroundColor(.white)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Capsule().fill(Color(red: 0.75, green: 0.28, blue: 0.23)))
                 }
+                .buttonStyle(.plain)
+                .padding(10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
-            .padding(10)
         }
         .frame(width: Self.sceneSize.width, height: Self.sceneSize.height)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
