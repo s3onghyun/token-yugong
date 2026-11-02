@@ -9,8 +9,9 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
 
 - **The carrier (지게) is your 5-hour limit.** Earth heaps up in his A-frame carrier. When it is
   full he sits down and naps, and the menu bar shows when he starts again.
-- **Accounts with only a weekly limit** (verified Ultra): the carrier fills with today's fair share
-  of the week (1/7, unused days carry over). No 5-hour meter is ever invented.
+- **Accounts with only a weekly limit** (verified Ultra): the carrier is the weekly limit, and he naps
+  only when it runs out. Today's fair share (1/7 of the week, unused days carry over) sets his pace:
+  past it he sweats and asks you to take it slow. No 5-hour meter is ever invented.
 - **His pace** (RunCat-style): he digs faster when tokens flow faster on this Mac, leans on his
   shovel and chats with his magpie when it is quiet, and strains when you are heading for the limit.
 - **The mountain** wears down with every token you have ever used (kept on this Mac). Carry a
@@ -18,7 +19,7 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
 - **The grandson is Codex.** If you use Codex CLI, he carries a second basket.
 - **No data, no guessing.** Until Claude Code reports your limits, he says he doesn't know.
 
-Pixel style by default; an ink-wash style of the same poses is one click away.
+All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
 ## Install
 
@@ -67,8 +68,9 @@ Grandpa notices, tells you once with a notification, and moves into a small floa
 
 ## Settings
 
-Gear button in the popover: language (system, 한국어, English), show the grandson (Codex), mini
-window, open at login (off by default, opt-in only), and the guide. Everything is stored in the
+Gear button in the popover: language (system, 한국어, English), the menu-bar number (percent used,
+time to reset, reset time or none) and whether Grandpa is shown next to it, show the grandson
+(Codex), mini window, open at login (off by default, opt-in only), and the guide. Everything is stored in the
 UserDefaults domain `TokenPet`; `defaults delete TokenPet` resets it, including the mountain.
 
 ## How the numbers become a pet
@@ -80,7 +82,7 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 ## For development
 
 `swift run -c release TokenPet` with flags: `--demo lively|steady|straining|resting|morning|cutscene|cycle`,
-`--tempo idle|low|high|veryHigh`, `--weekly-only`, `--style pixel|ink`, `--lang en|ko`,
+`--tempo idle|low|high|veryHigh`, `--weekly-only`, `--lang en|ko`,
 `--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,
 `--settings`, `--guide`, `--pretend-hidden` (try the mini-window fallback),
 `--render <dir>` (PNG stills), `--icon-set <dir>`, `--scan-report` (prints what it read),

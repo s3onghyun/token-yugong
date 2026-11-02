@@ -23,16 +23,18 @@ Nothing else: no network, no credentials, no saved limit state. Token counts nev
 | 1 | No usable Claude reading (no file, corrupt or cut-off JSON, no window, percent missing or not a number) | **Don't know**: the bubble says so, the menu bar shows `?`, meters say "모름". Nothing is estimated. |
 | 2 | A window's reset time has passed (reset ≤ now) | That window is new and empty: 0%, next reset unknown until Claude Code reports again |
 | 3 | Any window at 100% | **Resting** until that window resets (the latest one if several are full; `?` if no reset time) |
-| 4 | No 5-hour window, weekly window with a reset time (verified Ultra) | Day *d* = whole days since (weekly reset − 7 days), 0…6. Carrier = (weekly % − *d*·100/7) ÷ (100/7), never below 0. Carrier ≥ 100% → **resting** until the day ends |
+| 4 | No 5-hour window, weekly window with a reset time (verified Ultra) | Day *d* = whole days since (weekly reset − 7 days), 0…6. Today's share = (weekly % − *d*·100/7) ÷ (100/7), never below 0. It only sets the pace (row 6); it never makes him rest |
 | 5 | A reset (row 2) or a new day (row 4) less than 5 minutes ago | **Morning** stretch |
-| 6 | Otherwise, top = highest window %, pace = highest of (window % ÷ share of that window gone by, at least 12%) | **Straining** if top ≥ 80 or pace ≥ 110 · **steady** if pace ≥ 75 · **lively** otherwise |
+| 6a | Otherwise, weekly-only (row 4) | **Straining** ("ahead of today's share, take it slow") if today's share ≥ 100% · **steady** if ≥ 75% · **lively** otherwise. A high weekly % alone does not strain him |
+| 6b | Otherwise, top = highest window %, pace = highest of (window % ÷ share of that window gone by, at least 12%) | **Straining** if top ≥ 80 or pace ≥ 110 · **steady** if pace ≥ 75 · **lively** otherwise |
 
-The carrier is the 5-hour %, else row 4's daily share, else the weekly %.
-The grandson's basket follows rows 2 and 4 for Codex's own windows. Codex never stands in for Claude.
+The carrier is the limit that makes him rest: the 5-hour %, else the weekly %. The menu bar shows the same %.
+The grandson's basket is Codex's own 5-hour %, else its weekly % (row 2 applies). Codex never stands in for Claude.
 
 Row 4 in words: by the end of day *d* the fair use is (*d*+1)/7 of the week. Days you used less
-carry over; days you used more show up as a fuller carrier. It needs no saved "start of day" value,
-so restarts, sleep and several Macs cannot skew it.
+carry over; days you used more make him sweat, but weekly use is bursty, so he naps only when the
+weekly limit itself runs out (row 3), and the popover says when it resets. It needs no saved
+"start of day" value, so restarts, sleep and several Macs cannot skew it.
 
 ## Shovel speed (RunCat-style)
 
@@ -66,6 +68,22 @@ so restarts, sleep and several Macs cannot skew it.
 
 ## Menu bar
 
+The item shows Grandpa and a number beside him. The number is the **headline** window (the
+5-hour window, else the weekly one; also the carrier), in the style chosen in Settings:
+
+| Setting | Shows (5-hour 24%, resets in 3 h 12 m at 04:40) |
+|---|---|
+| Percent used (default) | `24%` |
+| Time to reset | `3h 12m` (`5d 2h` over a day, `12m` under an hour) |
+| Reset time | `04:40` (`Mon 04:00` on another day) |
+| None | nothing |
+
+Before the style: `✨` while a mountain's cutscene is due, `?` without data, and while he rests
+the time he starts again (as time left in the *time to reset* style). The time styles show the
+percent when the reset time is unknown. **Grandpa in the menu bar** can be turned off; with no
+number as well, Grandpa stays, so the item is never empty. The text is redrawn only when it
+changes. The popover header shows the headline as `24% · 04:40`.
+
 | When | Then |
 |---|---|
 | Less than half of the item's width lies on any screen (macOS pushed it off a full menu bar; measured here at x = −4316 on a 1728-point screen) | **Hidden** |
@@ -88,6 +106,8 @@ item nor the mini window is on screen.
 |---|---|
 | Language | System (Korean if the first preferred language is Korean, else English); or pinned 한국어 / English |
 | Show the grandson (Codex) | On. Off hides him and his meters; his tokens still count toward the shovel speed |
+| Menu bar number | Percent used |
+| Grandpa in the menu bar | On |
 | Mini window | When the menu bar is full |
 | Open at login | **Off.** Only the user can turn it on (SMAppService, app bundle only); the app never registers itself |
 | Hide from screen sharing | On |

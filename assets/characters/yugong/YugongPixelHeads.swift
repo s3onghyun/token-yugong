@@ -1,6 +1,6 @@
 import AppKit
 
-// Hand-placed pixel heads for the pixel style. The head carries the charm (hat, eyes, beard),
+// Hand-placed pixel heads. The head carries the charm (hat, eyes, beard),
 // so it is drawn pixel by pixel instead of being rasterized from the vector rig.
 // One character per pixel; "." is transparent. Faces LEFT; mirrored when he looks back.
 

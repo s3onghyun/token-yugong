@@ -118,7 +118,6 @@ struct MountainLedger {
 final class UsageModel: ObservableObject {
     @Published private(set) var snap = Snapshot()
     @Published private(set) var pace = Pace()
-    @Published var style: CharacterStyle   // saved only by an explicit pick (see PopoverView)
     @Published private(set) var scanning = false
     @Published private(set) var mountain = MountainLedger.load()
     /// Demo override for the mountain (fraction left) and the cutscene.
@@ -140,10 +139,9 @@ final class UsageModel: ObservableObject {
     private var claude: Reading?
     private var timer: Timer?
 
-    init(bridgeURL: URL, logsRoot: URL, style: CharacterStyle?) {
+    init(bridgeURL: URL, logsRoot: URL) {
         self.bridgeURL = bridgeURL
         self.scanner = LogScanner(root: logsRoot)
-        self.style = style ?? CharacterStyle(rawValue: Prefs.store.string(forKey: "style") ?? "") ?? .pixel
     }
 
     func start() {
@@ -247,21 +245,21 @@ final class UsageModel: ObservableObject {
         case .steady:    s.five = Meter(pct: 48, resetsAt: now.addingTimeInterval(2 * 3600)); s.week = Meter(pct: 40, resetsAt: weekly)
         case .straining: s.five = Meter(pct: 91, resetsAt: now.addingTimeInterval(48 * 60)); s.week = Meter(pct: 63, resetsAt: weekly)
         case .resting:   let w = at(9); s.five = Meter(pct: 100, resetsAt: w); s.week = Meter(pct: 72, resetsAt: weekly)
-                         s.resting = true; s.wakeAt = w; s.restReason = "limit"
+                         s.resting = true; s.wakeAt = w
         case .morning:   s.five = Meter(pct: 0, resetsAt: nil); s.week = Meter(pct: 72, resetsAt: weekly); s.justReset = now
         }
         s.projected = s.five.flatMap { Logic.projection($0, window: Limits.fiveLength, now: now) }
         s.codexFill = (s.codex?.week?.pct ?? 0) / 100
         if weeklyOnly {
-            // an account without a 5-hour window: the carrier is today's share of the week
-            let fills: [PetState: Double] = [.lively: 0.3, .steady: 0.62, .straining: 0.9, .resting: 1.0, .morning: 0]
+            // an account without a 5-hour window: the carrier is the week, today's share sets the pace
+            let fills: [PetState: Double] = [.lively: 0.3, .steady: 0.8, .straining: 1.4, .resting: 1.6, .morning: 0]
             let dayStart = cal.date(bySettingHour: 4, minute: 0, second: 0, of: now).map { $0 > now ? $0.addingTimeInterval(-86400) : $0 } ?? now
             let f = fills[st] ?? 0.3
             s.daily = Daily(fill: f, dayStart: dayStart, dayEnd: dayStart.addingTimeInterval(86400))
             s.five = nil
-            s.week = Meter(pct: [.lively: 31, .steady: 44, .straining: 58, .resting: 61, .morning: 61][st] ?? 31, resetsAt: weekly)
+            s.week = Meter(pct: [.lively: 31, .steady: 44, .straining: 58, .resting: 100, .morning: 61][st] ?? 31, resetsAt: weekly)
             s.projected = s.week.flatMap { Logic.projection($0, window: Limits.weekLength, now: now) }
-            if st == .resting { s.wakeAt = s.daily?.dayEnd; s.restReason = "daily" }
+            if st == .resting { s.wakeAt = weekly }
         }
         return s
     }
@@ -278,6 +276,13 @@ final class UsageModel: ObservableObject {
     /// Show the grandson (Codex) in the scene and his meters.
     @Published var showCodex: Bool = Prefs.store.object(forKey: "showCodex") as? Bool ?? true {
         didSet { Prefs.store.set(showCodex, forKey: "showCodex") }
+    }
+    /// The menu-bar item: Grandpa on or off, and which number beside him (percent by default).
+    @Published var barGrandpa: Bool = Prefs.store.object(forKey: "barGrandpa") as? Bool ?? true {
+        didSet { Prefs.store.set(barGrandpa, forKey: "barGrandpa") }
+    }
+    @Published var barText: BarText = BarText(rawValue: Prefs.store.string(forKey: "barText") ?? "") ?? .percent {
+        didSet { Prefs.store.set(barText.rawValue, forKey: "barText") }
     }
     /// The floating mini window: only while the menu-bar item is hidden (default), always, or never.
     @Published var miniMode: MiniMode = MiniMode(rawValue: Prefs.store.string(forKey: "miniWindow") ?? "") ?? .auto {

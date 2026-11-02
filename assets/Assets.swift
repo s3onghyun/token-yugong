@@ -25,11 +25,6 @@ public enum Tempo: String, CaseIterable {
     case idle, working, sweating
 }
 
-/// The two finished art styles of the same poses.
-public enum ArtStyle: String, CaseIterable {
-    case pixel, ink
-}
-
 /// Everything the popover scene needs besides the clock.
 public struct SceneInfo {
     public var state: PetState
@@ -49,22 +44,22 @@ public struct SceneInfo {
 /// Entry points into the separately licensed character assets.
 public enum TokenPetAssets {
     /// The character alone, feet on the bottom edge, inside a `size` square.
-    public static func figure(_ style: ArtStyle, _ state: PetState, t: Double, carrier: Double, night: Bool,
+    public static func figure(_ state: PetState, t: Double, carrier: Double, night: Bool,
                               size: CGFloat, menuBar: Bool, tempo: Tempo = .working) -> NSImage {
-        YugongArt.figure(style, state, t: t, carrier: carrier, night: night, size: size, menuBar: menuBar, tempo: tempo)
+        YugongArt.figure(state, t: t, carrier: carrier, night: night, size: size, menuBar: menuBar, tempo: tempo)
     }
 
     /// The whole popover scene: sky, the mountain, Grandpa, the magpie and the grandson.
-    public static func scene(_ style: ArtStyle, _ info: SceneInfo, t: Double, size: CGSize) -> NSImage {
-        YugongArt.scene(style, info, t: t, size: size)
+    public static func scene(_ info: SceneInfo, t: Double, size: CGSize) -> NSImage {
+        YugongArt.scene(info, t: t, size: size)
     }
 
     /// A pose signature, so a caller can tell when two moments draw the same picture.
-    public static func signature(_ style: ArtStyle, _ state: PetState, t: Double, night: Bool, tempo: Tempo = .working) -> String {
-        YugongRig.signature(state, t: t, night: night, stepped: style == .pixel, tempo: tempo)
+    public static func signature(_ state: PetState, t: Double, night: Bool, tempo: Tempo = .working) -> String {
+        YugongRig.signature(state, t: t, night: night, tempo: tempo)
     }
 
-    /// The app icon (pixel style) at `size` points.
+    /// The app icon at `size` points.
     public static func appIcon(size: CGFloat, t: Double = iconMoment) -> NSImage { YugongArt.appIcon(size: size, t: t) }
     public static let iconMoment = 0.0
 

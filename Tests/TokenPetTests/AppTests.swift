@@ -48,6 +48,56 @@ import Testing
         #expect(BarFit.hidden(item: .zero, screens: [mac]) == nil)
     }
 
+    // The menu-bar number: the headline window (5-hour, else weekly) in the chosen style
+    // (clock strings depend on the time zone and language, which other tests change in parallel:
+    // compare with Fmt.clock, tested on its own; the rule under test is which window and which style)
+    @Test func barTextFollowsTheHeadlineAndTheStyle() {
+        let now = Date(timeIntervalSince1970: 1_793_636_880)              // Tue 2026-11-03 01:28 KST
+        let weekReset = Date(timeIntervalSince1970: 1_794_164_400)       // Mon 2026-11-09 04:00 KST
+        var s = Snapshot(); s.known = true
+        s.five = Meter(pct: 23.6, resetsAt: now + 3 * 3600 + 12 * 60); s.week = Meter(pct: 40, resetsAt: weekReset)
+        #expect(BarText.percent.text(s, cutscene: false, now: now) == "24%")          // 5-hour wins, rounded
+        #expect(BarText.timeLeft.text(s, cutscene: false, now: now) == "3h 12m")
+        #expect(BarText.resetClock.text(s, cutscene: false, now: now) == Fmt.clock(now + 3 * 3600 + 12 * 60, now: now))
+        #expect(BarText.none.text(s, cutscene: false, now: now) == "")
+        s.five = nil                                                                  // weekly-only
+        #expect(BarText.percent.text(s, cutscene: false, now: now) == "40%")
+        #expect(BarText.timeLeft.text(s, cutscene: false, now: now) == "6d 2h")
+        #expect(BarText.resetClock.text(s, cutscene: false, now: now) == Fmt.clock(weekReset, now: now))
+        s.week = Meter(pct: 40, resetsAt: nil)                                        // no reset time: the percent
+        #expect(BarText.timeLeft.text(s, cutscene: false, now: now) == "40%")
+    }
+
+    @Test func barTextSpecialCases() {
+        let now = Date(timeIntervalSince1970: 1_793_636_880)
+        var s = Snapshot()
+        #expect(BarText.percent.text(s, cutscene: false, now: now) == "?")            // no data
+        #expect(BarText.percent.text(s, cutscene: true, now: now) == "✨")             // a mountain is done
+        s.known = true; s.five = Meter(pct: 100, resetsAt: now + 3600); s.resting = true; s.wakeAt = now + 3600
+        #expect(BarText.timeLeft.text(s, cutscene: false, now: now) == "1h 0m")       // resting: when he starts again
+        #expect(BarText.percent.text(s, cutscene: false, now: now) == Fmt.clock(now + 3600, now: now))
+        s.wakeAt = nil
+        #expect(BarText.percent.text(s, cutscene: false, now: now) == "?")
+    }
+
+    @Test func barItemIsNeverEmpty() {
+        #expect(BarText.item("24%", grandpa: true) == (true, " 24%"))
+        #expect(BarText.item("24%", grandpa: false) == (false, "24%"))
+        #expect(BarText.item("", grandpa: true) == (true, ""))                       // Grandpa only
+        #expect(BarText.item("", grandpa: false) == (true, ""))                      // nothing chosen: Grandpa stays
+    }
+
+    @Test func popoverHeaderDetail() {
+        let now = Date(timeIntervalSince1970: 1_793_636_880)
+        let weekReset = Date(timeIntervalSince1970: 1_794_164_400)
+        var s = Snapshot()
+        #expect(BarText.detail(s, now: now) == nil)
+        s.known = true; s.week = Meter(pct: 21, resetsAt: weekReset)
+        #expect(BarText.detail(s, now: now) == "21% · " + Fmt.clock(weekReset, now: now))   // e.g. "21% · 월 04:00"
+        s.week = Meter(pct: 21, resetsAt: nil)
+        #expect(BarText.detail(s, now: now) == "21%")
+    }
+
     @Test func miniWindowFollowsTheSetting() {
         #expect(MiniMode.auto.shows(barHidden: true) && !MiniMode.auto.shows(barHidden: false))
         #expect(MiniMode.always.shows(barHidden: false) && MiniMode.always.shows(barHidden: true))

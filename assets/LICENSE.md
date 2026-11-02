@@ -6,7 +6,7 @@ app's MIT license.
 
 ## Current status: all rights reserved
 
-Grandpa Yugong (pixel and ink styles), his magpie, his grandson and the app icon are a
+Grandpa Yugong (pixel art), his magpie, his grandson and the app icon are a
 **prototype design** awaiting the owner's final, human-authored version (see `PROVENANCE.md`).
 The earlier sketches in `archive/` are superseded. The same terms cover images made from these
 assets, such as `docs/demo.gif` and screenshots.

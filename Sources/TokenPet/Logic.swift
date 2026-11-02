@@ -62,6 +62,7 @@ enum Limits {
 /// Weekly-only accounts: the week (counted back from its reset) is 7 equal days, and by the end
 /// of day d (0...6) the fair use is (d+1)/7 of the week. fill = (used - d/7) / (1/7):
 /// 0 = nothing of today's share used yet (unused days carry over), 1 = today's share used up.
+/// It only sets the pace; it never makes him rest.
 struct Daily: Equatable {
     static let share = 100.0 / 7
     var fill: Double
@@ -83,9 +84,8 @@ struct Snapshot {
     var five: Meter?
     var week: Meter?
     var daily: Daily?        // set when there is a weekly window but no 5-hour window
-    var resting = false
+    var resting = false      // a window is at 100%
     var wakeAt: Date?        // nil while resting = the reset time is not known
-    var restReason = ""      // "limit" or "daily"
     var justReset: Date?
     var projected: Double?   // % this pace reaches by the reset
     var state: PetState = .lively
@@ -93,8 +93,11 @@ struct Snapshot {
     var codexFill: Double?   // the grandson's basket
     var demo = false
 
-    /// Earth in Grandpa's carrier: the 5-hour window, else today's share of the week, else the week.
-    var carrier: Double { daily?.fill ?? (five ?? week).map { $0.pct / 100 } ?? 0 }
+    /// The limit that matters most: the 5-hour window, else the week. It is the carrier, the
+    /// menu-bar number and the popover header.
+    var headline: Meter? { five ?? week }
+    /// Earth in Grandpa's carrier.
+    var carrier: Double { headline.map { $0.pct / 100 } ?? 0 }
 }
 
 enum Logic {
@@ -106,7 +109,7 @@ enum Logic {
             var r = c, ignored: [Date] = []
             r.five = roll(c.five, now, &ignored); r.week = roll(c.week, now, &ignored)
             s.codex = r
-            s.codexFill = carrier(five: r.five, week: r.week, now: now)
+            s.codexFill = fill(five: r.five, week: r.week)
         }
         guard let c = claude else { return s }          // rule 1: no data -> "don't know"
         s.known = true
@@ -117,14 +120,13 @@ enum Logic {
         let windows = [s.five, s.week].compactMap { $0 }
         let full = windows.filter { $0.pct >= 100 }     // rule 3
         if !full.isEmpty {
-            s.resting = true; s.restReason = "limit"
+            s.resting = true
             s.wakeAt = full.contains { $0.resetsAt == nil } ? nil : full.compactMap(\.resetsAt).max()
         }
         if s.five == nil, let w = s.week, let r = w.resetsAt {   // rule 4
             let d = Daily.of(w, resetsAt: r, now: now)
             s.daily = d
             resets.append(d.dayStart)
-            if !s.resting && d.fill >= 1 { s.resting = true; s.restReason = "daily"; s.wakeAt = d.dayEnd }
         }
         s.justReset = resets.filter { now >= $0 && now.timeIntervalSince($0) < morningFor }.max()   // rule 5
         s.projected = [s.five.flatMap { projection($0, window: Limits.fiveLength, now: now) },
@@ -140,11 +142,7 @@ enum Logic {
         return m
     }
 
-    static func carrier(five: Meter?, week: Meter?, now: Date) -> Double? {
-        if let f = five { return f.pct / 100 }
-        if let w = week, let r = w.resetsAt { return Daily.of(w, resetsAt: r, now: now).fill }
-        return week.map { $0.pct / 100 }
-    }
+    static func fill(five: Meter?, week: Meter?) -> Double? { (five ?? week).map { $0.pct / 100 } }
 
     /// Where this pace lands by the reset: used % / share of the window gone by (at least 12%, so a
     /// window that just started is not judged on a few minutes).
@@ -158,6 +156,9 @@ enum Logic {
     static func state(_ s: Snapshot) -> PetState {
         if s.resting { return .resting }
         if s.justReset != nil { return .morning }
+        if let d = s.daily {           // weekly-only: today's share is the pace
+            return d.fill >= 1 ? .straining : d.fill >= 0.75 ? .steady : .lively
+        }
         let top = [s.five, s.week].compactMap { $0?.pct }.max() ?? 0
         let pace = s.projected ?? top
         if top >= 80 || pace >= 110 { return .straining }

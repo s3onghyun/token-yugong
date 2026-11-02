@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Menu-bar number setting: percent used (default, `24%`), time to reset (`3h 12m`), reset time
+  (`Mon 04:00`) or none; and Grandpa on or off beside it (the item is never left empty). The
+  number is the 5-hour window, else the weekly one. The popover header shows it as `24% · Mon 04:00`.
+
+### Changed
+- Weekly-only accounts: Grandpa naps only when the weekly limit is used up, never just because
+  today's share (1/7 of the week) is spent. Weekly use is bursty, and a nap on day one was too
+  strict. The carrier and the menu bar now show the weekly %; today's share sets his pace (past it
+  he sweats: "ahead of today's share, take it slow"), and the popover says when the week resets.
+  Codex's basket follows the same rule.
+
+### Removed
+- The ink-wash style. Grandpa Yugong, and every character after him, is pixel art only: the
+  style picker in the popover, the `--style` flag and the ink drawing code are gone.
+
 ## 0.1.0 (2026-11-02)
 
 First version meant for daily use.

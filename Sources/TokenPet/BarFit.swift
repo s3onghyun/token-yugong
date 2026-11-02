@@ -27,6 +27,41 @@ enum BarFit {
     }
 }
 
+/// The number on the menu-bar item (Settings): percent used (default), time until the reset, or
+/// the reset time; or none, leaving Grandpa alone.
+enum BarText: String, CaseIterable {
+    case percent, timeLeft, resetClock, none
+
+    /// The text: ✨ when a mountain is done, ? without data; while resting, when he starts again;
+    /// else the headline window (5-hour, else weekly) in the chosen style. Without a reset time,
+    /// the time styles fall back to the percent.
+    func text(_ s: Snapshot, cutscene: Bool, now: Date) -> String {
+        if self == .none { return "" }
+        if cutscene { return "✨" }
+        if !s.known { return "?" }
+        if s.resting { return s.wakeAt.map { self == .timeLeft ? Fmt.left($0, now: now) : Fmt.clock($0, now: now) } ?? "?" }
+        guard let m = s.headline else { return "" }
+        switch (self, m.resetsAt) {
+        case (.timeLeft, let r?): return Fmt.left(r, now: now)
+        case (.resetClock, let r?): return Fmt.clock(r, now: now)
+        default: return "\(Int(m.pct.rounded()))%"
+        }
+    }
+
+    /// Whether Grandpa is drawn, and the item's title. Never an empty item: no text means Grandpa stays.
+    static func item(_ text: String, grandpa: Bool) -> (image: Bool, title: String) {
+        let image = grandpa || text.isEmpty
+        return (image, text.isEmpty ? "" : image ? " " + text : text)
+    }
+
+    /// The popover header's "24% · Mon 04:00": the headline and when it resets; nil without data.
+    static func detail(_ s: Snapshot, now: Date) -> String? {
+        guard s.known, let m = s.headline else { return nil }
+        let pct = "\(Int(m.pct.rounded()))%"
+        return m.resetsAt.map { pct + " · " + Fmt.clock($0, now: now) } ?? pct
+    }
+}
+
 /// Which floating mini window to show (Settings): only while the menu-bar item is hidden (default),
 /// always, or never.
 enum MiniMode: String, CaseIterable {

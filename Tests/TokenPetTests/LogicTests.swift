@@ -104,7 +104,7 @@ func json(_ s: String) -> Data { Data(s.utf8) }
     @Test func fullWindowRests() {
         let fiveReset = weekStart + 3 * hour
         let s = eval(claude(five: Meter(pct: 100, resetsAt: fiveReset), week: Meter(pct: 40, resetsAt: reset)), now: weekStart + hour)
-        #expect(s.resting && s.restReason == "limit" && s.wakeAt == fiveReset && s.state == .resting)
+        #expect(s.resting && s.wakeAt == fiveReset && s.state == .resting)
     }
 
     @Test func bothFullWaitsForTheLater() {
@@ -123,7 +123,7 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         #expect(!s.resting && s.state == .straining)
     }
 
-    // Rule 4: weekly-only accounts fill today's share
+    // Rule 4: weekly-only accounts carry the week; today's share only sets the pace
     @Test func noFiveHourWindowUsesDailyShare() {
         // measured on this Mac: day 0 (Mon 19:24 KST), 19% of the week used
         let now = Date(timeIntervalSince1970: 1_793_615_035)
@@ -131,25 +131,46 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         #expect(s.five == nil)
         let d = try! #require(s.daily)
         #expect(d.dayStart == weekStart && d.dayEnd == weekStart + day)
-        #expect(abs(d.fill - 19 / share) < 1e-9)               // 133%
-        #expect(s.resting && s.restReason == "daily" && s.wakeAt == weekStart + day)
-        #expect(abs(s.carrier - 19 / share) < 1e-9)
+        #expect(abs(d.fill - 19 / share) < 1e-9)               // 133% of today's share
+        #expect(!s.resting && s.wakeAt == nil && s.state == .straining)   // ahead of pace: sweating, never a forced nap
+        #expect(s.carrier == 0.19)                             // the carrier is the week
+    }
+
+    @Test func requesterDayOneIsNotARest() {
+        // reported 2026-11-03: Tue 01:08 KST, still day 0 of the week that began Mon 04:00, 21% used
+        let now = weekStart + 21 * hour + 8 * 60
+        let s = eval(claude(week: Meter(pct: 21, resetsAt: reset), at: now), now: now)
+        #expect(!s.resting && s.state == .straining && s.carrier == 0.21 && s.week?.resetsAt == reset)
+    }
+
+    @Test func weeklyOnlyRestsOnlyAtTheWeeklyLimit() {
+        let now = weekStart + 3 * day + hour
+        let full = eval(claude(week: Meter(pct: 100, resetsAt: reset)), now: now)
+        #expect(full.resting && full.wakeAt == reset && full.state == .resting && full.carrier == 1)
+        let nearly = eval(claude(week: Meter(pct: 99.9, resetsAt: reset)), now: now)
+        #expect(!nearly.resting && nearly.state == .straining)
     }
 
     @Test func unusedDaysCarryOver() {
         let s = eval(claude(week: Meter(pct: 19, resetsAt: reset)), now: weekStart + day + hour)   // day 1
         #expect(abs(s.daily!.fill - (19 - share) / share) < 1e-9)    // 33%
-        #expect(!s.resting)
+        #expect(!s.resting && s.state == .lively)
         let s3 = eval(claude(week: Meter(pct: 19, resetsAt: reset)), now: weekStart + 3 * day + hour)
-        #expect(s3.daily!.fill == 0)                                   // under pace: an empty carrier, never negative
+        #expect(s3.daily!.fill == 0)                                   // under pace: never negative
+        let late = eval(claude(week: Meter(pct: 86, resetsAt: reset)), now: reset - 2 * hour)   // day 6, behind pace
+        #expect(late.state == .lively)                                 // a high weekly % alone does not strain him
     }
 
     @Test func dailyShareExactlyAtThreshold() {
         let now = weekStart + 2 * day + 5 * hour                       // day 2: fair use so far = 3/7
         let at = eval(claude(week: Meter(pct: 3 * share, resetsAt: reset)), now: now)
-        #expect(abs(at.daily!.fill - 1) < 1e-9 && at.resting)
+        #expect(abs(at.daily!.fill - 1) < 1e-9 && !at.resting && at.state == .straining)
         let under = eval(claude(week: Meter(pct: 3 * share - 0.01, resetsAt: reset)), now: now)
-        #expect(under.daily!.fill < 1 && !under.resting)
+        #expect(under.daily!.fill < 1 && under.state == .steady)
+        let steady = eval(claude(week: Meter(pct: 2.75 * share + 1e-9, resetsAt: reset)), now: now)   // 0.75 of today's share (+ float slack)
+        #expect(steady.state == .steady)
+        let lively = eval(claude(week: Meter(pct: 2.75 * share - 0.01, resetsAt: reset)), now: now)
+        #expect(lively.state == .lively)
     }
 
     @Test func dailyDayBoundariesAndClamp() {
@@ -179,8 +200,8 @@ func json(_ s: String) -> Data { Data(s.utf8) }
     }
 
     @Test func restingBeatsMorning() {
-        let s = eval(claude(week: Meter(pct: 40, resetsAt: reset)), now: weekStart + day + 60)   // day 1, 40% > 2/7
-        #expect(s.state == .resting)
+        let s = eval(claude(week: Meter(pct: 100, resetsAt: reset)), now: weekStart + day + 60)  // a new day, but the week is used up
+        #expect(s.justReset != nil && s.state == .resting)
     }
 
     // Rule 6: working pace, exactly at each threshold (five-hour window half gone: pace = 2 x used)
@@ -241,16 +262,12 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         #expect(Set(out).count == 1)
     }
 
-    @Test func clockTextFollowsTheTimeZone() {
-        let saved = L.korean
-        defer { L.korean = saved }
-        L.korean = false
+    @Test func clockTextFollowsTheTimeZone() {   // the language is passed in: tests run in parallel, so none flips L.korean
         let now = reset - 2 * day
-        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "Asia/Seoul")!) == "Mon 04:00")
-        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "UTC")!) == "Sun 19:00")
-        #expect(Fmt.clock(reset, now: reset - hour, tz: TimeZone(identifier: "Asia/Seoul")!) == "04:00")  // same day: time only
-        L.korean = true
-        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "Asia/Seoul")!) == "월 04:00")
+        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "Asia/Seoul")!, korean: false) == "Mon 04:00")
+        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "UTC")!, korean: false) == "Sun 19:00")
+        #expect(Fmt.clock(reset, now: reset - hour, tz: TimeZone(identifier: "Asia/Seoul")!, korean: false) == "04:00")  // same day: time only
+        #expect(Fmt.clock(reset, now: now, tz: TimeZone(identifier: "Asia/Seoul")!, korean: true) == "월 04:00")
     }
 
     @Test func codexLogsOlderThanTheWindow() {
@@ -262,9 +279,8 @@ func json(_ s: String) -> Data { Data(s.utf8) }
 
     @Test func codexBasket() {
         let now = weekStart + 2 * hour
-        let weekly = Reading(five: nil, week: Meter(pct: 66, resetsAt: weekStart + 2.5 * day), at: now)  // its day 4
-        let s = eval(nil, now: now, codex: weekly)
-        #expect(abs(s.codexFill! - (66 - 4 * share) / share) < 1e-9)
+        let weekly = Reading(five: nil, week: Meter(pct: 66, resetsAt: weekStart + 2.5 * day), at: now)
+        #expect(eval(nil, now: now, codex: weekly).codexFill == 0.66)   // weekly-only: the basket is the week
         let five = Reading(five: Meter(pct: 25, resetsAt: now + hour), week: Meter(pct: 90, resetsAt: reset), at: now)
         #expect(eval(nil, now: now, codex: five).codexFill == 0.25)
         #expect(eval(nil, now: now).codexFill == nil)        // no Codex logs: no grandson
@@ -329,13 +345,13 @@ func json(_ s: String) -> Data { Data(s.utf8) }
 
     @Test func idleLeansAndSweatingSweats() {
         let t = 0.1
-        #expect(TokenPetAssets.signature(.pixel, .lively, t: t, night: false, tempo: .idle)
-                != TokenPetAssets.signature(.pixel, .lively, t: t, night: false, tempo: .working))
-        #expect(TokenPetAssets.signature(.pixel, .lively, t: t, night: false, tempo: .sweating).contains(" true "))
+        #expect(TokenPetAssets.signature(.lively, t: t, night: false, tempo: .idle)
+                != TokenPetAssets.signature(.lively, t: t, night: false, tempo: .working))
+        #expect(TokenPetAssets.signature(.lively, t: t, night: false, tempo: .sweating).contains(" true "))
         // resting and morning ignore the tempo: a tired Grandpa does not dig faster
         for st in [PetState.resting, .morning] {
-            #expect(TokenPetAssets.signature(.pixel, st, t: t, night: false, tempo: .sweating)
-                    == TokenPetAssets.signature(.pixel, st, t: t, night: false, tempo: .idle))
+            #expect(TokenPetAssets.signature(st, t: t, night: false, tempo: .sweating)
+                    == TokenPetAssets.signature(st, t: t, night: false, tempo: .idle))
         }
     }
 }
