@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 import TokenPetAssets
+import UserNotifications
 
 // Usage:
 //   TokenPet [--style pixel|ink] [--lang en|ko] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
@@ -15,7 +16,7 @@ func arg(_ name: String) -> String? {
     guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
     return args[i + 1]
 }
-if let lang = arg("--lang") { L.korean = lang == "ko" }
+if let lang = arg("--lang") { L.korean = lang == "ko" }   // this run only; the saved setting stays
 
 let home = FileManager.default.homeDirectoryForCurrentUser
 let bridgeURL = URL(fileURLWithPath: arg("--bridge")
@@ -107,6 +108,27 @@ if let dir = arg("--render") {
     exit(0)
 }
 
+if let dir = arg("--icon-set") {   // PNGs for iconutil (scripts/bundle.sh)
+    let out = URL(fileURLWithPath: dir)
+    try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    for pt in [16, 32, 128, 256, 512] {
+        for scale in [1, 2] {
+            let px = pt * scale
+            guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px, bitsPerSample: 8, samplesPerPixel: 4,
+                                             hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            TokenPetAssets.appIcon(size: CGFloat(px), t: Double(arg("--icon-t") ?? "") ?? TokenPetAssets.iconMoment)
+                .draw(in: NSRect(x: 0, y: 0, width: px, height: px))
+            NSGraphicsContext.restoreGraphicsState()
+            let name = "icon_\(pt)x\(pt)\(scale == 2 ? "@2x" : "").png"
+            try? rep.representation(using: .png, properties: [:])?.write(to: out.appendingPathComponent(name))
+        }
+    }
+    print("icon set in \(dir)")
+    exit(0)
+}
+
 /// Mirror of the status item, so a window-only capture can show it next to the popover.
 final class BarMirror: ObservableObject {
     @Published var image = NSImage()
@@ -132,8 +154,13 @@ struct StageView: View {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     let bar = BarMirror()
+    var mini: MiniWindow?
+    var miniForced = false          // shown on request (app reopened) although the setting says off
+    var barHidden = false           // the menu-bar item is off-screen or behind the notch
+    var guide: NSWindow?
+    var sinks: [AnyCancellable] = []
     var stage: NSPanel?
     var sharingSink: AnyCancellable?
     var snapSink: AnyCancellable?
@@ -145,10 +172,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ note: Notification) {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.target = self
-        item.button?.action = #selector(toggle)
+        item.button?.action = #selector(toggleFromBar)
         item.button?.imagePosition = .imageLeading
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: PopoverView(model: model))
+        let host = NSHostingController(rootView: PopoverView(model: model))
+        host.sizingOptions = .preferredContentSize
+        popover.contentViewController = host
+        model.openGuide = { [weak self] in self?.popover.performClose(nil); self?.showGuide() }
+        Notify.setUp(self)
 
         model.captureAllowedForDemo = args.contains("--allow-capture")
         model.demoPace = arg("--tempo").flatMap { a in Pace.Level.allCases.first { "\($0)" == a } }
@@ -163,6 +194,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         snapSink = model.$snap.sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } }
         watchVisibility()
         scheduleAnim()
+        sinks.append(model.$miniMode.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.miniForced = false; self?.updateMini() } })
+        sinks.append(model.$mountain.sink { m in DispatchQueue.main.async { AppDelegate.milestoneNotice(m) } })
+        let demoRun = arg("--demo") != nil || args.contains("--stage")
+        if args.contains("--guide") || (!demoRun && !Prefs.store.bool(forKey: "onboarded")) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.showGuide() }
+        }
         sharingSink = model.$hideFromCapture.sink { [weak self] _ in DispatchQueue.main.async { self?.applySharing() } }
         if args.contains("--stage") {
             let host = NSHostingView(rootView: StageView(bar: bar, model: model))
@@ -176,9 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             applySharing()
             print("stage window \(p.windowNumber)")
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            print("status item window frame: \(self.item.button?.window?.frame ?? .zero), visible=\(self.item.isVisible)")
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.checkBar() }
         if args.contains("--anim-stats") {   // measurement: menu-bar wakes and redraws per 30 s, drawn even if the bar hides the icon
             Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
                 print("anim: \(self.wakeCount) wakes, \(self.drawCount) redraws, paused=\(self.paused), state=\(model.snap.state), tempo=\(model.tempo), speed=\(String(format: "%.2f", model.animSpeed))")
@@ -215,6 +250,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.window?.sharingType = t
         popover.contentViewController?.view.window?.sharingType = t
         stage?.sharingType = t
+        mini?.sharingType = t
     }
 
     // RunCat-style menu bar: each routine loop is drawn once into bitmaps, merged into runs of the
@@ -224,20 +260,106 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var loops: [String: (runs: [(img: NSImage, end: Double)], period: Double)] = [:]
     private var lastImage: NSImage?, lastTitle = ""
 
+    private var screensAsleep = false, sessionAway = false
+
     func watchVisibility() {
         let ws = NSWorkspace.shared.notificationCenter
-        var screensAsleep = false, sessionAway = false
-        let update = { [weak self] in
-            guard let self else { return }
-            let offScreen = !(self.item.button?.window?.occlusionState.contains(.visible) ?? true) && !args.contains("--anim-stats")
-            let hidden = screensAsleep || sessionAway || offScreen
-            if hidden != self.paused { self.paused = hidden; self.scheduleAnim() }
+        ws.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in self?.screensAsleep = true; self?.updatePaused() }
+        ws.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.screensAsleep = false; self?.updatePaused() }
+        ws.addObserver(forName: NSWorkspace.sessionDidResignActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.sessionAway = true; self?.updatePaused() }
+        ws.addObserver(forName: NSWorkspace.sessionDidBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.sessionAway = false; self?.updatePaused() }
+        NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main) { [weak self] _ in self?.updatePaused() }
+        // the bar reshuffles when other apps add items or screens change: look again a moment later
+        let recheck: (Notification) -> Void = { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self?.checkBar() }
         }
-        ws.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { _ in screensAsleep = true; update() }
-        ws.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { _ in screensAsleep = false; update() }
-        ws.addObserver(forName: NSWorkspace.sessionDidResignActiveNotification, object: nil, queue: .main) { _ in sessionAway = true; update() }
-        ws.addObserver(forName: NSWorkspace.sessionDidBecomeActiveNotification, object: nil, queue: .main) { _ in sessionAway = false; update() }
-        NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: item.button?.window, queue: .main) { _ in update() }
+        NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: item.button?.window, queue: .main, using: recheck)
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main, using: recheck)
+    }
+
+    /// Draw only while someone can see the pet: the bar item or the mini window on screen, display awake.
+    func updatePaused() {
+        let itemSeen = !barHidden && (item.button?.window?.occlusionState.contains(.visible) ?? true)
+        let miniSeen = mini.map { $0.isVisible && $0.occlusionState.contains(.visible) } ?? false
+        let hidden = screensAsleep || sessionAway || !(itemSeen || miniSeen || args.contains("--anim-stats"))
+        if hidden != paused { paused = hidden; scheduleAnim() }
+    }
+
+    /// Is the menu-bar item really on screen? If not, tell the user once and fall back to the mini window.
+    func checkBar() {
+        guard let f = item.button?.window?.frame else { return }
+        let screens = NSScreen.screens.map {
+            BarFit.Screen(frame: $0.frame, notch: BarFit.notch(frame: $0.frame, left: $0.auxiliaryTopLeftArea, right: $0.auxiliaryTopRightArea))
+        }
+        guard var hidden = BarFit.hidden(item: f, screens: screens) else { return }
+        if args.contains("--pretend-hidden") { hidden = true }   // demo and testing of the fallback
+        if hidden != barHidden || !barChecked { print("menu bar item \(hidden ? "hidden" : "visible"): \(f)") }
+        barChecked = true
+        barHidden = hidden
+        if hidden && !Prefs.store.bool(forKey: "barHiddenWarned") {
+            Prefs.store.set(true, forKey: "barHiddenWarned")
+            Notify.post(id: "bar-hidden", title: L.t("No room for Grandpa in the menu bar", "메뉴바에 할아버지 자리가 없어요"),
+                        body: model.miniMode == .off
+                            ? L.t("The menu bar is full, so his icon is hidden. Open the app again to see him.", "메뉴바가 꽉 차서 아이콘이 가려졌어요. 앱을 다시 열면 보여요.")
+                            : L.t("The menu bar is full, so he moved into a small floating window. You can change this in Settings.",
+                                  "메뉴바가 꽉 차서 작은 창으로 옮겨 왔어요. 설정에서 바꿀 수 있어요."))
+        }
+        updateMini()
+        updatePaused()
+    }
+    private var barChecked = false
+
+    func updateMini() {
+        let want = miniForced || model.miniMode.shows(barHidden: barHidden)
+        if want, mini == nil {
+            let m = MiniWindow()
+            m.pet.onClick = { [weak self] v in self?.toggle(from: v) }
+            m.pet.onHide = { [weak self] in self?.miniForced = false; model.miniMode = .off }
+            m.update(image: lastImage, title: lastTitle, crisp: model.style.crisp)
+            mini = m
+        }
+        if want { mini?.orderFrontRegardless() } else { mini?.orderOut(nil) }
+        applySharing()
+        updatePaused()
+    }
+
+    /// One notification per mountain carried away.
+    static func milestoneNotice(_ m: MountainLedger) {
+        guard m.cutscenePending, Prefs.store.integer(forKey: "mountain.notified") <= m.index else { return }
+        Prefs.store.set(m.index + 1, forKey: "mountain.notified")
+        Notify.post(id: "mountain-\(m.index)", title: L.t("\(m.name) is gone!", "\(m.name)을 다 옮겼어요!"),
+                    body: L.t("Heaven was moved by Grandpa's stubbornness. Open him to watch.", "할아버지 끈기에 하늘이 감동했대요. 눌러서 보세요."))
+    }
+
+    func showGuide() {
+        if guide == nil {
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 520), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            w.title = L.t("Grandpa Yugong", "우공 할아버지")
+            w.isReleasedWhenClosed = false
+            w.contentView = NSHostingView(rootView: OnboardingView(model: model) { [weak self, weak w] in
+                Prefs.store.set(true, forKey: "onboarded"); w?.close(); _ = self
+            })
+            w.center()
+            guide = w
+        }
+        Prefs.store.set(true, forKey: "onboarded")   // shown once by itself; Settings reopens it
+        NSApp.activate(ignoringOtherApps: true)
+        guide?.makeKeyAndOrderFront(nil)
+        applySharing()
+    }
+
+    /// Opening the app again (Finder, Spotlight) brings Grandpa up, even when the bar has no room for him.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if barHidden && mini?.isVisible != true { miniForced = true; updateMini() }
+        show()
+        return false
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler done: @escaping (UNNotificationPresentationOptions) -> Void) { done([.banner]) }
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler done: @escaping () -> Void) {
+        DispatchQueue.main.async { _ = self.applicationShouldHandleReopen(NSApp, hasVisibleWindows: false); done() }
     }
 
     func scheduleAnim() {
@@ -293,10 +415,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastImage = run.img
             item.button?.image = run.img
             bar.image = run.img
+            if mini?.isVisible == true { mini?.pet.image = run.img }
             drawCount += 1
         }
         let title: String
-        if !s.known { title = " ?" }
+        if model.cutsceneDue { title = " ✨" }
+        else if !s.known { title = " ?" }
         else if s.resting { title = " " + (s.wakeAt.map { Fmt.clock($0) } ?? "?") }
         else if let d = s.daily { title = " \(Int((d.fill * 100).rounded()))%" }
         else if let m = s.five ?? s.week { title = " \(Int(m.pct.rounded()))%" }
@@ -307,6 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.button?.attributedTitle = NSAttributedString(string: title, attributes: [
                 .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
             ])
+            mini?.update(image: run.img, title: title, crisp: model.style.crisp)
         }
         // wake again when this picture ends, at the current speed (at least 1/30 s, at most 30 s)
         let wait = l.period.isFinite ? min(30, max(1.0 / 30, (run.end - p) / max(0.3, model.animSpeed))) : 30
@@ -314,12 +439,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         animTimer?.tolerance = wait * 0.1
     }
 
-    @objc func toggle() { popover.isShown ? popover.performClose(nil) : show() }
+    @objc func toggleFromBar() { toggle(from: nil) }
+    func toggle(from v: NSView?) { popover.isShown ? popover.performClose(nil) : show(from: v) }
 
-    func show() {
-        guard let b = item.button else { return }
+    /// Opens the popover under the bar item, or under the mini window when the bar has no room.
+    func show(from v: NSView? = nil) {
+        guard let anchor = v ?? ((barHidden && mini?.isVisible == true) ? mini?.pet : item.button) else { return }
+        if model.cutsceneDue && model.cutsceneStart == nil { model.cutsceneStart = Date() }   // play it once from the top
         NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: b.bounds, of: b, preferredEdge: .minY)
+        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
         applySharing()
     }
 }

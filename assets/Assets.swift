@@ -64,6 +64,10 @@ public enum TokenPetAssets {
         YugongRig.signature(state, t: t, night: night, stepped: style == .pixel, tempo: tempo)
     }
 
+    /// The app icon (pixel style) at `size` points.
+    public static func appIcon(size: CGFloat, t: Double = iconMoment) -> NSImage { YugongArt.appIcon(size: size, t: t) }
+    public static let iconMoment = 0.0
+
     /// Length of one seamless loop of the character's routine in this state.
     public static func period(_ state: PetState, night: Bool, tempo: Tempo = .working) -> Double { YugongRig.period(state, night: night, tempo: tempo) }
 }

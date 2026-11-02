@@ -1,5 +1,13 @@
 import Foundation
+import ServiceManagement
 import TokenPetAssets
+
+/// One settings domain however the app is started (`swift run` or the .app bundle), so the
+/// mountain and the settings carry over. `defaults delete TokenPet` clears everything.
+/// TOKENPET_PREFS names another domain (tests and demo recordings, so they leave yours alone).
+enum Prefs {
+    static let store = UserDefaults(suiteName: ProcessInfo.processInfo.environment["TOKENPET_PREFS"] ?? "TokenPet") ?? .standard
+}
 
 // MARK: - Codex CLI (local session logs; no network, no credentials)
 
@@ -59,18 +67,18 @@ struct MountainLedger {
     var index: Int              // 0 = Taihang, 1 = Wangwu, then "another mountain"
     var cutscenePending: Bool
     let size: Double
+    var store: UserDefaults = Prefs.store
 
-    static func load() -> MountainLedger {
-        let d = UserDefaults.standard
-        return MountainLedger(tokens: d.double(forKey: "mountain.tokens"),
-                              through: (d.object(forKey: "mountain.through") as? Double).map(Date.init(timeIntervalSince1970:)),
-                              index: d.integer(forKey: "mountain.index"),
-                              cutscenePending: d.bool(forKey: "mountain.cutscene"),
-                              size: (d.object(forKey: "mountain.size") as? Double) ?? defaultSize)
+    static func load(_ d: UserDefaults = Prefs.store) -> MountainLedger {
+        MountainLedger(tokens: d.double(forKey: "mountain.tokens"),
+                       through: (d.object(forKey: "mountain.through") as? Double).map(Date.init(timeIntervalSince1970:)),
+                       index: d.integer(forKey: "mountain.index"),
+                       cutscenePending: d.bool(forKey: "mountain.cutscene"),
+                       size: (d.object(forKey: "mountain.size") as? Double) ?? defaultSize, store: d)
     }
 
     func save() {
-        let d = UserDefaults.standard
+        let d = store
         d.set(tokens, forKey: "mountain.tokens")
         d.set(through?.timeIntervalSince1970, forKey: "mountain.through")
         d.set(index, forKey: "mountain.index")
@@ -135,7 +143,7 @@ final class UsageModel: ObservableObject {
     init(bridgeURL: URL, logsRoot: URL, style: CharacterStyle?) {
         self.bridgeURL = bridgeURL
         self.scanner = LogScanner(root: logsRoot)
-        self.style = style ?? CharacterStyle(rawValue: UserDefaults.standard.string(forKey: "style") ?? "") ?? .pixel
+        self.style = style ?? CharacterStyle(rawValue: Prefs.store.string(forKey: "style") ?? "") ?? .pixel
     }
 
     func start() {
@@ -174,9 +182,12 @@ final class UsageModel: ObservableObject {
     var mountainLeft: Double { demoMountainLeft ?? mountain.left }
     var cutsceneDue: Bool { demoCutscene || (demo == nil && !demoCycle && mountain.cutscenePending) }
     func finishCutscene() {
+        cutsceneStart = nil
         if demoCutscene { demoCutscene = false; objectWillChange.send(); return }
         mountain.nextMountain()
     }
+    /// Set by the app: opens the first-run guide again (Settings).
+    var openGuide: (() -> Void)?
 
     static func readBridge(_ url: URL) -> Reading? {
         guard let data = try? Data(contentsOf: url) else { return nil }
@@ -258,8 +269,32 @@ final class UsageModel: ObservableObject {
     /// `--allow-capture` (demo recording only): windows stay capturable without changing the saved setting.
     var captureAllowedForDemo = false
 
+    // MARK: - Settings (UserDefaults domain of the app; `defaults delete <domain>` clears them)
+
+    /// "auto" follows the system language; "ko" or "en" pins it.
+    @Published var language: String = Prefs.store.string(forKey: "language") ?? "auto" {
+        didSet { Prefs.store.set(language, forKey: "language"); L.korean = L.resolve(language) }
+    }
+    /// Show the grandson (Codex) in the scene and his meters.
+    @Published var showCodex: Bool = Prefs.store.object(forKey: "showCodex") as? Bool ?? true {
+        didSet { Prefs.store.set(showCodex, forKey: "showCodex") }
+    }
+    /// The floating mini window: only while the menu-bar item is hidden (default), always, or never.
+    @Published var miniMode: MiniMode = MiniMode(rawValue: Prefs.store.string(forKey: "miniWindow") ?? "") ?? .auto {
+        didSet { Prefs.store.set(miniMode.rawValue, forKey: "miniWindow") }
+    }
+
+    /// Launch at login is opt-in only: the app never registers itself. Needs the .app bundle.
+    var canLaunchAtLogin: Bool { Bundle.main.bundleIdentifier != nil }
+    var launchAtLogin: SMAppService.Status { canLaunchAtLogin ? SMAppService.mainApp.status : .notRegistered }
+    func setLaunchAtLogin(_ on: Bool) {
+        do { try on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() }
+        catch { FileHandle.standardError.write("launch at login: \(error)\n".data(using: .utf8)!) }
+        objectWillChange.send()
+    }
+
     /// Keep the pet and the numbers out of screen shares and recordings (default on).
-    @Published var hideFromCapture: Bool = UserDefaults.standard.object(forKey: "hideFromCapture") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(hideFromCapture, forKey: "hideFromCapture") }
+    @Published var hideFromCapture: Bool = Prefs.store.object(forKey: "hideFromCapture") as? Bool ?? true {
+        didSet { Prefs.store.set(hideFromCapture, forKey: "hideFromCapture") }
     }
 }

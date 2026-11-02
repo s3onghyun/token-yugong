@@ -2,7 +2,11 @@ import SwiftUI
 import TokenPetAssets
 
 enum L {
-    static var korean = (Locale.preferredLanguages.first ?? "en").hasPrefix("ko")
+    static var korean = resolve(Prefs.store.string(forKey: "language") ?? "auto")
+    /// The language setting ("auto", "ko", "en") -> Korean or not.
+    static func resolve(_ pref: String, system: [String] = Locale.preferredLanguages) -> Bool {
+        pref == "auto" ? (system.first ?? "en").hasPrefix("ko") : pref == "ko"
+    }
     static func t(_ en: String, _ ko: String) -> String { korean ? ko : en }
 }
 
@@ -37,6 +41,7 @@ struct PopoverView: View {
     var cutsceneT: Double? = nil     // stills: freeze the cutscene at this progress
 
     static let sceneSize = CGSize(width: 292, height: 176)
+    @State private var showSettings = false
 
     var body: some View {
         let s = model.snap
@@ -48,7 +53,7 @@ struct PopoverView: View {
                 Spacer()
                 HStack(spacing: 4) {
                     ForEach(CharacterStyle.allCases) { c in
-                        Button { model.style = c; UserDefaults.standard.set(c.rawValue, forKey: "style") } label: {
+                        Button { model.style = c; Prefs.store.set(c.rawValue, forKey: "style") } label: {
                             HStack(spacing: 4) {
                                 Image(nsImage: c.image(.lively, t: 0, size: 18, menuBar: true))
                                     .interpolation(c.crisp ? .none : .high)
@@ -85,7 +90,7 @@ struct PopoverView: View {
                          "삽질 속도: 분당 출력 토큰 \(Int(model.pace.smoothed.rounded())) (최근 3분, 이 Mac)"))
                     .font(.caption).foregroundColor(.secondary)
             }
-            if let c = s.codex {
+            if let c = s.codex, model.showCodex {
                 Divider()
                 HStack {
                     Text(L.t("Codex · grandson's basket", "Codex · 손주 바구니")).font(.caption.weight(.bold)).foregroundColor(.secondary)
@@ -107,7 +112,10 @@ struct PopoverView: View {
                 .font(.caption)
             }
             .buttonStyle(.plain).foregroundColor(.secondary)
+            if showSettings { settings }
             HStack {
+                Button { showSettings.toggle() } label: { Image(systemName: showSettings ? "gearshape.fill" : "gearshape") }
+                    .buttonStyle(.plain).foregroundColor(.secondary).help(L.t("Settings", "설정"))
                 if model.demo != nil || model.demoCycle || model.demoCutscene {
                     Text(L.t("Demo data", "데모 데이터")).font(.caption.weight(.semibold))
                         .padding(.horizontal, 6).padding(.vertical, 2)
@@ -125,8 +133,38 @@ struct PopoverView: View {
 
     private var clockNow: Date { now ?? Date() }
 
+    private var settings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            Text(L.t("Settings", "설정")).font(.caption.weight(.bold)).foregroundColor(.secondary)
+            Picker(L.t("Language", "언어"), selection: $model.language) {
+                Text(L.t("System", "시스템")).tag("auto")
+                Text("한국어").tag("ko")
+                Text("English").tag("en")
+            }
+            Picker(L.t("Mini window", "작은 창"), selection: $model.miniMode) {
+                Text(L.t("When the menu bar is full", "메뉴바가 꽉 찼을 때")).tag(MiniMode.auto)
+                Text(L.t("Always", "항상")).tag(MiniMode.always)
+                Text(L.t("Never", "끔")).tag(MiniMode.off)
+            }
+            Toggle(L.t("Show the grandson (Codex)", "손주(Codex) 보이기"), isOn: $model.showCodex)
+            let login = model.launchAtLogin
+            Toggle(L.t("Open at login", "로그인할 때 열기"), isOn: Binding(get: { login == .enabled || login == .requiresApproval },
+                                                                       set: { model.setLaunchAtLogin($0) }))
+                .disabled(!model.canLaunchAtLogin)
+                .help(model.canLaunchAtLogin ? "" : L.t("Only in the app bundle (scripts/bundle.sh)", "앱 번들에서만 (scripts/bundle.sh)"))
+            if login == .requiresApproval {
+                Text(L.t("Allow it in System Settings › General › Login Items.", "시스템 설정 › 일반 › 로그인 항목에서 허용해 주세요."))
+                    .font(.caption).foregroundColor(.secondary)
+            }
+            Button(L.t("How it works and Claude Code setup…", "사용법과 Claude Code 연결…")) { model.openGuide?() }
+                .buttonStyle(.link)
+        }
+        .font(.callout)
+    }
+
     private func info(_ s: Snapshot, t: Double) -> SceneInfo {
-        var i = SceneInfo(state: s.state, carrier: s.carrier, mountainLeft: model.mountainLeft, grandson: s.codexFill,
+        var i = SceneInfo(state: s.state, carrier: s.carrier, mountainLeft: model.mountainLeft, grandson: model.showCodex ? s.codexFill : nil,
                           night: s.state == .resting || model.night,
                           cutscene: model.cutsceneDue ? (cutsceneT ?? model.cutsceneStart.map { min(1, Date().timeIntervalSince($0) / 4.5) }
                                                          ?? (t / 7).truncatingRemainder(dividingBy: 1)) : nil)

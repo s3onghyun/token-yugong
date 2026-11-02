@@ -6,12 +6,18 @@
 # and nothing goes over the network.
 dir="${TOKENPET_DIR:-$HOME/.claude/token-pet}"
 input=$(cat)
-rl=$(printf '%s' "$input" | jq -c '.rate_limits // empty' 2>/dev/null)
+# jq when installed (built into macOS 15+), otherwise plutil (every macOS)
+if command -v jq >/dev/null 2>&1; then
+  rl=$(printf '%s' "$input" | jq -c '.rate_limits // empty' 2>/dev/null)
+  pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
+else
+  rl=$(printf '%s' "$input" | plutil -extract rate_limits json -o - - 2>/dev/null)
+  pct=$(printf '%s' "$rl" | plutil -extract five_hour.used_percentage raw -o - - 2>/dev/null)
+fi
 if [ -n "$rl" ] && [ "$rl" != "null" ]; then
   mkdir -p "$dir"
   printf '{"captured_at":%s,"rate_limits":%s}\n' "$(date +%s)" "$rl" > "$dir/limits.json.tmp" &&
     mv "$dir/limits.json.tmp" "$dir/limits.json"
 fi
-pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
 [ -n "$pct" ] && printf '🐾 5h %.0f%%' "$pct"
 exit 0
