@@ -10,11 +10,18 @@ struct Meter: Equatable {
     var resetsAt: Date?
 }
 
-/// One reading of the official limits. Either window may be absent.
+/// One reading of the official limits. Any window may be absent.
 struct Reading: Equatable {
     var five: Meter?
     var week: Meter?
     var at: Date            // when the tool reported these numbers
+    var month: Meter? = nil // a billed API: this month's spend against the budget
+}
+
+/// A family member other than Grandpa: his reading with passed resets applied, and his meter.
+struct Member: Equatable {
+    var reading: Reading?
+    var fill: Double?       // nil = don't know
 }
 
 enum Limits {
@@ -89,13 +96,13 @@ struct Snapshot {
     var justReset: Date?
     var projected: Double?   // % this pace reaches by the reset
     var state: PetState = .lively
-    var codex: Reading?
-    var codexFill: Double?   // the grandson's basket
+    var month: Meter?
+    var members: [Role: Member] = [:]   // the rest of the family (Settings › Family)
     var demo = false
 
-    /// The limit that matters most: the 5-hour window, else the week. It is the carrier, the
-    /// menu-bar number and the popover header.
-    var headline: Meter? { five ?? week }
+    /// The limit that matters most: the 5-hour window, else the week, else the month (a billed API).
+    /// It is the carrier, the menu-bar number and the popover header.
+    var headline: Meter? { five ?? week ?? month }
     /// Earth in Grandpa's carrier.
     var carrier: Double { headline.map { $0.pct / 100 } ?? 0 }
 }
@@ -103,21 +110,18 @@ struct Snapshot {
 enum Logic {
     static let morningFor: TimeInterval = 300
 
-    static func evaluate(claude: Reading?, codex: Reading?, now: Date) -> Snapshot {
+    /// `main` is Grandpa's AI; `members` the others in the family (nil = assigned, nothing to read).
+    static func evaluate(main: Reading?, members: [Role: Reading?] = [:], now: Date) -> Snapshot {
         var s = Snapshot()
-        if let c = codex {
-            var r = c, ignored: [Date] = []
-            r.five = roll(c.five, now, &ignored); r.week = roll(c.week, now, &ignored)
-            s.codex = r
-            s.codexFill = fill(five: r.five, week: r.week)
-        }
-        guard let c = claude else { return s }          // rule 1: no data -> "don't know"
+        s.members = members.mapValues { member($0, now: now) }
+        guard let c = main else { return s }            // rule 1: no data -> "don't know"
         s.known = true
         s.captured = c.at
         var resets: [Date] = []
         s.five = roll(c.five, now, &resets)            // rule 2
         s.week = roll(c.week, now, &resets)
-        let windows = [s.five, s.week].compactMap { $0 }
+        s.month = roll(c.month, now, &resets)
+        let windows = [s.five, s.week, s.month].compactMap { $0 }
         let full = windows.filter { $0.pct >= 100 }     // rule 3
         if !full.isEmpty {
             s.resting = true
@@ -142,7 +146,13 @@ enum Logic {
         return m
     }
 
-    static func fill(five: Meter?, week: Meter?) -> Double? { (five ?? week).map { $0.pct / 100 } }
+    /// The others' meters: the same windows and rule 2, filled by the 5-hour, else weekly, else monthly %.
+    static func member(_ r: Reading?, now: Date) -> Member {
+        guard var r else { return Member(reading: nil, fill: nil) }
+        var ignored: [Date] = []
+        r.five = roll(r.five, now, &ignored); r.week = roll(r.week, now, &ignored); r.month = roll(r.month, now, &ignored)
+        return Member(reading: r, fill: (r.five ?? r.week ?? r.month).map { $0.pct / 100 })
+    }
 
     /// Where this pace lands by the reset: used % / share of the window gone by (at least 12%, so a
     /// window that just started is not judged on a few minutes).
@@ -159,7 +169,7 @@ enum Logic {
         if let d = s.daily {           // weekly-only: today's share is the pace
             return d.fill >= 1 ? .straining : d.fill >= 0.75 ? .steady : .lively
         }
-        let top = [s.five, s.week].compactMap { $0?.pct }.max() ?? 0
+        let top = [s.five, s.week, s.month].compactMap { $0?.pct }.max() ?? 0
         let pace = s.projected ?? top
         if top >= 80 || pace >= 110 { return .straining }
         if pace >= 75 { return .steady }
@@ -169,7 +179,7 @@ enum Logic {
 
 // MARK: - Live pace (RunCat-style): how fast tokens are being generated on this Mac
 
-/// Output tokens per minute over the last 3 minutes, from Claude Code and Codex logs, smoothed so
+/// Output tokens per minute over the last 3 minutes, from Claude Code, Codex and Gemini CLI logs, smoothed so
 /// the shovel speeds up and slows down gently and never flickers between levels.
 struct Pace {
     enum Level: Int, Comparable, CaseIterable {

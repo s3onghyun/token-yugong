@@ -3,33 +3,54 @@
 The usage rules are in `Sources/TokenPet/Logic.swift`, as pure functions of (readings, now); the
 app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup`) and the
 `MountainLedger` in `UsageModel.swift`. Every row below has a unit test (`./test.sh`,
-`Tests/TokenPetTests/LogicTests.swift` for the usage rules, `AppTests.swift` for the app rules).
+`Tests/TokenPetTests/LogicTests.swift` for the usage rules, `AppTests.swift` for the app rules,
+`FamilyTests.swift` for the family, the budgets and the connectors).
 
 ## Inputs
 
 | Input | Where it comes from | Used for |
 |---|---|---|
-| Claude `five_hour`, `seven_day`: used %, reset time | Claude Code's status line JSON, saved by `bridge/statusline-bridge.sh` with its capture time | the carrier and Grandpa's state |
-| Codex 5-hour (300 min) and weekly (10080 min) windows | newest `rate_limits` line in `~/.codex/sessions/**/*.jsonl` | the grandson's basket only |
-| Output tokens with timestamps | `~/.claude/projects/**/*.jsonl` (`message.usage`) and Codex `token_count` events | shovel speed only |
-| Tokens (input + output + cache writes) | the same Claude Code logs | the mountain only |
+| Claude `five_hour`, `seven_day`: used %, reset time | Claude Code's status line JSON, saved by `bridge/statusline-bridge.sh` with its capture time | the meter of whoever watches Claude |
+| Codex 5-hour (300 min) and weekly (10080 min) windows | newest `rate_limits` line in `~/.codex/sessions/**/*.jsonl` | the meter of whoever watches Codex |
+| Gemini: nothing | Gemini CLI saves no limits or reset times on the Mac | its meter is always "don't know" |
+| OpenAI API: this month's spend in USD | `GET api.openai.com/v1/organization/costs` from the first day of the month (UTC), with an Admin key from the Keychain, every 15 minutes | its meter: spend ÷ the monthly budget typed in Settings |
+| DeepSeek API: balance only | `GET api.deepseek.com/user/balance` with its API key from the Keychain, every 15 minutes | shown as a balance; its meter is "don't know" (DeepSeek reports no spend) |
+| Output tokens with timestamps | `~/.claude/projects/**/*.jsonl` (`message.usage`), Codex `token_count` events, Gemini CLI `~/.gemini/tmp/*/chats/session-*.json` | shovel speed only |
+| Tokens: Claude input + output + cache writes; Codex input without the cached part + output; Gemini `total` | the same logs | the mountain only |
 
-Nothing else: no network, no credentials, no saved limit state. Token counts never become a limit percentage.
+No saved limit state, and token counts never become a limit percentage. The network is used
+only for an OpenAI or DeepSeek member you set up: the request carries your key (kept in the
+login Keychain, never in a file or the settings) and nothing else leaves the Mac.
 
 ## Limits → state (checked top to bottom)
 
+The rows below read **Grandpa's AI** (Claude unless changed in Settings › Family). Its windows
+are the 5-hour and weekly ones, or for a billed API the month's budget.
+
 | # | When | Then |
 |---|---|---|
-| 1 | No usable Claude reading (no file, corrupt or cut-off JSON, no window, percent missing or not a number) | **Don't know**: the bubble says so, the menu bar shows `?`, meters say "모름". Nothing is estimated. |
-| 2 | A window's reset time has passed (reset ≤ now) | That window is new and empty: 0%, next reset unknown until Claude Code reports again |
+| 1 | No usable reading (no file, corrupt or cut-off JSON, no window, percent missing or not a number; Gemini; DeepSeek; OpenAI without key, budget or answer) | **Don't know**: the bubble says so, the menu bar shows `?`, meters say "모름". Nothing is estimated. |
+| 2 | A window's reset time has passed (reset ≤ now; for a budget, the month ended) | That window is new and empty: 0%, next reset unknown until the AI reports again |
 | 3 | Any window at 100% | **Resting** until that window resets (the latest one if several are full; `?` if no reset time) |
 | 4 | No 5-hour window, weekly window with a reset time (verified Ultra) | Day *d* = whole days since (weekly reset − 7 days), 0…6. Today's share = (weekly % − *d*·100/7) ÷ (100/7), never below 0. It only sets the pace (row 6); it never makes him rest |
 | 5 | A reset (row 2) or a new day (row 4) less than 5 minutes ago | **Morning** stretch |
 | 6a | Otherwise, weekly-only (row 4) | **Straining** ("ahead of today's share, take it slow") if today's share ≥ 100% · **steady** if ≥ 75% · **lively** otherwise. A high weekly % alone does not strain him |
 | 6b | Otherwise, top = highest window %, pace = highest of (window % ÷ share of that window gone by, at least 12%) | **Straining** if top ≥ 80 or pace ≥ 110 · **steady** if pace ≥ 75 · **lively** otherwise |
 
-The carrier is the limit that makes him rest: the 5-hour %, else the weekly %. The menu bar shows the same %.
-The grandson's basket is Codex's own 5-hour %, else its weekly % (row 2 applies). Codex never stands in for Claude.
+The carrier is the limit that makes him rest: the 5-hour %, else the weekly %, else the month's
+budget %. The menu bar shows the same %.
+
+## Family
+
+| When | Then |
+|---|---|
+| First run | Grandpa watches Claude, the grandson watches Codex (or nobody if "show the grandson" was turned off before) |
+| An AI is given to a member who already has one, and another member had that AI | The two members swap: an AI is watched by one member at a time |
+| Grandpa is set to nobody | Ignored: Grandpa always watches one AI |
+| The son, the grandson or the neighbour's boy watches an AI | He stands in the scene with his own meter (heap of stone, basket, little basket): that AI's 5-hour %, else weekly %, else month's budget %, row 2 applies. Full = he sits down. Nothing to read = "don't know" and an empty meter |
+| Grandpa rests (row 3) | Zhisou, the mocking neighbour of the tale, says "Told you so!" under the scene |
+
+Only Grandpa's AI sets his state and the menu bar; the others never stand in for him.
 
 Row 4 in words: by the end of day *d* the fair use is (*d*+1)/7 of the week. Days you used less
 carry over; days you used more make him sweat, but weekly use is bursty, so he naps only when the
@@ -105,7 +126,9 @@ item nor the mini window is on screen.
 | Setting | Default |
 |---|---|
 | Language | System (Korean if the first preferred language is Korean, else English); or pinned 한국어 / English |
-| Show the grandson (Codex) | On. Off hides him and his meters; his tokens still count toward the shovel speed |
+| Family | Grandpa: Claude · grandson: Codex · son and neighbour's boy: nobody. Every AI's tokens count toward the shovel speed and the mountain whoever watches it |
+| OpenAI monthly budget | Not set (its meter says "don't know" until a budget and an Admin key are given) |
+| API keys (OpenAI, DeepSeek) | None. Stored only in the login Keychain (`dev.yugongpet.api.*`) |
 | Menu bar number | Percent used |
 | Grandpa in the menu bar | On |
 | Mini window | When the menu bar is full |

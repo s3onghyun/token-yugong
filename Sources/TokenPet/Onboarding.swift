@@ -101,8 +101,8 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L.t("What you are looking at", "무엇을 보여 주나요")).font(.title2.bold())
             row(figure(.straining, carrier: 0.8), L.t("The carrier (지게)", "지게"),
-                L.t("Earth in his A-frame carrier is your Claude 5-hour limit. Full = he sits down and naps until it resets, and the menu bar shows when he starts again. Accounts with only a weekly limit fill it with the week; going past today's fair share (1/7 of the week) only makes him sweat.",
-                    "등에 진 지게의 흙이 Claude 5시간 한도예요. 가득 차면 리셋까지 쉬고, 메뉴바에 다시 퍼는 시각이 나와요. 주간 한도만 있는 계정은 주간 한도만큼 차고, 오늘 몫(주간의 1/7)을 넘으면 땀만 흘려요."))
+                L.t("Earth in his A-frame carrier is your main AI's 5-hour limit (Claude unless you pick another in Settings › Family). Full = he sits down and naps until it resets, and the menu bar shows when he starts again. Accounts with only a weekly limit fill it with the week; going past today's fair share (1/7 of the week) only makes him sweat.",
+                    "등에 진 지게의 흙이 주로 쓰는 AI의 5시간 한도예요(기본 Claude, 설정 › 식구에서 바꿔요). 가득 차면 리셋까지 쉬고, 메뉴바에 다시 퍼는 시각이 나와요. 주간 한도만 있는 계정은 주간 한도만큼 차고, 오늘 몫(주간의 1/7)을 넘으면 땀만 흘려요."))
             row(figure(.lively, carrier: 0.3), L.t("His pace", "삽질 속도"),
                 L.t("He digs faster when tokens flow faster on this Mac, leans on his shovel when it is quiet, and strains when you are heading for the limit before the reset.",
                     "이 Mac에서 토큰이 빨리 나오면 빨리 파고, 조용하면 삽에 기대 쉬어요. 리셋 전에 한도에 닿을 속도면 힘에 부쳐 해요."))
@@ -110,10 +110,10 @@ struct OnboardingView: View {
                 L.t("The mountain", "산"),
                 L.t("Every token you have ever used wears it down (counted from your local logs, kept on this Mac). Carry a whole mountain away and heaven takes notice.",
                     "지금까지 쓴 모든 토큰이 산을 깎아요(이 Mac의 로그로 세고, 이 Mac에만 저장). 산 하나를 다 옮기면 하늘이 감동해요."))
-            row(Image(systemName: "figure.child").font(.system(size: 24)).foregroundColor(.secondary),
-                L.t("The grandson", "손주"),
-                L.t("If you use Codex CLI, his grandson carries a second basket: your Codex limit, read from Codex's own logs.",
-                    "Codex CLI를 쓰면 손주가 바구니를 메고 와요. 바구니 흙이 Codex 한도예요(Codex 기록에서 읽음)."))
+            row(Image(systemName: "figure.2.and.child.holdinghands").font(.system(size: 22)).foregroundColor(.secondary),
+                L.t("The family", "식구"),
+                L.t("His son, his grandson and the neighbour's boy can each watch another AI (Codex, Gemini, the OpenAI or DeepSeek API) and carry its meter. What an AI does not report, they say they don't know.",
+                    "아들, 손주, 이웃집 아이가 다른 AI(Codex, Gemini, OpenAI·DeepSeek API)를 하나씩 맡아 미터를 져요. AI가 알려 주지 않는 건 모른다고 해요."))
         }
     }
 

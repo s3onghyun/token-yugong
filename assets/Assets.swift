@@ -30,7 +30,9 @@ public struct SceneInfo {
     public var state: PetState
     public var carrier: Double           // 0...1, Claude 5-hour (or weekly) usage = earth in Grandpa's carrier
     public var mountainLeft: Double      // 1 = untouched mountain, 0 = all carried away
-    public var grandson: Double?         // Codex usage 0...1; nil hides the grandson
+    public var grandson: Double?         // the grandson's AI, 0...1; nil hides him
+    public var son: Double? = nil        // the son's AI (his heap of stone); nil hides him
+    public var boy: Double? = nil        // the neighbour's boy's AI (his basket); nil hides him
     public var night: Bool
     public var cutscene: Double?         // 0...1 progress of the milestone cutscene placeholder; nil = none
     public var tempo: Tempo = .working

@@ -16,7 +16,7 @@ enum Prefs {
 final class CodexReader {
     let root: URL
     private(set) var reading: Reading?
-    private(set) var events: [(time: Date, tokens: Int)] = []   // output tokens, for the live pace
+    private(set) var events: [LogScanner.Event] = []   // for the shovel speed and the mountain
     private var seenFiles: [String] = []
 
     init(root: URL) { self.root = root }
@@ -33,7 +33,7 @@ final class CodexReader {
         let key = newest.map { "\($0.0.path)@\($0.1.timeIntervalSince1970)" }
         guard key != seenFiles else { return }
         seenFiles = key
-        var reading: Reading?, events: [(time: Date, tokens: Int)] = []
+        var reading: Reading?, events: [LogScanner.Event] = []
         for (u, _) in newest {
             guard let text = try? String(contentsOf: u, encoding: .utf8) else { continue }
             for line in text.split(separator: "\n") where line.contains("\"token_count\"") {
@@ -43,15 +43,17 @@ final class CodexReader {
             }
         }
         self.reading = reading
-        self.events = events.filter { $0.time > now.addingTimeInterval(-3600) }
+        self.events = events.filter { $0.time > cutoff }.sorted { $0.time < $1.time }
     }
 
-    static func output(_ line: Data) -> (time: Date, tokens: Int)? {
+    /// One response's tokens: input without the cached part (as Claude counts) plus output.
+    static func output(_ line: Data) -> LogScanner.Event? {
         guard let o = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
               let p = o["payload"] as? [String: Any], let info = p["info"] as? [String: Any],
               let last = info["last_token_usage"] as? [String: Any], let n = last["output_tokens"] as? Int,
               let t = (o["timestamp"] as? String).flatMap(Limits.iso.date(from:)) else { return nil }
-        return (t, n)
+        let input = max(0, (last["input_tokens"] as? Int ?? 0) - (last["cached_input_tokens"] as? Int ?? 0))
+        return LogScanner.Event(time: t, tokens: input + n, output: n)
     }
 }
 
@@ -135,6 +137,8 @@ final class UsageModel: ObservableObject {
     let bridgeURL: URL
     let scanner: LogScanner
     let codexReader = CodexReader(root: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/sessions"))
+    let geminiReader = GeminiReader(root: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/tmp"))
+    let budgets = BudgetClient()
     private let queue = DispatchQueue(label: "tokenpet.scan", qos: .utility)
     private var claude: Reading?
     private var timer: Timer?
@@ -157,13 +161,30 @@ final class UsageModel: ObservableObject {
         queue.async { [self] in
             scanner.scan()
             codexReader.scan()
+            geminiReader.scan()
             let b = Self.readBridge(bridgeURL)
             DispatchQueue.main.async { [self] in
                 claude = b
                 scanning = false
-                mountain.absorb(scanner.events)
+                mountain.absorb(allEvents)
                 recompute()
+                budgets.refresh(Array(family.roles.values)) { [weak self] in self?.recompute() }
             }
+        }
+    }
+
+    /// Every local CLI's token events, oldest first: the mountain and the shovel speed.
+    var allEvents: [LogScanner.Event] {
+        (scanner.events + codexReader.events + geminiReader.events).sorted { $0.time < $1.time }
+    }
+
+    /// The latest reading for an AI; nil = nothing to read (Gemini, DeepSeek spend, no key or budget yet).
+    func reading(_ p: Provider) -> Reading? {
+        switch p {
+        case .claude: return claude
+        case .codex: return codexReader.reading
+        case .gemini, .deepseek: return nil
+        case .openai: return budgets.state[.openai].flatMap { st in st.spent.flatMap { Budget.reading(spent: $0, budget: openAIBudget, at: st.at) } }
         }
     }
 
@@ -171,8 +192,9 @@ final class UsageModel: ObservableObject {
     func scanNow() {
         scanner.scan()
         codexReader.scan()
+        geminiReader.scan()
         claude = Self.readBridge(bridgeURL)
-        mountain.absorb(scanner.events)
+        mountain.absorb(allEvents)
         recompute()
     }
 
@@ -198,9 +220,9 @@ final class UsageModel: ObservableObject {
     /// Real night-time on this Mac: Grandpa yawns between digs.
     var night: Bool { let h = Calendar.current.component(.hour, from: Date()); return h >= 22 || h < 6 }
 
-    /// Output tokens per minute right now (Claude Code + Codex logs).
+    /// Output tokens per minute right now (Claude Code, Codex and Gemini CLI logs).
     func liveRate(now: Date = Date()) -> Double {
-        Pace.rate(scanner.events.map { ($0.time, $0.output) } + codexReader.events, now: now)
+        Pace.rate(allEvents.map { ($0.time, $0.output) }, now: now)
     }
 
     /// The animation clock. It runs at the tempo's speed and eases between speeds, so the pose never jumps.
@@ -222,13 +244,15 @@ final class UsageModel: ObservableObject {
 
     func recompute() {
         let now = Date()
-        if let d = demo { snap = Self.demoSnapshot(d, now: now, weeklyOnly: demoWeeklyOnly); return }
+        if let d = demo { snap = Self.demoSnapshot(d, now: now, weeklyOnly: demoWeeklyOnly, family: family); return }
         if demoCycle { return }
         pace.update(rate: liveRate(now: now), now: now)
-        snap = Logic.evaluate(claude: claude, codex: codexReader.reading, now: now)
+        var others: [Role: Reading?] = [:]
+        for (role, p) in family.roles where role != .grandpa { others[role] = reading(p) }
+        snap = Logic.evaluate(main: family.roles[.grandpa].flatMap(reading), members: others, now: now)
     }
 
-    static func demoSnapshot(_ st: PetState, now: Date, weeklyOnly: Bool = false) -> Snapshot {
+    static func demoSnapshot(_ st: PetState, now: Date, weeklyOnly: Bool = false, family: Family = .standard) -> Snapshot {
         let cal = Calendar.current
         func at(_ h: Int, _ m: Int = 0, daysAhead: Int = 0) -> Date {
             var d = cal.date(bySettingHour: h, minute: m, second: 0, of: now) ?? now
@@ -237,8 +261,17 @@ final class UsageModel: ObservableObject {
         }
         var s = Snapshot(known: true, state: st)
         s.demo = true
-        let codexPct: [PetState: Double] = [.lively: 18, .steady: 42, .straining: 66, .resting: 100, .morning: 4]
-        s.codex = Reading(five: nil, week: Meter(pct: codexPct[st] ?? 18, resetsAt: at(10, daysAhead: 1)), at: now)
+        let kidPct: [PetState: Double] = [.lively: 18, .steady: 42, .straining: 66, .resting: 100, .morning: 4]
+        // the demo is as honest as real data: Gemini and DeepSeek never report a limit
+        for (role, p) in family.roles where role != .grandpa {
+            let pct = role == .grandson ? kidPct[st] ?? 18 : role == .son ? 45 : 30
+            switch p {
+            case .gemini, .deepseek: s.members[role] = Member(reading: nil, fill: nil)
+            case .openai: s.members[role] = Logic.member(Budget.reading(spent: pct, budget: 100, at: now), now: now)
+            case .claude, .codex:
+                s.members[role] = Member(reading: Reading(five: nil, week: Meter(pct: pct, resetsAt: at(10, daysAhead: 1)), at: now), fill: pct / 100)
+            }
+        }
         let weekly = at(9, daysAhead: 3)
         switch st {
         case .lively:    s.five = Meter(pct: 22, resetsAt: now.addingTimeInterval(2 * 3600 + 13 * 60)); s.week = Meter(pct: 21, resetsAt: weekly)
@@ -249,7 +282,6 @@ final class UsageModel: ObservableObject {
         case .morning:   s.five = Meter(pct: 0, resetsAt: nil); s.week = Meter(pct: 72, resetsAt: weekly); s.justReset = now
         }
         s.projected = s.five.flatMap { Logic.projection($0, window: Limits.fiveLength, now: now) }
-        s.codexFill = (s.codex?.week?.pct ?? 0) / 100
         if weeklyOnly {
             // an account without a 5-hour window: the carrier is the week, today's share sets the pace
             let fills: [PetState: Double] = [.lively: 0.3, .steady: 0.8, .straining: 1.4, .resting: 1.6, .morning: 0]
@@ -273,9 +305,20 @@ final class UsageModel: ObservableObject {
     @Published var language: String = Prefs.store.string(forKey: "language") ?? "auto" {
         didSet { Prefs.store.set(language, forKey: "language"); L.korean = L.resolve(language) }
     }
-    /// Show the grandson (Codex) in the scene and his meters.
-    @Published var showCodex: Bool = Prefs.store.object(forKey: "showCodex") as? Bool ?? true {
-        didSet { Prefs.store.set(showCodex, forKey: "showCodex") }
+    /// Which AI each family member watches (Grandpa = the main one).
+    @Published var family: Family = Family.load() {
+        didSet { family.save(); recompute(); budgets.refresh(Array(family.roles.values)) { [weak self] in self?.recompute() } }
+    }
+    /// OpenAI: the monthly budget in USD that its meter fills against (0 = not set).
+    @Published var openAIBudget: Double = Prefs.store.double(forKey: "budget.openai") {
+        didSet { Prefs.store.set(openAIBudget, forKey: "budget.openai"); recompute() }
+    }
+    /// Saves (or with nil removes) an API key in the Keychain and asks again.
+    func setKey(_ key: String?, for p: Provider) {
+        Keychain.setKey(key, for: p)
+        budgets.reset(p)
+        budgets.refresh(Array(family.roles.values)) { [weak self] in self?.recompute() }
+        recompute()
     }
     /// The menu-bar item: Grandpa on or off, and which number beside him (percent by default).
     @Published var barGrandpa: Bool = Prefs.store.object(forKey: "barGrandpa") as? Bool ?? true {

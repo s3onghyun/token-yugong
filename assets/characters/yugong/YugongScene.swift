@@ -11,11 +11,16 @@ extension YugongArt {
         let bg = pixelLayer(gw, gh, outline: false) { c in pixelBackdrop(c, info, t: t, w: gw, h: gh) }
         let fig = figureLayer(info, t: t, grid: 40)
         let kid = info.grandson.map { kidLayer($0, t: t, grid: 24) }
+        let son = info.son.map { sonLayer(sonPose(t, fill: $0), fill: $0) }
+        let boy = info.boy.map { boyLayer(boyPose(t, fill: $0), fill: $0) }
         let ground = gh - 6
         return NSImage(size: size, flipped: false) { r in
             guard let c = NSGraphicsContext.current?.cgContext else { return false }
             c.interpolationQuality = .none
             if let bg { c.draw(bg, in: r) }
+            // the son at the mountain's foot and the boy in front of it, both behind Grandpa
+            if let son, let s = son { c.draw(s, in: cellRect(12, ground + 2 - 30, 32, 32, gh: gh, cell: cell)) }
+            if let boy, let b = boy { c.draw(b, in: cellRect(-3, ground + 2 - 21, 22, 22, gh: gh, cell: cell)) }
             // figure: 40 cells, feet (row 37.6) on the ground line
             let fx = Int(CGFloat(gw) * 0.42), fy = ground + 2 - 38
             if let fig { c.draw(fig, in: cellRect(fx, fy, 40, 40, gh: gh, cell: cell)) }

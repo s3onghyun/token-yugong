@@ -63,8 +63,11 @@ struct PopoverView: View {
                 }
             }
             mountainRow
-            Text(L.t("Claude · Grandpa's carrier", "Claude · 할아버지 지게")).font(.caption.weight(.bold)).foregroundColor(.secondary)
-            if let d = s.daily {
+            let main = model.family.roles[.grandpa] ?? .claude
+            Text("\(main.name) · \(Role.grandpa.name) \(Role.grandpa.meter)").font(.caption.weight(.bold)).foregroundColor(.secondary)
+            if !s.known {
+                meterRow(L.t("Limit", "한도"), nil)
+            } else if let d = s.daily {
                 // no 5-hour window on this account: the weekly limit is the carrier, today's share only sets the pace
                 meterRow(L.t("Weekly (the carrier)", "주간 (지게)"), s.week)
                 meterRow(L.t("Today's share: pace (1/7 of the week)", "오늘 몫: 속도 (주간의 1/7)"), Meter(pct: d.fill * 100, resetsAt: d.dayEnd), pace: true)
@@ -72,29 +75,28 @@ struct PopoverView: View {
                          "이 계정은 5시간 한도 없이 주간 한도만 있어요. 할아버지는 주간 한도를 다 쓸 때만 쉬어요\(weeklyReset(s)). 오늘 몫을 넘으면 땀만 흘려요."))
                     .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
-                meterRow(L.t("5-hour", "5시간"), s.five)
-                meterRow(L.t("Weekly", "주간"), s.week)
+                windowRows(Reading(five: s.five, week: s.week, at: s.captured ?? clockNow, month: s.month))
             }
             if let p = s.projected, s.known, s.state != .resting, s.daily == nil {
                 Text(L.t("At this pace: about \(Int(p.rounded()))% by the reset", "이 속도면 리셋 때 약 \(Int(p.rounded()))%"))
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
-            sourceNote(s)
+            if s.state == .resting {
+                // Zhisou, the clever neighbour of the tale, never misses a chance
+                Text(L.t("Zhisou next door: “Told you so!”", "옆집 지수 영감: “거봐, 내 뭐랬나!”")).font(.caption.italic()).foregroundColor(.secondary)
+            }
+            note(s.demo ? L.t("Simulated state for preview.", "미리보기용 가상 상태입니다.") : source(main, s.known ? s.captured : nil))
             if !s.demo {
                 Text(L.t("Shovel speed: \(Int(model.pace.smoothed.rounded())) output tokens/min (last 3 min, this Mac)",
                          "삽질 속도: 분당 출력 토큰 \(Int(model.pace.smoothed.rounded())) (최근 3분, 이 Mac)"))
                     .font(.caption).foregroundColor(.secondary)
             }
-            if let c = s.codex, model.showCodex {
+            ForEach([Role.son, .grandson, .boy].filter { model.family.roles[$0] != nil }) { role in
+                // one row each: his headline window (5-hour, else weekly, else the month's budget)
+                let p = model.family.roles[role]!, r = s.members[role]?.reading
                 Divider()
-                HStack {
-                    Text(L.t("Codex · grandson's basket", "Codex · 손주 바구니")).font(.caption.weight(.bold)).foregroundColor(.secondary)
-                    Spacer()
-                    Text(L.t("from Codex CLI logs · \(Fmt.clock(c.at, now: clockNow))", "Codex CLI 기록 · \(Fmt.clock(c.at, now: clockNow))"))
-                        .font(.caption2).foregroundColor(.secondary)
-                }
-                if let f = c.five { meterRow(L.t("5-hour", "5시간"), f) }
-                if let w = c.week { meterRow(L.t("Weekly", "주간"), w) }
+                meterRow("\(p.name) · \(role.name) \(role.meter)", r.flatMap { $0.five ?? $0.week ?? $0.month })
+                if r == nil || s.demo == false && p.billed { note(source(p, r?.at)) }
             }
             Button { model.hideFromCapture.toggle() } label: {
                 HStack(spacing: 6) {
@@ -149,7 +151,7 @@ struct PopoverView: View {
                 Text(L.t("Always", "항상")).tag(MiniMode.always)
                 Text(L.t("Never", "끔")).tag(MiniMode.off)
             }
-            Toggle(L.t("Show the grandson (Codex)", "손주(Codex) 보이기"), isOn: $model.showCodex)
+            familySettings
             let login = model.launchAtLogin
             Toggle(L.t("Open at login", "로그인할 때 열기"), isOn: Binding(get: { login == .enabled || login == .requiresApproval },
                                                                        set: { model.setLaunchAtLogin($0) }))
@@ -166,11 +168,13 @@ struct PopoverView: View {
     }
 
     private func info(_ s: Snapshot, t: Double) -> SceneInfo {
-        var i = SceneInfo(state: s.state, carrier: s.carrier, mountainLeft: model.mountainLeft, grandson: model.showCodex ? s.codexFill : nil,
+        func fill(_ r: Role) -> Double? { model.family.roles[r] == nil ? nil : s.members[r]?.fill ?? 0 }   // assigned but unknown: an empty meter
+        var i = SceneInfo(state: s.state, carrier: s.carrier, mountainLeft: model.mountainLeft, grandson: fill(.grandson),
                           night: s.state == .resting || model.night,
                           cutscene: model.cutsceneDue ? (cutsceneT ?? model.cutsceneStart.map { min(1, Date().timeIntervalSince($0) / 4.5) }
                                                          ?? (t / 7).truncatingRemainder(dividingBy: 1)) : nil)
         i.tempo = model.tempo
+        i.son = fill(.son); i.boy = fill(.boy)
         return i
     }
 
@@ -312,16 +316,80 @@ struct PopoverView: View {
         return L.t("resets \(Fmt.clock(r, now: clockNow)) (\(Fmt.until(r, now: clockNow)))", "\(Fmt.clock(r, now: clockNow)) 리셋 (\(Fmt.until(r, now: clockNow)))")
     }
 
-    private func sourceNote(_ s: Snapshot) -> some View {
-        let text: String
-        if s.demo { text = L.t("Simulated state for preview.", "미리보기용 가상 상태입니다.") }
-        else if let cap = s.captured {
-            text = L.t("Limits from Claude Code's status line, as of \(Fmt.clock(cap, now: clockNow)) (they can only have grown since).",
-                       "Claude Code 상태줄의 공식 한도 · \(Fmt.clock(cap, now: clockNow)) 기준 (그 뒤로는 늘었을 수만 있어요)")
-        } else {
-            text = L.t("No limits from Claude Code yet. Connect its status line (Settings › How it works); until then Grandpa says he doesn't know.",
-                       "아직 Claude Code 한도 정보가 없어요. 상태줄을 연결하면 보여요(설정 › 사용법과 Claude Code 연결). 그 전에는 모른다고 말해요.")
+    /// The windows a reading has: 5-hour, weekly, and a billed API's month.
+    @ViewBuilder private func windowRows(_ r: Reading) -> some View {
+        if r.five == nil && r.week == nil && r.month == nil { meterRow(L.t("Limit", "한도"), nil) }
+        if let f = r.five { meterRow(L.t("5-hour", "5시간"), f) }
+        if let w = r.week { meterRow(L.t("Weekly", "주간"), w) }
+        if let m = r.month { meterRow(L.t("This month's budget", "이번 달 예산"), m) }
+    }
+
+    @ViewBuilder private func note(_ text: String) -> some View {
+        if !text.isEmpty { Text(text).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true) }
+    }
+
+    /// Where an AI's numbers come from, or why there are none. `at` = when the numbers were reported.
+    private func source(_ p: Provider, _ at: Date?) -> String {
+        let when = at.map { Fmt.clock($0, now: clockNow) } ?? ""
+        let budget = model.budgets.state[p]
+        switch p {
+        case .claude:
+            return at != nil ? L.t("Limits from Claude Code's status line, as of \(when) (they can only have grown since).",
+                                   "Claude Code 상태줄의 공식 한도 · \(when) 기준 (그 뒤로는 늘었을 수만 있어요)")
+                             : L.t("No limits from Claude Code yet. Connect its status line (Settings › How it works); until then he says he doesn't know.",
+                                   "아직 Claude Code 한도 정보가 없어요. 상태줄을 연결하면 보여요(설정 › 사용법과 Claude Code 연결). 그 전에는 모른다고 말해요.")
+        case .codex:
+            return at != nil ? L.t("From Codex CLI logs, as of \(when).", "Codex CLI 기록 · \(when) 기준")
+                             : L.t("No Codex CLI logs with limits on this Mac yet.", "이 Mac에 한도가 적힌 Codex CLI 기록이 아직 없어요.")
+        case .gemini:
+            return L.t("Gemini CLI keeps no limits on this Mac, so he can't say how full it is. Its tokens still move the mountain.",
+                       "Gemini CLI는 이 Mac에 한도를 남기지 않아서 얼마나 찼는지 몰라요. 토큰은 산 옮기기에 들어가요.")
+        case .openai:
+            if let pr = budget?.problem { return "OpenAI: \(pr)" }
+            if let sp = budget?.spent {
+                return model.openAIBudget > 0
+                    ? L.t(String(format: "OpenAI costs this month: $%.2f of a $%.0f budget, as of %@.", sp, model.openAIBudget, when),
+                          String(format: "OpenAI 이번 달 비용: $%.2f / 예산 $%.0f · %@ 기준", sp, model.openAIBudget, when))
+                    : L.t(String(format: "OpenAI costs this month: $%.2f. Set a monthly budget (Settings › Family) to fill the meter.", sp),
+                          String(format: "OpenAI 이번 달 비용: $%.2f. 설정 › 식구에서 월 예산을 넣으면 미터가 차요.", sp))
+            }
+            return L.t("Add an OpenAI Admin key and a monthly budget (Settings › Family).", "설정 › 식구에서 OpenAI 관리자(Admin) 키와 월 예산을 넣어 주세요.")
+        case .deepseek:
+            if let pr = budget?.problem { return "DeepSeek: \(pr)" }
+            if let b = budget?.balance {
+                return L.t("DeepSeek reports only the balance (\(b)), not what was spent, so he can't say how full it is.",
+                           "DeepSeek은 잔액(\(b))만 알려 주고 쓴 돈은 알려 주지 않아서 얼마나 찼는지 몰라요.")
+            }
+            return L.t("DeepSeek reports only a balance, never the spend. Add a key to see the balance (Settings › Family).",
+                       "DeepSeek은 쓴 돈 없이 잔액만 알려 줘요. 설정 › 식구에서 키를 넣으면 잔액이 보여요.")
         }
-        return Text(text).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+
+    @State private var keyDraft: [Provider: String] = [:]
+
+    /// Settings › Family: who watches which AI, the OpenAI budget, API keys (kept in the Keychain).
+    @ViewBuilder private var familySettings: some View {
+        Text(L.t("Family: who watches which AI", "식구: 누가 어떤 AI를 맡나")).font(.caption.weight(.bold)).foregroundColor(.secondary)
+        ForEach(Role.allCases) { role in
+            Picker(role.name, selection: Binding(get: { model.family.roles[role] }, set: { model.family = model.family.assigning($0, to: role) })) {
+                if role != .grandpa { Text(L.t("Nobody", "없음")).tag(Provider?.none) }
+                ForEach(Provider.allCases) { p in Text(p.name).tag(Optional(p)) }
+            }
+        }
+        if model.family.roles.values.contains(.openai) {
+            HStack {
+                Text(L.t("OpenAI monthly budget (USD)", "OpenAI 월 예산 (USD)"))
+                TextField("", value: $model.openAIBudget, format: .number).frame(width: 80)
+            }
+        }
+        ForEach(Provider.allCases.filter { $0.billed && model.family.roles.values.contains($0) }) { p in
+            HStack {
+                SecureField(p == .openai ? L.t("OpenAI Admin key", "OpenAI 관리자 키") : L.t("DeepSeek API key", "DeepSeek API 키"),
+                            text: Binding(get: { keyDraft[p] ?? "" }, set: { keyDraft[p] = $0 }))
+                Button(L.t("Save", "저장")) { model.setKey(keyDraft[p], for: p); keyDraft[p] = nil }
+                    .disabled((keyDraft[p] ?? "").isEmpty)
+                if Keychain.key(p) != nil { Button(L.t("Remove", "지우기")) { model.setKey(nil, for: p) } }
+            }
+        }
     }
 }

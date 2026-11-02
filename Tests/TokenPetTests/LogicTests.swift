@@ -12,7 +12,10 @@ let hour: TimeInterval = 3600, day: TimeInterval = 86400
 let share = 100.0 / 7
 
 func claude(five: Meter? = nil, week: Meter? = nil, at: Date = weekStart) -> Reading { Reading(five: five, week: week, at: at) }
-func eval(_ r: Reading?, now: Date, codex: Reading? = nil) -> Snapshot { Logic.evaluate(claude: r, codex: codex, now: now) }
+/// Grandpa watches `r`; `codex` (if given) goes to the grandson, as in the standard family.
+func eval(_ r: Reading?, now: Date, codex: Reading? = nil) -> Snapshot {
+    Logic.evaluate(main: r, members: codex.map { [Role.grandson: Optional($0)] } ?? [:], now: now)
+}
 func json(_ s: String) -> Data { Data(s.utf8) }
 
 // MARK: - Reading the inputs
@@ -273,17 +276,17 @@ func json(_ s: String) -> Data { Data(s.utf8) }
     @Test func codexLogsOlderThanTheWindow() {
         let old = Reading(five: nil, week: Meter(pct: 38, resetsAt: weekStart + hour), at: weekStart - 2 * day)
         let s = eval(nil, now: weekStart + 2 * hour, codex: old)
-        #expect(s.codex?.week == Meter(pct: 0, resetsAt: nil) && s.codexFill == 0)
+        #expect(s.members[.grandson]?.reading?.week == Meter(pct: 0, resetsAt: nil) && s.members[.grandson]?.fill == 0)
         #expect(!s.known)                                    // Codex never stands in for Claude
     }
 
     @Test func codexBasket() {
         let now = weekStart + 2 * hour
         let weekly = Reading(five: nil, week: Meter(pct: 66, resetsAt: weekStart + 2.5 * day), at: now)
-        #expect(eval(nil, now: now, codex: weekly).codexFill == 0.66)   // weekly-only: the basket is the week
+        #expect(eval(nil, now: now, codex: weekly).members[.grandson]?.fill == 0.66)   // weekly-only: the basket is the week
         let five = Reading(five: Meter(pct: 25, resetsAt: now + hour), week: Meter(pct: 90, resetsAt: reset), at: now)
-        #expect(eval(nil, now: now, codex: five).codexFill == 0.25)
-        #expect(eval(nil, now: now).codexFill == nil)        // no Codex logs: no grandson
+        #expect(eval(nil, now: now, codex: five).members[.grandson]?.fill == 0.25)
+        #expect(eval(nil, now: now).members[.grandson] == nil)        // nobody watches Codex: no grandson
     }
 }
 

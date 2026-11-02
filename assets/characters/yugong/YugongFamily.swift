@@ -201,6 +201,24 @@ extension YugongArt {
         pn.ellipse(b, 6, 6, pn.pal.skin, edge: false)
     }
 
+    // MARK: - routines (stepped, like all the pixel art)
+
+    /// The son: leans on the pickaxe, then two blows; sits down when his heap is full. 3 s loop.
+    static func sonPose(_ t: Double, fill: Double) -> SonPose {
+        if fill >= 1 { return .rest }
+        var p = t.truncatingRemainder(dividingBy: 3.0); if p < 0 { p += 3.0 }
+        let steps: [(SonPose, Double)] = [(.lean, 1.2), (.raise, 0.5), (.strike, 0.4), (.raise, 0.5), (.strike, 0.4)]
+        for (pose, d) in steps { if p < d { return pose }; p -= d }
+        return .strike
+    }
+
+    /// The boy: carries, crouches, hops; sits down when his basket is full. 1.1 s loop.
+    static func boyPose(_ t: Double, fill: Double) -> BoyPose {
+        if fill >= 1 { return .rest }
+        var p = t.truncatingRemainder(dividingBy: 1.1); if p < 0 { p += 1.1 }
+        return p < 0.5 ? .carry : p < 0.7 ? .crouch : .hop
+    }
+
     // MARK: - layers
 
     /// The son on an n-cell grid (32 in the scene and on the sheet).

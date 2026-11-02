@@ -36,7 +36,10 @@ if args.contains("--scan-report") {
     if let d = s.daily { print(String(format: "no 5-hour window: today's share %.0f%%, day %@ - %@", d.fill * 100, t(d.dayStart), t(d.dayEnd))) }
     if s.resting { print("resting until \(s.wakeAt.map { Fmt.clock($0) } ?? "?")") }
     if let p = s.projected { print(String(format: "projected by reset: %.0f%%", p)) }
-    if let c = s.codex { print("codex: 5h=\(c.five.map { "\(Int($0.pct.rounded()))%" } ?? "-") week=\(c.week.map { "\(Int($0.pct.rounded()))% resets \(t($0.resetsAt))" } ?? "-") (log line \(t(c.at)))") }
+    print("family: " + Role.allCases.compactMap { r in model.family.roles[r].map { "\(r.rawValue)=\($0.rawValue)" } }.joined(separator: " "))
+    for (role, m) in s.members.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+        print("\(role.rawValue): " + (m.fill.map { "\(Int(($0 * 100).rounded()))%" } ?? "don't know") + (m.reading.map { " (reported \(t($0.at)))" } ?? ""))
+    }
     let paceNow = Date(), settled = paceNow.addingTimeInterval(-300)   // 5 minutes ago: every log line is written
     print(String(format: "pace: %.0f output tokens/min (last 3 min) -> %@ at %.0f; %.0f at %.0f", model.liveRate(now: paceNow), "\(model.pace.level)",
                  paceNow.timeIntervalSince1970, model.liveRate(now: settled), settled.timeIntervalSince1970))
