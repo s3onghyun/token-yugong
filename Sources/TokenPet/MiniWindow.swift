@@ -37,28 +37,65 @@ final class MiniWindow: NSPanel {
 }
 
 final class MiniView: NSView {
-    var image: NSImage? { didSet { if image !== oldValue { needsDisplay = true } } }
-    var title = "" { didSet { needsDisplay = true } }
-    var crisp = true
+    // Layer-backed: a new frame only swaps the sprite layer's contents (no view redraw), and the
+    // title layer changes only when the text does. This keeps the mini window as cheap as the bar item.
+    private let sprite = CALayer(), label = CATextLayer()
+    var image: NSImage? {
+        didSet {
+            guard image !== oldValue else { return }
+            CATransaction.begin(); CATransaction.setDisableActions(true)
+            sprite.contents = image?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+            CATransaction.commit()
+        }
+    }
+    var title = "" {
+        didSet {
+            CATransaction.begin(); CATransaction.setDisableActions(true)
+            label.string = title.trimmingCharacters(in: .whitespaces)
+            CATransaction.commit()
+            needsLayout = true
+        }
+    }
+    var crisp = true { didSet { sprite.magnificationFilter = crisp ? .nearest : .linear } }
     var onClick: ((NSView) -> Void)?
     var onHide: (() -> Void)?
     private var dragged = false
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
 
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layerContentsRedrawPolicy = .never
+        sprite.magnificationFilter = .nearest
+        label.font = Self.font; label.fontSize = 13
+        label.alignmentMode = .left
+        layer?.addSublayer(sprite); layer?.addSublayer(label)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() {   // colours follow light and dark mode
+        guard let l = layer else { return }
+        l.cornerRadius = 10
+        l.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.92).cgColor
+        l.borderColor = NSColor.separatorColor.cgColor; l.borderWidth = 1
+        label.foregroundColor = NSColor.labelColor.cgColor
+        label.contentsScale = window?.backingScaleFactor ?? 2
+        sprite.contentsScale = label.contentsScale
+    }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        sprite.frame = CGRect(x: 6, y: (bounds.height - 28) / 2, width: 28, height: 28)
+        let h = ceil(Self.font.ascender - Self.font.descender)
+        label.frame = CGRect(x: 38, y: (bounds.height - h) / 2, width: max(0, bounds.width - 42), height: h)
+        CATransaction.commit()
+    }
+
     var fittingWidth: CGFloat {
         let w = (title.trimmingCharacters(in: .whitespaces) as NSString).size(withAttributes: [.font: Self.font]).width
         return ceil(6 + 28 + (w > 0 ? 4 + w : 0) + 10)
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let bg = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 10, yRadius: 10)
-        NSColor.windowBackgroundColor.withAlphaComponent(0.92).setFill(); bg.fill()
-        NSColor.separatorColor.setStroke(); bg.stroke()
-        NSGraphicsContext.current?.imageInterpolation = crisp ? .none : .high
-        image?.draw(in: NSRect(x: 6, y: (bounds.height - 28) / 2, width: 28, height: 28))
-        let t = title.trimmingCharacters(in: .whitespaces) as NSString
-        let size = t.size(withAttributes: [.font: Self.font])
-        t.draw(at: NSPoint(x: 38, y: (bounds.height - size.height) / 2), withAttributes: [.font: Self.font, .foregroundColor: NSColor.labelColor])
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }

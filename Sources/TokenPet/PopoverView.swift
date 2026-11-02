@@ -41,7 +41,7 @@ struct PopoverView: View {
     var cutsceneT: Double? = nil     // stills: freeze the cutscene at this progress
 
     static let sceneSize = CGSize(width: 292, height: 176)
-    @State private var showSettings = false
+    @State var showSettings = args.contains("--settings")   // demo: open with settings shown
 
     var body: some View {
         let s = model.snap
@@ -310,8 +310,8 @@ struct PopoverView: View {
             text = L.t("Limits from Claude Code's status line, as of \(Fmt.clock(cap, now: clockNow)) (they can only have grown since).",
                        "Claude Code 상태줄의 공식 한도 · \(Fmt.clock(cap, now: clockNow)) 기준 (그 뒤로는 늘었을 수만 있어요)")
         } else {
-            text = L.t("No limits from Claude Code yet. Point its status line at bridge/statusline-bridge.sh; until then Grandpa says he doesn't know.",
-                       "아직 Claude Code 한도 정보가 없어요. 상태줄을 bridge/statusline-bridge.sh에 연결하면 보여요. 그 전에는 모른다고 말해요.")
+            text = L.t("No limits from Claude Code yet. Connect its status line (Settings › How it works); until then Grandpa says he doesn't know.",
+                       "아직 Claude Code 한도 정보가 없어요. 상태줄을 연결하면 보여요(설정 › 사용법과 Claude Code 연결). 그 전에는 모른다고 말해요.")
         }
         return Text(text).font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
     }

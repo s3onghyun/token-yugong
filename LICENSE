@@ -21,5 +21,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ---
-Scope: this license covers the app code (Package.swift, Sources/, bridge/).
-Everything under assets/ is NOT covered by this license; see assets/LICENSE.md.
+Scope: this license covers the app code (Package.swift, Sources/, bridge/, scripts/, Tests/).
+Everything under assets/ (and images made from it, such as docs/demo.gif) is NOT covered by
+this license; see assets/LICENSE.md.

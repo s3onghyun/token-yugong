@@ -6,14 +6,22 @@ app's MIT license.
 
 ## Current status: all rights reserved
 
-Grandpa Yugong (pixel and ink styles), his magpie and his grandson are a **prototype design**
-awaiting the owner's final, human-authored version (see `PROVENANCE.md`). The earlier sketches in
-`archive/` are superseded. None of it is licensed for any use:
+Grandpa Yugong (pixel and ink styles), his magpie, his grandson and the app icon are a
+**prototype design** awaiting the owner's final, human-authored version (see `PROVENANCE.md`).
+The earlier sketches in `archive/` are superseded. The same terms cover images made from these
+assets, such as `docs/demo.gif` and screenshots.
 
 Copyright (c) 2026 the TokenPet owner. All rights reserved.
 
-You may view them as part of this repository. You may not copy, modify, redistribute, or
-use them in another product.
+### Personal-use grant
+
+You may build this repository and run the resulting app, with these characters, on your own
+computers for your own personal use, and view them as part of this repository.
+
+You may not, without written permission: redistribute the assets or builds that contain them
+(including app bundles and disk images), modify them or make derivative characters, use them in
+another product or project, or use them commercially. Removing or replacing `assets/` with your
+own character is fine; the app code itself is MIT.
 
 ## Planned split once the character is final
 

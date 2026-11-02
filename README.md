@@ -1,63 +1,98 @@
-# TokenPet (prototype): Grandpa Yugong
+# Yugong Pet: Grandpa Yugong shovels your Claude tokens
 
-Grandpa Yugong (우공 할아버지), from the Liezi tale of the old man who moved the mountains,
-lives in your Mac menu bar and shovels your Claude Code tokens:
+[한국어](README.ko.md)
 
-- **Working pace**: lively, steady or straining, from how fast you are using the window
-  compared with the time left before it resets.
-- **Shovel speed** (RunCat-style): how many output tokens Claude Code and Codex are generating on
-  this Mac right now. Idle = he leans on the shovel and chats; faster = faster digs; very fast = sweat.
-- **No data = "don't know"**: without Claude Code's status-line numbers he says so; nothing is guessed.
-- **The carrier (지게) is the 5-hour meter**: earth heaps up in his basket. When it is full he
-  sets it down and naps, showing when he starts again ("09:00에 다시 퍼요").
-- **Reset**: a morning stretch, and he picks the shovel back up.
-- **Accounts without a 5-hour window** (verified Ultra): the carrier fills with today's fair
-  share of the weekly limit (1/7 of the week, unused days carry over); full = he naps until the next day starts.
-  No 5-hour meter is ever invented.
-- **The mountain** in the popover erodes with every token he has ever shovelled (kept on this
-  Mac). When a whole mountain is gone, heaven is moved and carries it away (cutscene), and the
-  next mountain appears.
-- **Codex** is his grandson, carrying a second basket.
-- Habits: chatting with his magpie, wiping sweat, stretching his back, yawning at night.
+![Grandpa Yugong in the popover, going through his states](docs/demo.gif)
 
-Two art styles of the same poses: **pixel** (default) and **ink** (brush/ink-wash vector).
+Grandpa Yugong (우공 할아버지), from the old tale of the ninety-year-old man who moved the
+mountains one shovel at a time, lives in your Mac menu bar and shows your Claude Code usage:
 
-## Run
+- **The carrier (지게) is your 5-hour limit.** Earth heaps up in his A-frame carrier. When it is
+  full he sits down and naps, and the menu bar shows when he starts again.
+- **Accounts with only a weekly limit** (verified Ultra): the carrier fills with today's fair share
+  of the week (1/7, unused days carry over). No 5-hour meter is ever invented.
+- **His pace** (RunCat-style): he digs faster when tokens flow faster on this Mac, leans on his
+  shovel and chats with his magpie when it is quiet, and strains when you are heading for the limit.
+- **The mountain** wears down with every token you have ever used (kept on this Mac). Carry a
+  whole mountain away and heaven is moved: a short cutscene, then the next mountain.
+- **The grandson is Codex.** If you use Codex CLI, he carries a second basket.
+- **No data, no guessing.** Until Claude Code reports your limits, he says he doesn't know.
+
+Pixel style by default; an ink-wash style of the same poses is one click away.
+
+## Install
+
+Needs macOS 13 or later and the Swift toolchain (Xcode or the Command Line Tools).
 
 ```sh
-swift run --package-path data/token-pet-proto/app -c release TokenPet
+./scripts/bundle.sh          # builds build/YugongPet.app (ad-hoc signed, not notarized)
+open build/YugongPet.app     # or move it to /Applications first
 ```
 
-Useful flags: `--demo lively|steady|straining|resting|morning|cutscene|cycle`, `--tempo idle|low|high|veryHigh`,
-`--weekly-only` (demo an account with no 5-hour window), `--style pixel|ink`, `--lang en|ko`,
-`--stage` (menu-bar item and popover in one window), `--render <dir>` (PNG stills),
-`--scan-report` (prints what it read). Older flag names (`full`, `asleep`, `stretch`) still work.
+The first launch shows a short guide. Its last page has a **Copy snippet** button for the
+Claude Code status line (below). Quit from the popover.
 
-Character sheets: `swift run --package-path data/token-pet-proto/app -c release YugongSheet <dir> [--scenes]`.
+Or run without a bundle: `swift run -c release TokenPet` (no notifications or open-at-login there).
 
-Tests: `./test.sh` (the rules are in [LOGIC.md](LOGIC.md)).
+## Connect Claude Code
 
-Nothing is installed: no login item, nothing copied to /Applications. Quit from the popover.
+Claude Code hands its status-line command your official limits (`rate_limits.five_hour` and
+`rate_limits.seven_day`: used %, reset time). The bridge script saves only that object to
+`~/.claude/token-pet/limits.json`; no prompts, paths or session ids, no network.
 
-## Where the numbers come from
+**Copy snippet** in the guide (or Settings › How it works) copies the bridge into
+`~/.claude/token-pet/` and this onto the clipboard. Paste it into the top-level object of
+`~/.claude/settings.json` yourself; the app never edits that file:
 
-1. **Official Claude limits (best):** Claude Code passes `rate_limits.five_hour` and
-   `rate_limits.seven_day` (used %, reset time) to its status line command; either window may be
-   absent. Point your status line at `bridge/statusline-bridge.sh`, which saves only that object to
-   `~/.claude/token-pet/limits.json`:
+```json
+"statusLine": {
+  "type": "command",
+  "command": "sh ~/.claude/token-pet/statusline-bridge.sh"
+}
+```
 
-   ```json
-   { "statusLine": { "type": "command", "command": "sh /path/to/bridge/statusline-bridge.sh" } }
-   ```
+Already have a status line? Keep it and make its first line
+`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null`,
+then read the JSON from `$input`.
 
-2. **Codex:** the `rate_limits` that Codex CLI writes into `~/.codex/sessions/**/*.jsonl`.
-3. **Shovel speed and the mountain:** token counts from `~/.claude/projects/**/*.jsonl` and Codex
-   `token_count` events. These never become a limit percentage.
+The bridge uses `jq` when present (built into macOS 15+) and `plutil` otherwise.
+Codex needs no setup: its own logs (`~/.codex/sessions`) carry its limits.
 
-No network calls, no credentials read. Local state (UserDefaults domain `TokenPet`): the mountain
-ledger (`mountain.*`), the chosen style and the screen-share setting. `defaults delete TokenPet` clears it.
+## When the menu bar is full
+
+macOS quietly hides menu-bar icons that do not fit, or puts them behind the camera notch.
+Grandpa notices, tells you once with a notification, and moves into a small floating window
+(drag it anywhere; right-click to hide it). Settings › Mini window: *when the menu bar is full*
+(default), *always* or *never*. Opening the app again always brings him up.
+
+## Settings
+
+Gear button in the popover: language (system, 한국어, English), show the grandson (Codex), mini
+window, open at login (off by default, opt-in only), and the guide. Everything is stored in the
+UserDefaults domain `TokenPet`; `defaults delete TokenPet` resets it, including the mountain.
+
+## How the numbers become a pet
+
+Every rule is in one page, [LOGIC.md](LOGIC.md), and every rule has a unit test (`./test.sh`).
+In short: official limits only, the reset time decides when a window starts over, and the
+weekly-only share needs no saved state, so restarts and several Macs give the same answer.
+
+## For development
+
+`swift run -c release TokenPet` with flags: `--demo lively|steady|straining|resting|morning|cutscene|cycle`,
+`--tempo idle|low|high|veryHigh`, `--weekly-only`, `--style pixel|ink`, `--lang en|ko`,
+`--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,
+`--settings`, `--guide`, `--pretend-hidden` (try the mini-window fallback),
+`--render <dir>` (PNG stills), `--icon-set <dir>`, `--scan-report` (prints what it read),
+`--anim-stats`. `TOKENPET_PREFS=<domain>` keeps a test run out of your settings.
+
+Character sheets: `swift run -c release YugongSheet <dir> [--scenes]`.
 
 ## License
 
-App code: MIT (`LICENSE`). Characters under `assets/`: separate license
-(`assets/LICENSE.md`); see `assets/PROVENANCE.md` for how each asset was made.
+- App code (`Sources/`, `bridge/`, `scripts/`, `Tests/`): MIT, see [LICENSE](LICENSE).
+- Grandpa Yugong and everything under `assets/` (including `docs/demo.gif`): all rights reserved,
+  with a personal-use grant, see [assets/LICENSE.md](assets/LICENSE.md) and
+  [assets/PROVENANCE.md](assets/PROVENANCE.md).
+
+[Changelog](CHANGELOG.md)

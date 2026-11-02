@@ -1,7 +1,9 @@
 # How Grandpa reads your usage
 
-All of this is in `Sources/TokenPet/Logic.swift`, as pure functions of (readings, now).
-Every row below has a unit test (`./test.sh`, `Tests/TokenPetTests/LogicTests.swift`).
+The usage rules are in `Sources/TokenPet/Logic.swift`, as pure functions of (readings, now); the
+app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup`) and the
+`MountainLedger` in `UsageModel.swift`. Every row below has a unit test (`./test.sh`,
+`Tests/TokenPetTests/LogicTests.swift` for the usage rules, `AppTests.swift` for the app rules).
 
 ## Inputs
 
@@ -52,6 +54,51 @@ so restarts, sleep and several Macs cannot skew it.
   Only the printed clock times use this Mac's time zone (e.g. reset `1794164400` prints `월 04:00` in Seoul, `Sun 19:00` in UTC).
 - Old readings are shown as they were, with their capture time: usage can only have grown since, unless a reset passed (row 2).
 - A clock moved backwards changes nothing: readings stamped "in the future" still count, and smoothing ignores negative time.
+
+## The mountain and the milestone
+
+| When | Then |
+|---|---|
+| A log event newer than the last one counted | Its tokens (input + output + cache writes) are added once; the count and the newest counted time are saved, so a restart neither loses nor double-counts |
+| First run | The week of logs already on disk is counted |
+| Tokens reach the mountain's size (1 billion) | The cutscene is due (saved, survives a restart): the menu bar shows ✨, one notification per mountain, and the popover plays the cutscene once from the start when opened |
+| "On to the next mountain" | The next mountain starts with the tokens beyond the size (Taihang, then Wangwu, then numbered) |
+
+## Menu bar
+
+| When | Then |
+|---|---|
+| Less than half of the item's width lies on any screen (macOS pushed it off a full menu bar; measured here at x = −4316 on a 1728-point screen) | **Hidden** |
+| More than half of the item lies under the camera notch (the gap between the screen's two usable menu-bar areas) | **Hidden** |
+| The item has no frame yet | No verdict; look again later |
+
+Checked 2 s after launch and again 1 s after the item moves or the screens change.
+The first time it is hidden, one notification says so (never again; saved).
+The **mini window** setting: *when the menu bar is full* (default) shows a small floating window
+with the same pet only while the item is hidden; *always*; or *never*. Opening the app again
+(Finder, Spotlight, the notification) opens the popover; if the item is hidden it opens under the
+mini window, which then shows even when set to never.
+
+Drawing stops when nobody can see the pet: display asleep, user switched out, or neither the bar
+item nor the mini window is on screen.
+
+## Settings (UserDefaults domain `TokenPet`, shared by `swift run` and the app)
+
+| Setting | Default |
+|---|---|
+| Language | System (Korean if the first preferred language is Korean, else English); or pinned 한국어 / English |
+| Show the grandson (Codex) | On. Off hides him and his meters; his tokens still count toward the shovel speed |
+| Mini window | When the menu bar is full |
+| Open at login | **Off.** Only the user can turn it on (SMAppService, app bundle only); the app never registers itself |
+| Hide from screen sharing | On |
+
+## Claude Code setup
+
+The app never edits `~/.claude/settings.json`. "Copy snippet" copies the bridge script into the
+folder that holds `limits.json` and puts this on the clipboard, to paste into the top-level object:
+`"statusLine": {"type": "command", "command": "sh ~/.claude/token-pet/statusline-bridge.sh"}`
+(another folder gets `TOKENPET_DIR='…' sh '…/statusline-bridge.sh'`, quoted). The bridge reads the
+JSON with `jq`, or with `plutil` on Macs without `jq` (before macOS 15); both save the same file.
 
 ## Not used (on purpose)
 

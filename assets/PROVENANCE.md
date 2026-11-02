@@ -16,6 +16,7 @@ picture book or illustration of the tale was used as a reference.
 | Grandson (손주, the Codex helper) | `characters/yugong/YugongScene.swift` | Vector drawing code; pixel style rasterized on a 24 pixel grid |
 | Scenes: sky, eroding mountain, ground, seal | `characters/yugong/YugongScene.swift` | Gradients, ordered dithering and paths in code |
 | Turnaround (front/back), expressions, character sheet | `characters/yugong/YugongSheet.swift` | Drawing code; rendered by the `YugongSheet` tool |
+| App icon | `characters/yugong/YugongIcon.swift` | The pixel scene and figure above, composed on a 52-pixel grid in code (v0.1) |
 | Earlier discussion sketches (pebble, rabbit, mochi) | `archive/` | Superseded; kept for the record, not built |
 
 ## Who made them, and with what

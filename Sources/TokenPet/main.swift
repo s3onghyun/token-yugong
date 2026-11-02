@@ -100,6 +100,13 @@ if args.contains("--scan-report") {
         png(strip, "menubar-yugong-\(style.rawValue).png")
     }
     model.demoMountainLeft = nil
+    model.style = .pixel
+    for page in 0..<3 {
+        let r = ImageRenderer(content: OnboardingView(model: model, done: {}, page: page).background(Color(nsColor: .windowBackgroundColor)))
+        r.scale = 2
+        if let img = r.nsImage { png(img, "guide-\(page)\(ko).png") }
+    }
+    png(TokenPetAssets.appIcon(size: 512), "app-icon.png")
 }
 
 if let dir = arg("--render") {
@@ -222,7 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         if args.contains("--open") {
             popover.behavior = .applicationDefined
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.show() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { self.show() }   // after checkBar, so it opens under the mini window when the bar is full
         }
     }
 
@@ -295,6 +302,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if args.contains("--pretend-hidden") { hidden = true }   // demo and testing of the fallback
         if hidden != barHidden || !barChecked { print("menu bar item \(hidden ? "hidden" : "visible"): \(f)") }
         barChecked = true
+        if barHidden && !hidden { item.button?.image = lastImage }   // back in view: show the current frame
         barHidden = hidden
         if hidden && !Prefs.store.bool(forKey: "barHiddenWarned") {
             Prefs.store.set(true, forKey: "barHiddenWarned")
@@ -413,7 +421,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let run = l.runs.first { p < $0.end } ?? l.runs[l.runs.count - 1]
         if run.img !== lastImage {
             lastImage = run.img
-            item.button?.image = run.img
+            // a hidden bar item still costs a redraw per frame (measured 3% CPU at "high"): skip it
+            if !barHidden || args.contains("--anim-stats") { item.button?.image = run.img }
             bar.image = run.img
             if mini?.isVisible == true { mini?.pet.image = run.img }
             drawCount += 1

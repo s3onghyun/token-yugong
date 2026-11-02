@@ -46,7 +46,7 @@ enum StatusLineSetup {
 struct OnboardingView: View {
     @ObservedObject var model: UsageModel
     var done: () -> Void
-    @State private var page = 0
+    @State var page = 0
     @State private var copied = false
 
     private var dir: URL { model.bridgeURL.deletingLastPathComponent() }
@@ -124,7 +124,7 @@ struct OnboardingView: View {
                      "Claude Code는 상태줄에 공식 한도를 알려 줘요. 아래를 ~/.claude/settings.json 맨 바깥 객체에 붙여 넣으세요(앱이 그 파일을 직접 고치지는 않아요):"))
                 .fixedSize(horizontal: false, vertical: true)
             Text(snippet)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: 11, design: .monospaced))
                 .textSelection(.enabled)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -164,7 +164,9 @@ struct OnboardingView: View {
     }
 
     private func figure(_ st: PetState, carrier: Double) -> some View {
-        Image(nsImage: CharacterStyle.pixel.image(st, t: 0.2, size: 40, carrier: carrier)).interpolation(.none)
+        // the same 20-pixel sprite as in the menu bar, enlarged
+        Image(nsImage: CharacterStyle.pixel.image(st, t: 0.2, size: 20, menuBar: true, carrier: carrier))
+            .resizable().interpolation(.none).frame(width: 40, height: 40)
     }
 
     private func row(_ icon: some View, _ title: String, _ text: String) -> some View {
