@@ -30,7 +30,9 @@ jobs:
       - name: Build universal app and release archive
         run: ./scripts/release-artifacts.sh
       - name: Extract release notes
-        run: ./scripts/changelog-notes.sh "$(tr -d '\r\n' < VERSION)" > release-notes.md
+        run: |
+          version=$(tr -d '\r\n' < VERSION)
+          { sed "s/@VERSION@/$version/g" .github/release-header.md; ./scripts/changelog-notes.sh "$version"; } > release-notes.md
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -38,6 +40,6 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           gh release create "$TAG" \
-            --title "Yugong Pet $VERSION" \
+            --title "Token Yugong $VERSION" \
             --notes-file release-notes.md \
             dist/*.zip dist/*.sha256

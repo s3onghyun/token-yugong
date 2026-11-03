@@ -1,0 +1,25 @@
+name: Translation fix
+description: A wrong, awkward or missing text in English, 한국어, 日本語 or 简体中文.
+labels: [translation]
+body:
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options: [English, 한국어, 日本語, 简体中文, Other (a new language)]
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where is it?
+      description: The app screen (popover, settings, guide, titles...) or the README file, and the text as it is now.
+    validations:
+      required: true
+  - type: textarea
+    id: better
+    attributes:
+      label: Better wording
+      description: Your suggestion, and why if it is not obvious (tone, Liezi terms such as 智叟 or 夸娥氏...).
+    validations:
+      required: true

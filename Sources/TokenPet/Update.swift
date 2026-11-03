@@ -69,7 +69,7 @@ enum Update {
 
     /// The fixed language header: URLSession would otherwise send the system's languages.
     static func headers(_ v: SemVer) -> [String: String] {
-        ["User-Agent": "YugongPet/\(v)", "Accept": "application/vnd.github+json", "Accept-Language": "en"]
+        ["User-Agent": "TokenYugong/\(v)", "Accept": "application/vnd.github+json", "Accept-Language": "en"]
     }
 
     static let session = URLSession(configuration: .ephemeral)
@@ -108,7 +108,7 @@ extension UsageModel {
         guard let offer = updateOffer, Prefs.store.string(forKey: "update.notified") != offer.description else { return }
         Prefs.store.set(offer.description, forKey: "update.notified")
         Notify.post(id: "update-\(offer)",
-                    title: L.t("Yugong Pet \(offer) is out", "새 버전 \(offer)이 나왔어요", "新しいバージョン \(offer) が出ました", "新版本 \(offer) 已发布"),
+                    title: L.t("Token Yugong \(offer) is out", "새 버전 \(offer)이 나왔어요", "新しいバージョン \(offer) が出ました", "新版本 \(offer) 已发布"),
                     body: L.t("Open Grandpa to see the release page, or skip this version.",
                               "할아버지를 열어 릴리스 페이지를 보거나 이 버전을 건너뛸 수 있어요.",
                               "おじいさんを開いてリリースページを見るか、このバージョンをスキップできます。",

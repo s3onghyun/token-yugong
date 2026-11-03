@@ -254,12 +254,12 @@ struct PopoverView: View {
                        "アップデート確認はアプリバンドルでのみ（scripts/bundle.sh）", "检查更新仅限应用包（scripts/bundle.sh）")
         }
         switch model.updateStatus {
-        case .checking: return L.t("Yugong Pet \(current) · checking…", "Yugong Pet \(current) · 확인하는 중…", "Yugong Pet \(current)・確認中…", "Yugong Pet \(current) · 正在检查…")
-        case .failed: return L.t("Yugong Pet \(current) · couldn't reach GitHub", "Yugong Pet \(current) · GitHub에 연결하지 못했어요",
-                                 "Yugong Pet \(current)・GitHub に接続できませんでした", "Yugong Pet \(current) · 无法连接 GitHub")
+        case .checking: return L.t("Token Yugong \(current) · checking…", "Token Yugong \(current) · 확인하는 중…", "Token Yugong \(current)・確認中…", "Token Yugong \(current) · 正在检查…")
+        case .failed: return L.t("Token Yugong \(current) · couldn't reach GitHub", "Token Yugong \(current) · GitHub에 연결하지 못했어요",
+                                 "Token Yugong \(current)・GitHub に接続できませんでした", "Token Yugong \(current) · 无法连接 GitHub")
         case .upToDate where !(model.latestVersion.flatMap(SemVer.init).map { current < $0 } ?? false):   // not when a newer one was skipped
-            return L.t("Yugong Pet \(current) · up to date", "Yugong Pet \(current) · 최신 버전이에요", "Yugong Pet \(current)・最新です", "Yugong Pet \(current) · 已是最新版本")
-        default: return "Yugong Pet \(current)"
+            return L.t("Token Yugong \(current) · up to date", "Token Yugong \(current) · 최신 버전이에요", "Token Yugong \(current)・最新です", "Token Yugong \(current) · 已是最新版本")
+        default: return "Token Yugong \(current)"
         }
     }
 

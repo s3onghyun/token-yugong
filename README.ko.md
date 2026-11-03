@@ -1,8 +1,29 @@
-# 우공 펫: 우공 할아버지가 Claude 토큰을 퍼 나릅니다
+<h1 align="center">Token Yugong 愚公 (토큰 우공)</h1>
 
-[English](README.md)
+<p align="center"><b>우공 할아버지가 토큰 한 삽씩 산을 옮깁니다.</b><br>
+Claude Code와 Codex 사용 한도를 보여 주는 픽셀 아트 메뉴바 펫:
+5시간 한도만큼 지게가 차고, 다 쓰면 낮잠을 자고, 쓴 토큰만큼 산이 깎입니다.</p>
 
-![팝오버 속 우공 할아버지, 상태별로](docs/demo.gif)
+<p align="center">
+  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a> · 한국어
+</p>
+
+<p align="center">
+  <a href="https://github.com/s3onghyun/token-yugong/releases/latest"><img src="https://img.shields.io/github/v/release/s3onghyun/token-yugong?style=flat-square" alt="최신 릴리스"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B%20·%20universal-0a0a0c?style=flat-square" alt="macOS 13+, universal">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/code-MIT-6e5aff?style=flat-square" alt="코드: MIT"></a>
+  <img src="https://img.shields.io/badge/telemetry-none-2e8b57?style=flat-square" alt="텔레메트리 없음">
+</p>
+
+<p align="center"><img src="docs/hero.gif" width="584" alt="삽질하는 우공 할아버지, 지게가 차며 힘겨워하고, 한도에 닿아 낮잠 자는 동안 지수가 비웃고, 리셋 뒤 다시 시작하고, 까치가 새 칭호를 알리는 모습"><br>
+<sub>앱의 그림 코드로 데모 데이터를 그린 장면입니다 (<code>YugongSheet --hero</code>).</sub></p>
+
+**설치** (macOS 13 이상, Apple silicon·Intel): [Releases](https://github.com/s3onghyun/token-yugong/releases/latest)에서
+`TokenYugong-<version>-macos-universal.zip`을 내려받아 풀고 `TokenYugong.app`을 응용 프로그램 폴더로 옮깁니다.
+아직 공증 전이라 처음 한 번은 승인이 필요합니다: [처음 실행](#처음-실행) 참고.
+그다음 [Claude Code를 연결](#claude-code-연결)합니다(스니펫 하나, Codex는 설정 없음).
+
+## 무엇을 보여 주나
 
 아흔 살에 한 삽씩 산을 옮기기 시작한 옛이야기 속 우공 할아버지가 Mac 메뉴바에 살면서
 Claude Code 사용량을 보여 줍니다.
@@ -46,27 +67,38 @@ macOS 13 이상이 필요합니다.
 
 ### 앱 내려받기
 
-1. 최신 [GitHub Release](https://github.com/s3onghyun/token-yugong/releases)에서
-   `YugongPet-<version>-macos-universal.zip`과 `.sha256` 파일을 함께 내려받습니다.
+1. 최신 [GitHub Release](https://github.com/s3onghyun/token-yugong/releases/latest)에서
+   `TokenYugong-<version>-macos-universal.zip`과 `.sha256` 파일을 함께 내려받습니다.
 2. 터미널에서 내려받은 파일을 확인합니다(`<version>`은 릴리스 버전으로 바꾸세요).
 
    ```sh
-   shasum -a 256 -c YugongPet-<version>-macos-universal.zip.sha256
+   shasum -a 256 -c TokenYugong-<version>-macos-universal.zip.sha256
    ```
 
-3. ZIP 파일을 더블 클릭해 푼 다음 `YugongPet.app`을 `/Applications`로 옮깁니다.
-4. 이 앱은 ad-hoc 서명 상태이며 아직 **공증(notarization)** 되지 않았습니다. 처음 실행할 때
-   앱을 Control-클릭하고 **열기**를 누른 뒤 한 번 더 **열기**를 누르세요. macOS가 먼저 막으면
-   **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누르세요. 공증은 이후
-   릴리스에 추가할 예정입니다.
+3. ZIP 파일을 더블 클릭해 푼 다음 `TokenYugong.app`을 `/Applications`로 옮깁니다.
+
+Yugong Pet 0.2.0을 쓰고 있었다면 종료한 뒤 `YugongPet.app`을 지우세요. 설정, 산, 칭호는 그대로
+이어집니다(같은 설정 도메인). *로그인 시 열기*를 켜 두었다면 설정에서 한 번 껐다가 다시 켜세요.
+
+### 처음 실행
+
+이 앱은 ad-hoc 서명 상태이며 아직 공증(notarization)되지 않아서 macOS가 한 번 묻습니다.
+
+1. 앱을 엽니다. macOS가 확인할 수 없다고 하면 **완료**를 누릅니다.
+2. **시스템 설정 → 개인정보 보호 및 보안**을 열고 아래로 내려 Token Yugong 옆의 **그래도 열기**를
+   누른 뒤 Touch ID나 암호로 확인합니다.
+3. macOS 13-14에서는 대신 앱을 Control-클릭하고 **열기**를 골라도 됩니다.
+
+코드를 먼저 보고 싶다면 직접 빌드하세요(아래).
 
 ### 소스에서 빌드
 
 로컬 빌드에는 Swift(Xcode 또는 Command Line Tools)가 필요합니다.
 
 ```sh
-./scripts/bundle.sh          # build/YugongPet.app 생성 (ad-hoc 서명, 공증 안 됨)
-open build/YugongPet.app     # 먼저 /Applications로 옮겨도 됩니다
+git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
+./scripts/bundle.sh            # build/TokenYugong.app 생성 (ad-hoc 서명, 공증 안 됨)
+open build/TokenYugong.app     # 먼저 /Applications로 옮겨도 됩니다
 ```
 
 처음 실행하면 짧은 안내가 나옵니다. 마지막 장의 **스니펫 복사** 버튼으로 Claude Code
@@ -144,11 +176,29 @@ macOS는 메뉴바에 자리가 없는 아이콘을 말없이 숨기거나 카�
 ## 새 버전 알림
 
 앱은 하루 한 번 GitHub에 최신 릴리스를 묻습니다. `api.github.com/repos/s3onghyun/token-yugong/releases/latest`
-에 HTTPS GET 하나를 보내고, 머리글은 `User-Agent: YugongPet/<버전>`, `Accept`, 고정값 `Accept-Language: en`
+에 HTTPS GET 하나를 보내고, 머리글은 `User-Agent: TokenYugong/<버전>`, `Accept`, 고정값 `Accept-Language: en`
 뿐이며 쿠키·캐시를 쓰지 않습니다. 사용자나 사용량에 관한 정보는 보내지 않고 텔레메트리도 없습니다.
 새 버전이 나오면 팝오버에 **릴리스 페이지**와 **이 버전 건너뛰기**가 있는 줄이 보이고, 그 버전마다
 알림이 한 번 옵니다. 앱이 스스로 내려받거나 설치하지는 않습니다. 새 ZIP을 받아 `.sha256`을 확인하고
 [설치](#설치)처럼 앱을 바꿔 주세요. 설정 › *새 버전 확인 (하루 한 번)*으로 끄고, *지금 확인*으로 바로 묻습니다.
+
+## 개인정보
+
+Token Yugong은 이 Mac의 파일을 읽고, 모든 것을 이 Mac에만 둡니다. 계정, 분석, 텔레메트리가 없습니다.
+
+| 읽는 것 | 이유 |
+|---|---|
+| `~/.claude/token-pet/limits.json` | 상태줄 브리지가 적는 Claude Code 공식 한도(사용 %, 리셋 시각. 프롬프트·경로·세션 id 없음) |
+| Claude Code 세션 로그(`~/.claude/projects`) | 할아버지의 속도와 산에 쓰는 토큰 수, 그리고 한도가 찼을 때 100%를 보여 주는 `usage_limit_reached` 거절 기록 |
+| `~/.codex/sessions` | Codex 자신의 한도와 토큰 수 |
+| `~/.gemini/tmp` | Gemini CLI 토큰 수 |
+
+- **네트워크:** 하루 한 번 새 버전 확인(GitHub releases API에 GET 하나, 끌 수 있음)과, 키를 넣은
+  경우에만 15분마다 OpenAI 비용 API 또는 DeepSeek 잔액 API.
+- **키**는 로그인 키체인에만 저장합니다.
+- **설정과 기록**(산, 칭호)은 이 Mac의 UserDefaults 도메인 `TokenPet`에만 있고,
+  `defaults delete TokenPet`으로 지웁니다.
+- 앱은 `~/.claude/settings.json`을 고치지 않습니다. 상태줄 스니펫은 직접 붙여 넣습니다.
 
 ## 숫자가 할아버지가 되는 방법
 
@@ -159,12 +209,17 @@ macOS는 메뉴바에 자리가 없는 아이콘을 말없이 숨기거나 카�
 ## 개발용
 
 `swift run -c release TokenPet`의 플래그와 `TOKENPET_PREFS`는 [README.md](README.md#for-development)에 있습니다.
-캐릭터 시트: `swift run -c release YugongSheet <폴더> [--scenes] [--family] [--visitors]`.
+캐릭터 시트: `swift run -c release YugongSheet <폴더> [--scenes] [--family] [--visitors] [--rewards]`.
+`--social`은 `docs/social-preview.png`를, `--hero`는 `docs/hero.gif`의 프레임을 그립니다(GIF로 묶는
+ffmpeg 명령은 [README.md](README.md#for-development)).
+
+기여 방법: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## 라이선스
 
-- 앱 코드(`Sources/`, `bridge/`, `scripts/`, `Tests/`): MIT, [LICENSE](LICENSE).
-- 우공 할아버지와 `assets/` 아래 전부(`docs/demo.gif` 포함): 모든 권리 보유, 개인 사용 허락.
+- 앱 코드(`Package.swift`, `Sources/`, `bridge/`, `scripts/`, `Tests/`): MIT, [LICENSE](LICENSE).
+- 우공 할아버지와 `assets/` 아래 전부(그리고 `docs/`의 그림처럼 거기서 만든 이미지)는 MIT 라이선스에
+  포함되지 **않습니다**: 모든 권리 보유, 개인 사용 허락.
   [assets/LICENSE.md](assets/LICENSE.md), [assets/PROVENANCE.md](assets/PROVENANCE.md) 참고.
 
 [변경 기록](CHANGELOG.md)

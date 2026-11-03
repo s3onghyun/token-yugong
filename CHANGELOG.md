@@ -1,8 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 (2026-11-03)
 
 ### Changed
+- One public name: **Token Yugong**. The app is now `TokenYugong.app` (shown as *Token Yugong*), the
+  release archive `TokenYugong-<version>-macos-universal.zip`, and the update check says
+  `User-Agent: TokenYugong/<version>`. The executable, the bundle identifier and the `TokenPet`
+  settings domain stay, so settings, the mountain and titles carry over: quit Yugong Pet, delete
+  `YugongPet.app`, and if *Open at login* was on, turn it off and on once.
+- The first-launch steps follow macOS 15 and later: System Settings › Privacy & Security › *Open
+  Anyway* first; Control-click › Open is the macOS 13-14 alternative.
+- `LICENSE` is the plain MIT text, so GitHub reads it as MIT; which files it covers (and that
+  `assets/` is not among them) is stated in the README and `assets/LICENSE.md`. The character art is
+  final, no longer a prototype.
+- README: a short top with the install line, badges and a new animation drawn by the app's own code
+  (`YugongSheet --hero`: digging, nearly full, the nap while Zhisou laughs, the reset, a new title),
+  a Privacy section listing everything the app reads and every network request, and full Japanese and
+  Simplified Chinese READMEs (AI-assisted translations; corrections welcome). `YugongSheet --social`
+  draws the 1280x640 link preview. CONTRIBUTING.md and issue templates for bugs and translations.
 - The mini window (shown when the menu bar has no room) draws Grandpa at twice the bar size, pixel for
   pixel, with a larger number, so it no longer reads as a lone number, and hovering says *Click to see
   Grandpa Yugong* (눌러서 우공 보기). An older, smaller saved mini window grows to the new size in place.
