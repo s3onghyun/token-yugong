@@ -5,8 +5,9 @@ import TokenPetAssets
 /// module; this is the app-side glue.
 enum Yugong {
     /// The character alone (menu bar and guide), at time `t`.
-    static func image(_ state: PetState, t: TimeInterval, size: CGFloat, menuBar: Bool = false, carrier: Double = 0.4, night: Bool = false, tempo: Tempo = .working) -> NSImage {
-        TokenPetAssets.figure(state, t: Motion.reduce ? 0 : t, carrier: carrier, night: night, size: size, menuBar: menuBar, tempo: tempo)
+    static func image(_ state: PetState, t: TimeInterval, size: CGFloat, menuBar: Bool = false, carrier: Double = 0.4, night: Bool = false,
+                      tempo: Tempo = .working, titles: Int = 1) -> NSImage {
+        TokenPetAssets.figure(state, t: Motion.reduce ? 0 : t, carrier: carrier, night: night, size: size, menuBar: menuBar, tempo: tempo, titles: titles)
     }
 
     /// The popover scene.

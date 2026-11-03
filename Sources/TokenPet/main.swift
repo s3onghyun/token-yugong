@@ -5,7 +5,7 @@ import TokenPetAssets
 import UserNotifications
 
 // Usage:
-//   TokenPet [--lang en|ko|ja|zh|pseudo] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
+//   TokenPet [--lang en|ko|ja|zh|pseudo] [--demo lively|steady|straining|resting|morning|cutscene|finale|cycle] [--open]
 //            [--bridge <limits.json>] [--logs <dir>] [--tempo idle|low|high|veryHigh] [--visitor wifeDoubting|wifeCheering|zhisou]
 //            [--lifetime <tokens>] [--award rank:<0-9>|feat:<name>] [--titles] [--window]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
@@ -90,6 +90,11 @@ if args.contains("--scan-report") {
     r.scale = 2
     if let img = r.nsImage { png(img, "popover-yugong-pixel-cutscene\(ko).png") }
     model.demoCutscene = false
+    model.demoLifetime = 3e9; model.demoFinale = true; model.setDemo(.morning)
+    let rf = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now, cutsceneT: 0.5).background(Color(nsColor: .windowBackgroundColor)))
+    rf.scale = 2
+    if let img = rf.nsImage { png(img, "popover-yugong-pixel-finale\(ko).png") }
+    model.demoFinale = false
     model.demoLifetime = 380_000_000; model.demoAward(.rank(5)); model.setDemo(.lively)   // matches the demo mountain (62% left)
     let rc = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now).background(Color(nsColor: .windowBackgroundColor)))
     rc.scale = 2
@@ -224,6 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             model.demoWeeklyOnly = args.contains("--weekly-only")
             if d == "cycle" { model.demoCycle = true; startCycle() }
             else if d == "cutscene" { model.demoCutscene = true; model.cutsceneStart = Date(); model.setDemo(.morning) }
+            else if d == "finale" { model.demoLifetime = 3e9; model.demoFinale = true; model.cutsceneStart = Date(); model.setDemo(.morning) }
             else { model.setDemo(PetState(flag: d)) }
         }
         model.start()
@@ -482,9 +488,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if !paused { tick() }
     }
 
-    private func loop(_ st: PetState, _ tempo: Tempo, night: Bool, carrier: Double) -> (runs: [(img: NSImage, end: Double)], period: Double) {
+    private func loop(_ st: PetState, _ tempo: Tempo, night: Bool, carrier: Double, titles: Int) -> (runs: [(img: NSImage, end: Double)], period: Double) {
         let fill = (carrier * 4).rounded() / 4          // the basket changes in quarter steps
-        let key = "\(st.rawValue)/\(tempo.rawValue)/\(night)/\(fill)"
+        let key = "\(st.rawValue)/\(tempo.rawValue)/\(night)/\(fill)/\(titles)"
         if let l = loops[key] { return l }
         let period = Motion.period(st, night: night, tempo: tempo)
         let step = 1.0 / 8
@@ -494,7 +500,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             let t = Double(i) * step
             let sig = TokenPetAssets.signature(st, t: t, night: night, tempo: tempo)
             if sig == prev, !runs.isEmpty { runs[runs.count - 1].end = t + step; continue }
-            runs.append((raster(Yugong.image(st, t: t, size: 20, menuBar: true, carrier: fill, night: night, tempo: tempo)), t + step))
+            runs.append((raster(Yugong.image(st, t: t, size: 20, menuBar: true, carrier: fill, night: night, tempo: tempo, titles: titles)), t + step))
             prev = sig
         }
         if loops.count > 24 { loops.removeAll() }
@@ -521,11 +527,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func tick() {
         wakeCount += 1
         let s = model.snap
-        let l = loop(s.state, model.tempo, night: model.night, carrier: s.carrier)
+        let l = loop(s.state, model.tempo, night: model.night, carrier: s.carrier, titles: model.rewards)
         let now = Date.timeIntervalSinceReferenceDate
         let p = l.period.isFinite ? model.phase(at: now).truncatingRemainder(dividingBy: l.period) : 0
         let run = l.runs.first { p < $0.end } ?? l.runs[l.runs.count - 1]
-        let (showImage, title) = BarText.item(model.barText.text(s, cutscene: model.cutsceneDue, now: Date()), grandpa: model.barGrandpa)
+        let (showImage, title) = BarText.item(model.barText.text(s, cutscene: model.cutsceneDue || model.finaleDue, now: Date()), grandpa: model.barGrandpa)
         if run.img !== lastImage || showImage != barShowsImage {
             if showImage || showImage != barShowsImage {   // % only: the item has no picture to change
                 // a hidden bar item still costs a redraw per frame (measured 3% CPU at "high"): skip it
@@ -575,7 +581,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Opens the popover under the bar item, or under the mini window when the bar has no room.
     func show(from v: NSView? = nil) {
         guard let anchor = v ?? ((barHidden && mini?.isVisible == true) ? mini?.pet : item.button) else { return }
-        if model.cutsceneDue && model.cutsceneStart == nil { model.cutsceneStart = Date() }   // play it once from the top
+        if (model.cutsceneDue || model.finaleDue) && model.cutsceneStart == nil { model.cutsceneStart = Date() }   // play it once from the top
         hint?.performClose(nil); hint = nil
         Prefs.store.set(true, forKey: "barHintShown")   // found him: no hint needed
         NSApp.activate(ignoringOtherApps: true)

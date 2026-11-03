@@ -2,13 +2,14 @@ import AppKit
 import UserNotifications
 
 /// The fallback when the menu bar has no room: a small floating window with the same animated
-/// Grandpa and number. Click opens the popover, drag moves it (the place is remembered),
-/// right-click offers to hide it.
+/// Grandpa (twice the bar size, so he is what you notice) and number. Click opens the popover,
+/// drag moves it (the place is remembered), right-click offers the Yugong window or to hide it.
 final class MiniWindow: NSPanel {
     let pet = MiniView()
+    static let height: CGFloat = 50
 
     init() {
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 80, height: 36), styleMask: [.borderless, .nonactivatingPanel],
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 100, height: Self.height), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
@@ -23,6 +24,9 @@ final class MiniWindow: NSPanel {
             setFrameOrigin(NSPoint(x: v.maxX - frame.width - 16, y: v.maxY - frame.height - 12))
         }
         setFrameAutosaveName("TokenPetMini")
+        if frame.height != Self.height {   // saved by an older, smaller mini window: grow it downward, top edge kept
+            setFrame(NSRect(x: frame.minX, y: frame.maxY - Self.height, width: frame.width, height: Self.height), display: false)
+        }
     }
 
     func update(image: NSImage?, title: String) {
@@ -59,14 +63,16 @@ final class MiniView: NSView {
     var onHide: (() -> Void)?
     var onWindow: (() -> Void)?
     private var dragged = false
-    private static let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+    private static let font = NSFont.monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
+    /// The 20-point bar sprite at exactly 2x, so every pixel stays square.
+    static let spriteSize: CGFloat = 40
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
         layerContentsRedrawPolicy = .never
         sprite.magnificationFilter = .nearest
-        label.font = Self.font; label.fontSize = 13
+        label.font = Self.font; label.fontSize = 15
         label.alignmentMode = .left
         layer?.addSublayer(sprite); layer?.addSublayer(label)
     }
@@ -86,15 +92,22 @@ final class MiniView: NSView {
     override func layout() {
         super.layout()
         CATransaction.begin(); CATransaction.setDisableActions(true)
-        sprite.frame = CGRect(x: 6, y: (bounds.height - 28) / 2, width: 28, height: 28)
+        let n = Self.spriteSize
+        sprite.frame = CGRect(x: 6, y: floor((bounds.height - n) / 2), width: n, height: n)
         let h = ceil(Self.font.ascender - Self.font.descender)
-        label.frame = CGRect(x: 38, y: (bounds.height - h) / 2, width: max(0, bounds.width - 42), height: h)
+        label.frame = CGRect(x: 6 + n + 4, y: (bounds.height - h) / 2, width: max(0, bounds.width - n - 14), height: h)
         CATransaction.commit()
+        removeAllToolTips(); addToolTip(bounds, owner: self, userData: nil)
     }
 
     var fittingWidth: CGFloat {
         let w = (title.trimmingCharacters(in: .whitespaces) as NSString).size(withAttributes: [.font: Self.font]).width
-        return ceil(6 + 28 + (w > 0 ? 4 + w : 0) + 10)
+        return ceil(6 + Self.spriteSize + (w > 0 ? 4 + w : 0) + 10)
+    }
+
+    /// The hover hint, asked each time so it follows a language change.
+    @objc func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+        L.t("Click to see Grandpa Yugong", "눌러서 우공 보기", "クリックして愚公を見る", "点击查看愚公")
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }

@@ -30,6 +30,13 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
   to *Yugong Who Moved the Mountains* (months), plus a few achievements (a 7-day streak, a week
   kept under the limit, two AIs in one day...). The magpie brings the news with pixel confetti;
   the titles window lists them all and saves a shareable title card (PNG, no personal data).
+- **Title rewards.** Each title adds one thing to the picture, and it stays: the wooden shovel gets its
+  iron blade, then a tassel, a pickaxe, baskets, the Bohai Sea, terraced fields, the family house, the
+  family banner, auspicious clouds, and at the top a golden shovel, an open road and a one-time finale
+  in which Kua'e's sons carry both mountains off. Five of them show in the menu bar too. Settings ›
+  *Hide background props* keeps only Grandpa's gear.
+
+  ![Every title reward, before and after](docs/title-rewards.png)
 
 All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
@@ -119,7 +126,8 @@ login*, at login. While the window is closed or covered the scene stops drawing 
 
 macOS quietly hides menu-bar icons that do not fit, or puts them behind the camera notch.
 Grandpa notices, tells you once with a notification, and moves into a small floating window
-(drag it anywhere; right-click to hide it). Settings › Mini window: *when the menu bar is full*
+(Grandpa at twice the bar size with the number; click for the popover on that display, drag it anywhere,
+right-click for the Yugong window or to hide it). Settings › Mini window: *when the menu bar is full*
 (default), *always* or *never*. Opening the app again always brings him up: the popover, or the
 Yugong window when the bar has no room and the mini window is off.
 

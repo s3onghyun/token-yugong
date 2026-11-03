@@ -90,4 +90,18 @@ if argv.contains("--visitors") {   // the wife, Zhisou and Kua'e's sons, 1x page
     NSGraphicsContext.restoreGraphicsState()
     try! rep.representation(using: .png, properties: [:])!.write(to: out.appendingPathComponent("visitors-sheet.png"))
 }
+if argv.contains("--rewards") {   // the title rewards, before and after, 1x page
+    let fs = YugongSheet.rewardsSize
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(fs.width) * 2, pixelsHigh: Int(fs.height) * 2, bitsPerSample: 8,
+                               samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    rep.size = fs
+    NSGraphicsContext.saveGraphicsState()
+    let g = NSGraphicsContext(bitmapImageRep: rep)!
+    g.cgContext.translateBy(x: 0, y: fs.height); g.cgContext.scaleBy(x: 1, y: -1)
+    NSGraphicsContext.current = NSGraphicsContext(cgContext: g.cgContext, flipped: true)
+    NSGraphicsContext.current?.imageInterpolation = .none
+    YugongSheet.drawRewardsSheet()
+    NSGraphicsContext.restoreGraphicsState()
+    try! rep.representation(using: .png, properties: [:])!.write(to: out.appendingPathComponent("rewards-sheet.png"))
+}
 print("wrote \(out.path)")

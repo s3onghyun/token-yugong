@@ -116,6 +116,7 @@ struct TitleBook {
     var seen = -1                 // the highest rank already celebrated
     var weekStart: Date?          // the weekly window being watched
     var weekFull = false          // it ran out
+    var finaleSeen = false        // the #10 finale played once (it can be replayed from the titles window)
     var store: UserDefaults = Prefs.store
 
     static func load(_ d: UserDefaults = Prefs.store) -> TitleBook {
@@ -127,6 +128,7 @@ struct TitleBook {
         b.seen = d.object(forKey: "titles.seen") as? Int ?? -1
         b.weekStart = (d.object(forKey: "titles.week.start") as? Double).map(Date.init(timeIntervalSince1970:))
         b.weekFull = d.bool(forKey: "titles.week.full")
+        b.finaleSeen = d.bool(forKey: "titles.finale")
         return b
     }
 
@@ -137,7 +139,11 @@ struct TitleBook {
         d.set(seen, forKey: "titles.seen")
         d.set(weekStart?.timeIntervalSince1970, forKey: "titles.week.start")
         d.set(weekFull, forKey: "titles.week.full")
+        d.set(finaleSeen, forKey: "titles.finale")
     }
+
+    /// The finale is due once the top title is reached, until it has been watched.
+    func finaleDue(_ lifetime: Double) -> Bool { Titles.rank(lifetime) == Titles.ladder.count - 1 && !finaleSeen }
 
     /// Records what `i` shows and returns what is newly earned: at most one rank (the highest, even after
     /// skipping several, e.g. on the first run with a full log), then any new achievements.

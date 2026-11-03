@@ -14,6 +14,7 @@ extension YugongArt {
         let son = info.son.map { sonLayer(sonPose(t, fill: $0), fill: $0) }
         let boy = info.boy.map { boyLayer(boyPose(t, fill: $0), fill: $0) }
         let guest = info.cutscene == nil ? info.visitor.map { visitorLayer($0, t: t) } : nil
+        let glint = info.sparkle.flatMap { n in pixelLayer(gw, gh, outline: false) { c in TitleWorld.sparkle(c, n, info, t: t, w: gw, h: gh) } }
         let ground = gh - 6
         return NSImage(size: size, flipped: false) { r in
             guard let c = NSGraphicsContext.current?.cgContext else { return false }
@@ -27,6 +28,7 @@ extension YugongArt {
             if let fig { c.draw(fig, in: cellRect(fx, fy, 40, 40, gh: gh, cell: cell)) }
             if let kid, let k = kid { c.draw(k, in: cellRect(gw - 27, ground + 2 - 23, 24, 24, gh: gh, cell: cell)) }
             if let (img, n) = guest, let g = img { c.draw(g, in: cellRect(0, ground + 2 - n, n, n, gh: gh, cell: cell)) }
+            if let glint { c.draw(glint, in: r) }
             return true
         }
     }
@@ -43,7 +45,7 @@ extension YugongArt {
 
     private static func figureLayer(_ info: SceneInfo, t: Double, grid: Int) -> CGImage? {
         let (p, k) = scenePose(info, t: t)
-        return pixelFigure(p, k: k, fill: CGFloat(min(1.2, info.carrier)), grid: grid, menuBar: false, bird: true)
+        return pixelFigure(p, k: k, fill: CGFloat(min(1.2, info.carrier)), grid: grid, menuBar: false, bird: true, titles: info.titles)
     }
 
     private static func kidLayer(_ fill: Double, t: Double, grid: Int) -> CGImage? {
@@ -107,6 +109,8 @@ extension YugongArt {
     static func pixelBackdrop(_ c: CGContext, _ info: SceneInfo, t: Double, w: Int, h: Int) {
         let sk = sky(info)
         let W = CGFloat(w), H = CGFloat(h), g = H - 6
+        let props = info.props, lay = TitleWorld.layout(info, w: w)
+        let edge = NSColor(srgbRed: 0.16, green: 0.2, blue: 0.18, alpha: 1)
         // dithered sky: two colours, ordered 2x2 dither in the middle band
         for y in 0..<h {
             let u = CGFloat(y) / H
@@ -136,25 +140,49 @@ extension YugongArt {
             let y = g - 10 - 4 * sin(CGFloat(x) * 0.17) - 2 * cos(CGFloat(x) * 0.41)
             c.fill(CGRect(x: CGFloat(x), y: floor(y), width: 1, height: g - floor(y)))
         }
+        if props { TitleWorld.horizon(c, info, lay, w: W, g: g, night: sk.night) }
         // the mountain in stepped pixels with a lit and a shaded face
         let move = info.cutscene.map { cutsceneMotion($0, width: w) }
         let lift = move?.lift ?? 0, dx = move?.dx ?? 0
+        // in the cutscene what is left is drawn at least 30% high, so the sons have a mountain to carry
+        let left = info.cutscene == nil ? info.mountainLeft : info.finale ? 0.55 : max(0.3, info.mountainLeft)
+        let pts = ridge(w: W, g: g, left: left).map { CGPoint(x: $0.x + dx, y: $0.y - lift) }
         if let move {
-            // Kua'e's two sons, behind the mountain: they rise out of the earth holding it up, then carry it off
-            for (b, cx) in [(0, 0.12), (1, 0.38)] {
+            // Kua'e's two sons, behind the mountain: they rise out of the earth holding it up, then carry it off.
+            // The finale: one takes this mountain west, the other a second one (Wangwu, at the right) east.
+            let sons: [(Int, CGFloat, Bool)] = info.finale ? [(0, 0.2, false), (1, 0.8, true)] : [(0, 0.12, false), (1, 0.38, false)]
+            for (b, cx, east) in sons {
                 let img = giantLayer(move.pose, brother: b)
-                let r = CGRect(x: floor(W * cx) - 18 + dx, y: g - lift - 2, width: 36, height: 36)
-                c.saveGState(); c.translateBy(x: 0, y: r.minY + r.maxY); c.scaleBy(x: 1, y: -1)   // the layer is y-up
+                let r = CGRect(x: floor(W * cx) - 18 + (east ? -dx : dx), y: g - lift - 2, width: 36, height: 36)
+                c.saveGState(); c.translateBy(x: east ? r.minX + r.maxX : 0, y: r.minY + r.maxY); c.scaleBy(x: east ? -1 : 1, y: -1)   // the layer is y-up
                 if let img { c.draw(img, in: r) }
                 c.restoreGState()
             }
         }
-        // in the cutscene what is left is drawn at least 30% high, so the sons have a mountain to carry
-        let left = info.cutscene == nil ? info.mountainLeft : max(0.3, info.mountainLeft)
-        let pts = ridge(w: W, g: g, left: left).map { CGPoint(x: $0.x + dx, y: $0.y - lift) }
+        if info.finale {   // the second mountain: the same ridge, mirrored and a little lower, carried the other way
+            let east = ridge(w: W, g: g, left: 0.4).reversed().map { CGPoint(x: W - $0.x - dx, y: $0.y - lift) }
+            drawMountain(c, east, w: w, g: g, lift: lift, dx: -dx, night: sk.night, mirror: true)
+        }
+        drawMountain(c, pts, w: w, g: g, lift: lift, dx: dx, night: sk.night)
+        if props { TitleWorld.mountain(c, info, pts, w: W, g: g, night: sk.night); TitleWorld.sky(c, info, w: W, night: sk.night) }
+        if let cs = info.cutscene, cs > 0.05, cs < 0.45 {   // dust as the earth gives up the mountain
+            c.setFillColor(NSColor.white.cgColor)
+            for i in 0..<4 { c.fillEllipse(in: CGRect(x: CGFloat(i) * W / 7 - 3, y: g - 4 + CGFloat(i % 2) * 2, width: 20, height: 7)) }
+        }
+        // ground
+        c.setFillColor(sk.ground.cgColor); c.fill(CGRect(x: 0, y: g, width: W, height: H - g))
+        c.setFillColor(edge.withAlphaComponent(1).cgColor); c.fill(CGRect(x: 0, y: g, width: W, height: 1))
+        c.setFillColor(NSColor(srgbRed: 0.45, green: 0.62, blue: 0.35, alpha: 1).cgColor)
+        for x in stride(from: 3, to: w, by: 7) { c.fill(CGRect(x: CGFloat(x), y: g - 1, width: 1, height: 1)) }
+        if props { TitleWorld.ground(c, info, lay, w: W, g: g, night: sk.night) }
+    }
+
+    /// One mountain from its ridge, lit and shaded, with pines (moved by `dx`, lifted by `lift`).
+    static func drawMountain(_ c: CGContext, _ pts: [CGPoint], w: Int, g: CGFloat, lift: CGFloat, dx: CGFloat, night: Bool, mirror: Bool = false) {
+        let W = CGFloat(w)
         let peakX = pts.min(by: { $0.y < $1.y })?.x ?? W * 0.2
-        let rock = sk.night ? NSColor(srgbRed: 0.24, green: 0.30, blue: 0.36, alpha: 1) : NSColor(srgbRed: 0.42, green: 0.60, blue: 0.42, alpha: 1)
-        let shade = sk.night ? NSColor(srgbRed: 0.17, green: 0.21, blue: 0.27, alpha: 1) : NSColor(srgbRed: 0.30, green: 0.46, blue: 0.34, alpha: 1)
+        let rock = night ? NSColor(srgbRed: 0.24, green: 0.30, blue: 0.36, alpha: 1) : NSColor(srgbRed: 0.42, green: 0.60, blue: 0.42, alpha: 1)
+        let shade = night ? NSColor(srgbRed: 0.17, green: 0.21, blue: 0.27, alpha: 1) : NSColor(srgbRed: 0.30, green: 0.46, blue: 0.34, alpha: 1)
         let edge = NSColor(srgbRed: 0.16, green: 0.2, blue: 0.18, alpha: 1)
         for x in 0..<w {
             guard let top = ridgeY(pts, CGFloat(x) + 0.5) else { continue }
@@ -167,20 +195,11 @@ extension YugongArt {
         // pines and dug ledges
         c.setFillColor(edge.cgColor)
         for f in [0.1, 0.17, 0.27, 0.33] as [CGFloat] {
-            let x = floor(W * f) + dx
+            let x = (mirror ? W - floor(W * f) : floor(W * f)) + dx
             guard let y = ridgeY(pts, x) else { continue }
             let yy = floor(y) + 2
             c.fill(CGRect(x: x, y: yy - 3, width: 1, height: 4)); c.fill(CGRect(x: x - 1, y: yy - 2, width: 3, height: 2))
         }
-        if let cs = info.cutscene, cs > 0.05, cs < 0.45 {   // dust as the earth gives up the mountain
-            c.setFillColor(NSColor.white.cgColor)
-            for i in 0..<4 { c.fillEllipse(in: CGRect(x: CGFloat(i) * W / 7 - 3, y: g - 4 + CGFloat(i % 2) * 2, width: 20, height: 7)) }
-        }
-        // ground
-        c.setFillColor(sk.ground.cgColor); c.fill(CGRect(x: 0, y: g, width: W, height: H - g))
-        c.setFillColor(edge.withAlphaComponent(1).cgColor); c.fill(CGRect(x: 0, y: g, width: W, height: 1))
-        c.setFillColor(NSColor(srgbRed: 0.45, green: 0.62, blue: 0.35, alpha: 1).cgColor)
-        for x in stride(from: 3, to: w, by: 7) { c.fill(CGRect(x: CGFloat(x), y: g - 1, width: 1, height: 1)) }
     }
 
     // MARK: - the grandson (Codex)

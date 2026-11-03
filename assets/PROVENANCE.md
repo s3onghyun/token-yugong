@@ -18,6 +18,7 @@ as a reference.
 | Yugong's wife, Zhisou (智叟) and Kua'e's two sons (夸娥氏二子) | `characters/yugong/YugongVisitors.swift` | Bodies as shapes in drawing code rasterized on a 26 / 30 / 36 pixel grid; heads placed by hand in text grids, one character per pixel |
 | Title celebration: the magpie alone, pixel confetti | `characters/yugong/YugongCelebration.swift` | The hand-placed magpie above, mirrored; confetti as single pixels placed in code |
 | Scenes: sky, eroding mountain, ground | `characters/yugong/YugongScene.swift` | Gradients, ordered dithering and paths in code |
+| Title rewards: tools, baskets, sea, fields, house, banner, clouds, road; the finale | `characters/yugong/YugongRewards.swift` | Pixels placed by hand in text grids, one character per pixel, and shapes in drawing code on the same grids; existing palette |
 | Turnaround (front/back), expressions, character sheet | `characters/yugong/YugongSheet.swift` | Drawing code; rendered by the `YugongSheet` tool |
 | App icon | `characters/yugong/YugongIcon.swift` | The pixel scene and figure above, composed on a 52-pixel grid in code (v0.1) |
 | Earlier discussion sketches (pebble, rabbit, mochi) | `archive/` | Superseded; kept for the record, not built |

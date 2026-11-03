@@ -42,6 +42,14 @@ public struct SceneInfo {
     public var cutscene: Double?         // 0...1 progress of the milestone cutscene (Kua'e's sons carry the mountain off); nil = none
     public var visitor: Visitor? = nil   // someone from the tale standing at the left; nil = nobody
     public var tempo: Tempo = .working
+    /// Titles earned, 0...10: each adds one reward to the scene (LOGIC.md "Title rewards"). 1 = the classic look.
+    public var titles = 1
+    /// false hides the background rewards (sky, horizon, ground); the gear on Grandpa stays.
+    public var props = true
+    /// The cutscene is the one-time #10 finale (both mountains carried off) instead of a mountain milestone.
+    public var finale = false
+    /// A title just earned (1...10): its reward glints during the celebration.
+    public var sparkle: Int? = nil
 
     public init(state: PetState, carrier: Double, mountainLeft: Double, grandson: Double?, night: Bool, cutscene: Double? = nil) {
         self.state = state; self.carrier = carrier; self.mountainLeft = mountainLeft
@@ -53,8 +61,8 @@ public struct SceneInfo {
 public enum TokenPetAssets {
     /// The character alone, feet on the bottom edge, inside a `size` square.
     public static func figure(_ state: PetState, t: Double, carrier: Double, night: Bool,
-                              size: CGFloat, menuBar: Bool, tempo: Tempo = .working) -> NSImage {
-        YugongArt.figure(state, t: t, carrier: carrier, night: night, size: size, menuBar: menuBar, tempo: tempo)
+                              size: CGFloat, menuBar: Bool, tempo: Tempo = .working, titles: Int = 1) -> NSImage {
+        YugongArt.figure(state, t: t, carrier: carrier, night: night, size: size, menuBar: menuBar, tempo: tempo, titles: titles)
     }
 
     /// The whole popover scene: sky, the mountain, Grandpa, the magpie and the grandson.
