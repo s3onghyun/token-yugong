@@ -18,7 +18,6 @@ final class MiniWindow: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         contentView = pet
         pet.setAccessibilityRole(.button)
-        pet.setAccessibilityLabel(L.t("Grandpa Yugong token pet", "우공 할아버지 토큰펫"))
         if !setFrameUsingName("TokenPetMini") , let s = NSScreen.main {
             let v = s.visibleFrame
             setFrameOrigin(NSPoint(x: v.maxX - frame.width - 16, y: v.maxY - frame.height - 12))
@@ -104,11 +103,17 @@ final class MiniView: NSView {
     }
     override func mouseUp(with event: NSEvent) { if !dragged { onClick?(self) } }
     override func accessibilityPerformPress() -> Bool { onClick?(self); return true }
+    override func accessibilityLabel() -> String? {   // asked each time, so it follows a language change
+        L.t("Grandpa Yugong token pet", "우공 할아버지 토큰펫", "愚公じいさんのトークンペット", "愚公爷爷 Token 宠物")
+    }
 
     override func rightMouseDown(with event: NSEvent) {
         let m = NSMenu()
-        m.addItem(withTitle: L.t("Hide mini window", "작은 창 숨기기"), action: #selector(hide), keyEquivalent: "").target = self
-        m.addItem(withTitle: L.t("Quit", "종료"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        m.addItem(withTitle: L.t("Hide mini window",
+                                 "작은 창 숨기기",
+                                 "ミニウィンドウを隠す",
+                                 "隐藏小窗口"), action: #selector(hide), keyEquivalent: "").target = self
+        m.addItem(withTitle: L.t("Quit", "종료", "終了", "退出"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         NSMenu.popUpContextMenu(m, with: event, for: self)
     }
     @objc private func hide() { onHide?() }

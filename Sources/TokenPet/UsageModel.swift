@@ -108,9 +108,9 @@ struct MountainLedger {
     var left: Double { max(0, 1 - tokens / size) }
     var name: String {
         switch index {
-        case 0: return L.t("Mount Taihang", "태행산")
-        case 1: return L.t("Mount Wangwu", "왕옥산")
-        default: return L.t("Mountain #\(index + 1)", "\(index + 1)번째 산")
+        case 0: return L.t("Mount Taihang", "태행산", "太行山", "太行山")
+        case 1: return L.t("Mount Wangwu", "왕옥산", "王屋山", "王屋山")
+        default: return L.t("Mountain #\(index + 1)", "\(index + 1)번째 산", "\(index + 1)番目の山", "第 \(index + 1) 座山")
         }
     }
 }
@@ -160,6 +160,7 @@ final class UsageModel: ObservableObject {
 
     func refresh() {
         if demo != nil || demoCycle { recompute(); return }
+        checkForUpdate()   // at most once a day (Update.isDue); nothing in demos
         guard !scanning else { return }
         scanning = true
         queue.async { [self] in
@@ -315,9 +316,9 @@ final class UsageModel: ObservableObject {
 
     // MARK: - Settings (UserDefaults domain of the app; `defaults delete <domain>` clears them)
 
-    /// "auto" follows the system language; "ko" or "en" pins it.
+    /// "auto" follows the system languages; "en", "ko", "ja" or "zh" pins it. Applied at once, no restart.
     @Published var language: String = Prefs.store.string(forKey: "language") ?? "auto" {
-        didSet { Prefs.store.set(language, forKey: "language"); L.korean = L.resolve(language) }
+        didSet { Prefs.store.set(language, forKey: "language"); L.lang = L.resolve(language) }
     }
     /// Which AI each family member watches (Grandpa = the main one).
     @Published var family: Family = Family.load() {
@@ -354,6 +355,17 @@ final class UsageModel: ObservableObject {
         catch { FileHandle.standardError.write("launch at login: \(error)\n".data(using: .utf8)!) }
         objectWillChange.send()
     }
+
+    /// The update notice (Update.swift): on by default; off means the app never asks GitHub.
+    @Published var checkUpdates: Bool = Prefs.store.object(forKey: "update.check") as? Bool ?? true {
+        didSet { Prefs.store.set(checkUpdates, forKey: "update.check"); checkForUpdate() }
+    }
+    /// The newest release GitHub reported, kept so a restart shows it without asking again.
+    @Published var latestVersion: String? = Prefs.store.string(forKey: "update.latest")
+    @Published var skippedVersion: String? = Prefs.store.string(forKey: "update.skipped") {
+        didSet { Prefs.store.set(skippedVersion, forKey: "update.skipped") }
+    }
+    @Published var updateStatus: Update.Status?
 
     /// Keep the pet and the numbers out of screen shares and recordings (default on).
     @Published var hideFromCapture: Bool = Prefs.store.object(forKey: "hideFromCapture") as? Bool ?? true {

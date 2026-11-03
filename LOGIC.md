@@ -20,7 +20,8 @@ app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup
 
 No saved limit state, and token counts never become a limit percentage. The network is used
 only for an OpenAI or DeepSeek member you set up: the request carries your key (kept in the
-login Keychain, never in a file or the settings) and nothing else leaves the Mac.
+login Keychain, never in a file or the settings) and nothing else leaves the Mac. The update check
+(below) is the one other request.
 
 ## Limits → state (checked top to bottom)
 
@@ -138,7 +139,8 @@ item nor the mini window is on screen.
 
 | Setting | Default |
 |---|---|
-| Language | System (Korean if the first preferred language is Korean, else English); or pinned 한국어 / English |
+| Language | System (macOS matches the preferred languages in order against English, Korean, Japanese and Simplified Chinese; Traditional Chinese falls through to the next one, else English); or pinned English / 한국어 / 日本語 / 简体中文. Applied at once |
+| Check for updates | On: at most one GitHub request a day (a failed one counts; a clock moved back asks again; never under `swift run`). A newer, unskipped version shows a popover row and one notification per version. Off: no request at all |
 | Family | Grandpa: Claude · grandson: Codex · son and neighbour's boy: nobody. Every AI's tokens count toward the shovel speed and the mountain whoever watches it |
 | OpenAI monthly budget | Not set (its meter says "don't know" until a budget and an Admin key are given) |
 | API keys (OpenAI, DeepSeek) | None. Stored only in the login Keychain (`dev.yugongpet.api.*`) |

@@ -5,7 +5,7 @@ import TokenPetAssets
 import UserNotifications
 
 // Usage:
-//   TokenPet [--lang en|ko] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
+//   TokenPet [--lang en|ko|ja|zh|pseudo] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
 //            [--bridge <limits.json>] [--logs <dir>] [--tempo idle|low|high|veryHigh] [--visitor wifeDoubting|wifeCheering|zhisou]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
 //   TokenPet --scan-report      scan local logs once, print what the pet would show, then exit
@@ -16,7 +16,9 @@ func arg(_ name: String) -> String? {
     guard let i = args.firstIndex(of: name), i + 1 < args.count else { return nil }
     return args[i + 1]
 }
-if let lang = arg("--lang") { L.korean = lang == "ko" }   // this run only; the saved setting stays
+if let lang = arg("--lang") {   // this run only; the saved setting stays. "pseudo": the truncation check
+    if lang == "pseudo" { L.pseudo = true } else { L.lang = L.resolve(lang) }
+}
 
 let home = FileManager.default.homeDirectoryForCurrentUser
 let bridgeURL = URL(fileURLWithPath: arg("--bridge")
@@ -57,7 +59,7 @@ if args.contains("--scan-report") {
         try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name))
     }
     let now = Date()
-    let ko = L.korean ? "-ko" : ""
+    let ko = L.pseudo ? "-pseudo" : L.lang == .en ? "" : "-\(L.lang.rawValue)"
     model.demoMountainLeft = 0.62
     for st in PetState.allCases {
         model.setDemo(st)
@@ -205,6 +207,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         sinks.append(model.$barText.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } })
         sinks.append(model.$barGrandpa.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } })
         sinks.append(model.$miniMode.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.miniForced = false; self?.updateMini() } })
+        sinks.append(model.$language.dropFirst().sink { [weak self] _ in   // live: AppKit text built once follows too
+            DispatchQueue.main.async { guard let self else { return }; self.guide?.title = self.guideTitle; self.scheduleAnim() }
+        })
         sinks.append(model.$mountain.sink { m in DispatchQueue.main.async { AppDelegate.milestoneNotice(m) } })
         let demoRun = arg("--demo") != nil || args.contains("--stage")
         if args.contains("--guide") || (!demoRun && !Prefs.store.bool(forKey: "onboarded")) {
@@ -308,11 +313,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         barHidden = hidden
         if hidden && !Prefs.store.bool(forKey: "barHiddenWarned") {
             Prefs.store.set(true, forKey: "barHiddenWarned")
-            Notify.post(id: "bar-hidden", title: L.t("No room for Grandpa in the menu bar", "메뉴바에 할아버지 자리가 없어요"),
+            Notify.post(id: "bar-hidden", title: L.t("No room for Grandpa in the menu bar",
+                                                     "메뉴바에 할아버지 자리가 없어요",
+                                                     "メニューバーにおじいさんの居場所がありません",
+                                                     "菜单栏里没有爷爷的位置了"),
                         body: model.miniMode == .off
-                            ? L.t("The menu bar is full, so his icon is hidden. Open the app again to see him.", "메뉴바가 꽉 차서 아이콘이 가려졌어요. 앱을 다시 열면 보여요.")
+                            ? L.t("The menu bar is full, so his icon is hidden. Open the app again to see him.",
+                                  "메뉴바가 꽉 차서 아이콘이 가려졌어요. 앱을 다시 열면 보여요.",
+                                  "メニューバーがいっぱいでアイコンが隠れています。アプリをもう一度開くと表示されます。",
+                                  "菜单栏已满，他的图标被藏起来了。再次打开应用即可看到他。")
                             : L.t("The menu bar is full, so he moved into a small floating window. You can change this in Settings.",
-                                  "메뉴바가 꽉 차서 작은 창으로 옮겨 왔어요. 설정에서 바꿀 수 있어요."))
+                                  "메뉴바가 꽉 차서 작은 창으로 옮겨 왔어요. 설정에서 바꿀 수 있어요.",
+                                  "メニューバーがいっぱいなので、小さなフローティングウィンドウに引っ越しました。設定で変更できます。",
+                                  "菜单栏已满，他搬进了一个浮动小窗口。可以在设置中更改。"))
         }
         updateMini()
         updatePaused()
@@ -337,14 +350,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     static func milestoneNotice(_ m: MountainLedger) {
         guard m.cutscenePending, Prefs.store.integer(forKey: "mountain.notified") <= m.index else { return }
         Prefs.store.set(m.index + 1, forKey: "mountain.notified")
-        Notify.post(id: "mountain-\(m.index)", title: L.t("\(m.name) is gone!", "\(m.name)을 다 옮겼어요!"),
-                    body: L.t("Heaven was moved by Grandpa's stubbornness. Open him to watch.", "할아버지 끈기에 하늘이 감동했대요. 눌러서 보세요."))
+        Notify.post(id: "mountain-\(m.index)", title: L.t("\(m.name) is gone!",
+                                                          "\(m.name)을 다 옮겼어요!",
+                                                          "\(m.name)を運びきりました！",
+                                                          "\(m.name)被搬走了！"),
+                    body: L.t("Heaven was moved by Grandpa's stubbornness. Open him to watch.",
+                              "할아버지 끈기에 하늘이 감동했대요. 눌러서 보세요.",
+                              "おじいさんの根気に天が心を打たれました。開いて見てください。",
+                              "爷爷的毅力感动了上天。打开看看吧。"))
     }
+
+    var guideTitle: String { L.t("Grandpa Yugong", "우공 할아버지", "愚公じいさん", "愚公爷爷") }
 
     func showGuide() {
         if guide == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 520), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = L.t("Grandpa Yugong", "우공 할아버지")
+            w.title = guideTitle
             w.isReleasedWhenClosed = false
             w.contentView = NSHostingView(rootView: OnboardingView(model: model) { [weak self, weak w] in
                 Prefs.store.set(true, forKey: "onboarded"); w?.close(); _ = self

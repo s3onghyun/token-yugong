@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Added
+- Japanese (日本語) and Simplified Chinese (简体中文) alongside English and Korean: Settings › Language
+  is System, English, 한국어, 日本語 or 简体中文, and a change shows at once without a restart (the guide
+  window title, the mini window and the menu-bar clock follow too). System picks the first of your
+  preferred languages the app has (Traditional Chinese falls through to the next one, not Simplified).
+  Clock text and token counts use that language's format (月 04:00, 周一 04:00, 12万, 2.5亿). The app
+  bundle declares its languages, so System Settings › Language & Region › Applications can pin one.
+- Update notice: at most once a day the app asks GitHub for the latest release (one HTTPS GET, fixed
+  headers, no cookies, no telemetry). A newer version shows a popover row with *Release page* and
+  *Skip this version*, plus one notification per version. Settings › *Check for updates (once a day)*
+  turns it off and *Check now* asks at once. The app never downloads or installs anything itself.
+- `--lang pseudo`: every string about 40% longer and accented, for finding truncation with `--render`.
+- Tests: every `L.t` call in the sources must carry a non-empty translation in the right script, with the
+  same values as the English; Korean-only strings outside `L.t` fail; version order, the daily throttle
+  and the release parsing are covered.
+
 ## 0.2.0 (2026-11-03)
 
 ### Added
