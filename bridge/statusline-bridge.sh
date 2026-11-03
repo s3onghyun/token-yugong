@@ -18,7 +18,9 @@ else
   trap '/bin/rm -f "$input_file"' 0 1 2 15
   printf '%s' "$input" > "$input_file"
   rl=$(plutil -extract rate_limits json -o - "$input_file" 2>/dev/null)
-  pct=$(plutil -extract rate_limits.five_hour.used_percentage raw -o - "$input_file" 2>/dev/null)
+  # Match the jq path above: inspect the extracted rate_limits object, not its wrapper.
+  printf '%s' "$rl" > "$input_file"
+  pct=$(plutil -extract five_hour.used_percentage raw -o - "$input_file" 2>/dev/null)
   /bin/rm -f "$input_file"
   trap - 0 1 2 15
 fi
