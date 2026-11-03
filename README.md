@@ -26,6 +26,10 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
 - **No data, no guessing.** Until an AI reports its limits, whoever watches it says he doesn't
   know. Gemini CLI keeps no limits on the Mac and DeepSeek reports only a balance, so for those
   he always says so.
+- **Titles.** Every token you carry earns a rank, from *Grandson with a Shovel* (the first hour)
+  to *Yugong Who Moved the Mountains* (months), plus a few achievements (a 7-day streak, a week
+  kept under the limit, two AIs in one day...). The magpie brings the news with pixel confetti;
+  the titles window lists them all and saves a shareable title card (PNG, no personal data).
 
 All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
@@ -133,6 +137,7 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 ## For development
 
 `swift run -c release TokenPet` with flags: `--demo lively|steady|straining|resting|morning|cutscene|cycle`,
+`--lifetime <tokens>`, `--award rank:<0-9>|feat:<name>`, `--titles` (open the titles window),
 `--tempo idle|low|high|veryHigh`, `--visitor wifeDoubting|wifeCheering|zhisou`, `--weekly-only`, `--lang en|ko|ja|zh|pseudo`
 (`pseudo`: every string about 40% longer and accented, to find truncation with `--render`),
 `--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,

@@ -106,6 +106,8 @@ struct MountainLedger {
     }
 
     var left: Double { max(0, 1 - tokens / size) }
+    /// Every token carried, all mountains together (the titles ladder).
+    var lifetime: Double { Double(index) * size + tokens }
     var name: String {
         switch index {
         case 0: return L.t("Mount Taihang", "태행산", "太行山", "太行山")
@@ -122,6 +124,14 @@ final class UsageModel: ObservableObject {
     @Published private(set) var pace = Pace()
     @Published private(set) var scanning = false
     @Published private(set) var mountain = MountainLedger.load()
+    @Published private(set) var titles = TitleBook.load()
+    /// Newly earned titles and achievements, oldest first: the popover celebrates the first one.
+    @Published private(set) var awards: [Award] = []
+    /// Set by the app: a notification per award.
+    var onAward: ((Award) -> Void)?
+    /// Demo override for every token carried (`--lifetime <tokens>`).
+    var demoLifetime: Double?
+    var lifetime: Double { demoLifetime ?? mountain.lifetime }
     /// Demo override for the mountain (fraction left) and the cutscene.
     var demoMountainLeft: Double?
     var demoCutscene = false
@@ -211,6 +221,12 @@ final class UsageModel: ObservableObject {
         if demoCutscene { demoCutscene = false; objectWillChange.send(); return }
         mountain.nextMountain()
     }
+    /// The celebration was seen.
+    func dismissAward() { if !awards.isEmpty { awards.removeFirst() } }
+    /// Demo: celebrate this award (stills and recordings).
+    func demoAward(_ a: Award?) { awards = a.map { [$0] } ?? [] }
+    /// Set by the app: opens the titles window.
+    var openTitles: (() -> Void)?
     /// Set by the app: opens the first-run guide again (Settings).
     var openGuide: (() -> Void)?
 
@@ -255,6 +271,12 @@ final class UsageModel: ObservableObject {
         var others: [Role: Reading?] = [:]
         for (role, p) in family.roles where role != .grandpa { others[role] = reading(p) }
         snap = Logic.evaluate(main: family.roles[.grandpa].flatMap(reading), members: others, now: now)
+        if demoLifetime == nil {
+            let days = [scanner.events, codexReader.events, geminiReader.events].map { Titles.days($0.map(\.time)) }
+            let new = titles.observe(TitleInputs(lifetime: lifetime, snap: snap, sourceDays: days, now: now))
+            awards += new
+            new.forEach { onAward?($0) }
+        }
         if let p = Visitors.plan(family, snap) {
             if let old = Prefs.store.string(forKey: "visitors.plan"), old != p { changedAt = now }
             Prefs.store.set(p, forKey: "visitors.plan")

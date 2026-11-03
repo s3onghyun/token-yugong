@@ -7,6 +7,7 @@ import UserNotifications
 // Usage:
 //   TokenPet [--lang en|ko|ja|zh|pseudo] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
 //            [--bridge <limits.json>] [--logs <dir>] [--tempo idle|low|high|veryHigh] [--visitor wifeDoubting|wifeCheering|zhisou]
+//            [--lifetime <tokens>] [--award rank:<0-9>|feat:<name>] [--titles]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
 //   TokenPet --scan-report      scan local logs once, print what the pet would show, then exit
 
@@ -46,6 +47,8 @@ if args.contains("--scan-report") {
     print(String(format: "pace: %.0f output tokens/min (last 3 min) -> %@ at %.0f; %.0f at %.0f", model.liveRate(now: paceNow), "\(model.pace.level)",
                  paceNow.timeIntervalSince1970, model.liveRate(now: settled), settled.timeIntervalSince1970))
     print("carrier: \(Int((s.carrier * 100).rounded()))%  mountain: \(model.mountain.name) \(Int(((1 - model.mountain.left) * 100).rounded()))% carried (\(Int(model.mountain.tokens)) tokens)")
+    let r = Titles.rank(model.lifetime)
+    print("title: \(r >= 0 ? Titles.ladder[r].name() : "none") (\(Int(model.lifetime)) tokens in all); achievements: \(model.titles.feats.keys.map(\.rawValue).sorted().joined(separator: " "))")
     print("state: \(s.known ? "\(s.state)" : "unknown")")
     exit(0)
 }
@@ -87,6 +90,16 @@ if args.contains("--scan-report") {
     r.scale = 2
     if let img = r.nsImage { png(img, "popover-yugong-pixel-cutscene\(ko).png") }
     model.demoCutscene = false
+    model.demoLifetime = 380_000_000; model.demoAward(.rank(5)); model.setDemo(.lively)   // matches the demo mountain (62% left)
+    let rc = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now).background(Color(nsColor: .windowBackgroundColor)))
+    rc.scale = 2
+    if let img = rc.nsImage { png(img, "popover-yugong-pixel-title\(ko).png") }
+    model.demoAward(nil)
+    let rt = ImageRenderer(content: TitlesView(model: model, scrolls: false).background(Color(nsColor: .windowBackgroundColor)))
+    rt.scale = 2
+    if let img = rt.nsImage { png(img, "titles\(ko).png") }
+    try? TitleCard.png(model)?.write(to: dir.appendingPathComponent("title-card\(ko).png"))
+    model.demoLifetime = nil
     // menu-bar strip: every state at actual size (1x) and 4x, on light and dark bars
     let states = PetState.allCases
     let strip = NSImage(size: NSSize(width: CGFloat(states.count) * 110 + 20, height: 230), flipped: true) { _ in
@@ -188,11 +201,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
         model.openGuide = { [weak self] in self?.popover.performClose(nil); self?.showGuide() }
+        model.openTitles = { [weak self] in self?.popover.performClose(nil); self?.showTitles() }
+        model.onAward = { a in Notify.post(id: "award-\(a)", title: L.t("A new title from the magpie", "까치가 새 칭호를 물어 왔어요", "カササギが新しい称号を運んできました", "喜鹊带来了新称号"),
+                                           body: a.announcement.replacingOccurrences(of: "\n", with: " ")) }
         Notify.setUp(self)
 
         model.captureAllowedForDemo = args.contains("--allow-capture")
         model.demoPace = arg("--tempo").flatMap { a in Pace.Level.allCases.first { "\($0)" == a } }
         model.demoVisitor = arg("--visitor").flatMap(Visitor.init(rawValue:))
+        model.demoLifetime = arg("--lifetime").flatMap(Double.init)
+        if let a = arg("--award") {   // rank:3 or feat:streak7
+            let p = a.split(separator: ":").map(String.init)
+            model.demoAward(p.first == "rank" ? Int(p.last ?? "").map(Award.rank) : Feat(rawValue: p.last ?? "").map(Award.feat))
+        }
         if let d = arg("--demo") {
             model.demoMountainLeft = 0.62
             model.demoWeeklyOnly = args.contains("--weekly-only")
@@ -208,7 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         sinks.append(model.$barGrandpa.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } })
         sinks.append(model.$miniMode.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.miniForced = false; self?.updateMini() } })
         sinks.append(model.$language.dropFirst().sink { [weak self] _ in   // live: AppKit text built once follows too
-            DispatchQueue.main.async { guard let self else { return }; self.guide?.title = self.guideTitle; self.scheduleAnim() }
+            DispatchQueue.main.async { guard let self else { return }; self.guide?.title = self.guideTitle; self.titlesWindow?.title = self.titlesTitle; self.scheduleAnim() }
         })
         sinks.append(model.$mountain.sink { m in DispatchQueue.main.async { AppDelegate.milestoneNotice(m) } })
         let demoRun = arg("--demo") != nil || args.contains("--stage")
@@ -235,6 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 self.wakeCount = 0; self.drawCount = 0
             }
         }
+        if args.contains("--titles") { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.showTitles() } }
         if args.contains("--open") {
             popover.behavior = .applicationDefined
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { self.show() }   // after checkBar, so it opens under the mini window when the bar is full
@@ -265,6 +287,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         popover.contentViewController?.view.window?.sharingType = t
         stage?.sharingType = t
         mini?.sharingType = t
+        titlesWindow?.sharingType = t
     }
 
     // RunCat-style menu bar: each routine loop is drawn once into bitmaps, merged into runs of the
@@ -361,6 +384,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     var guideTitle: String { L.t("Grandpa Yugong", "우공 할아버지", "愚公じいさん", "愚公爷爷") }
+
+    var titlesWindow: NSWindow?
+    var titlesTitle: String { L.t("Titles", "칭호", "称号", "称号") }
+    func showTitles() {
+        if titlesWindow == nil {
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 452, height: 560), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            w.isReleasedWhenClosed = false
+            w.contentView = NSHostingView(rootView: TitlesView(model: model))
+            w.center()
+            titlesWindow = w
+        }
+        titlesWindow?.title = titlesTitle
+        NSApp.activate(ignoringOtherApps: true)
+        titlesWindow?.makeKeyAndOrderFront(nil)
+        applySharing()
+    }
 
     func showGuide() {
         if guide == nil {
