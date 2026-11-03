@@ -1,8 +1,29 @@
-# Yugong Pet: Grandpa Yugong shovels your Claude tokens
+<h1 align="center">Token Yugong 愚公</h1>
 
-[한국어](README.ko.md)
+<p align="center"><b>Grandpa Yugong moves a mountain one token at a time.</b><br>
+A pixel-art menu-bar pet for your Claude Code and Codex usage limits:
+his carrier fills with your 5-hour limit, he naps when it runs out, and the mountain wears down with every token.</p>
 
-![Grandpa Yugong in the popover, going through his states](docs/demo.gif)
+<p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/s3onghyun/token-yugong/releases/latest"><img src="https://img.shields.io/github/v/release/s3onghyun/token-yugong?style=flat-square" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B%20·%20universal-0a0a0c?style=flat-square" alt="macOS 13+, universal">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/code-MIT-6e5aff?style=flat-square" alt="Code: MIT"></a>
+  <img src="https://img.shields.io/badge/telemetry-none-2e8b57?style=flat-square" alt="No telemetry">
+</p>
+
+<p align="center"><img src="docs/hero.gif" width="584" alt="Grandpa Yugong digging, straining as the carrier fills, napping at the limit while Zhisou laughs, starting again at the reset, and the magpie bringing a new title"><br>
+<sub>Drawn by the app's own code with demo data (<code>YugongSheet --hero</code>).</sub></p>
+
+**Install** (macOS 13+, Apple silicon or Intel): download `TokenYugong-<version>-macos-universal.zip` from
+[Releases](https://github.com/s3onghyun/token-yugong/releases/latest), unzip, move `TokenYugong.app` to Applications.
+It is not notarized yet, so the first launch needs one approval: see [First launch](#first-launch).
+Then [connect Claude Code](#connect-claude-code) (one snippet; Codex needs nothing).
+
+## What it shows
 
 Grandpa Yugong (우공 할아버지), from the old tale of the ninety-year-old man who moved the
 mountains one shovel at a time, lives in your Mac menu bar and shows your Claude Code usage:
@@ -50,27 +71,38 @@ Needs macOS 13 or later.
 
 ### Download the app
 
-1. Download `YugongPet-<version>-macos-universal.zip` and its `.sha256` file from the latest
-   [GitHub Release](https://github.com/s3onghyun/token-yugong/releases).
+1. Download `TokenYugong-<version>-macos-universal.zip` and its `.sha256` file from the latest
+   [GitHub Release](https://github.com/s3onghyun/token-yugong/releases/latest).
 2. In Terminal, verify the download (replace `<version>` with the release version):
 
    ```sh
-   shasum -a 256 -c YugongPet-<version>-macos-universal.zip.sha256
+   shasum -a 256 -c TokenYugong-<version>-macos-universal.zip.sha256
    ```
 
-3. Double-click the ZIP, then move `YugongPet.app` to `/Applications`.
-4. The app is ad-hoc signed but **not notarized** yet. On its first launch, Control-click the app
-   and choose **Open**, then choose **Open** again. If macOS blocks it first, go to **System
-   Settings → Privacy & Security** and choose **Open Anyway**. Notarization will be added in a
-   future release.
+3. Double-click the ZIP, then move `TokenYugong.app` to `/Applications`.
+
+Coming from Yugong Pet 0.2.0? Quit it and delete `YugongPet.app`; your settings, mountain and titles
+carry over (same settings domain). If *Open at login* was on, turn it off and on once in Settings.
+
+### First launch
+
+The app is ad-hoc signed but not notarized yet, so macOS asks once:
+
+1. Open the app. macOS says it cannot verify it; click **Done**.
+2. Open **System Settings → Privacy & Security**, scroll down, click **Open Anyway** next to
+   Token Yugong, and confirm with Touch ID or your password.
+3. On macOS 13-14 you can instead Control-click the app and choose **Open**.
+
+Prefer to check the code first? Build it yourself (below).
 
 ### Build from source
 
 For a local build, install the Swift toolchain (Xcode or the Command Line Tools), then:
 
 ```sh
-./scripts/bundle.sh          # builds build/YugongPet.app (ad-hoc signed, not notarized)
-open build/YugongPet.app     # or move it to /Applications first
+git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
+./scripts/bundle.sh            # builds build/TokenYugong.app (ad-hoc signed, not notarized)
+open build/TokenYugong.app     # or move it to /Applications first
 ```
 
 The first launch shows a short guide. Its last page has a **Copy snippet** button for the
@@ -152,13 +184,31 @@ one `L.t(en, ko, ja, zh)` call, and `./test.sh` fails on a missing or wrong-scri
 ## Updates
 
 Once a day the app asks GitHub for the latest release: one HTTPS GET to
-`api.github.com/repos/s3onghyun/token-yugong/releases/latest`, with only `User-Agent: YugongPet/<version>`,
+`api.github.com/repos/s3onghyun/token-yugong/releases/latest`, with only `User-Agent: TokenYugong/<version>`,
 `Accept` and a fixed `Accept-Language: en`, no cookies and no cache. Nothing about you or your usage is
 sent, and there is no telemetry. When a newer version is out, the popover shows a row with **Release
 page** and **Skip this version**, and you get one notification for that version. The app never
 downloads or installs anything itself: download the new ZIP, check its `.sha256` and replace the app
 as in [Install](#install). Settings › *Check for updates (once a day)* turns it off; *Check now* asks
 at once.
+
+## Privacy
+
+Token Yugong reads files on your Mac and keeps everything there. No account, no analytics, no telemetry.
+
+| What it reads | Why |
+|---|---|
+| `~/.claude/token-pet/limits.json` | Claude Code's official limits, written by the status-line bridge (used %, reset time; no prompts, paths or session ids) |
+| Claude Code session logs (`~/.claude/projects`) | token counts for Grandpa's pace and the mountain, and the `usage_limit_reached` refusal so a full limit shows 100% |
+| `~/.codex/sessions` | Codex's own limits and token counts |
+| `~/.gemini/tmp` | Gemini CLI token counts |
+
+- **Network:** only the once-a-day update check (one GET to the GitHub releases API, can be turned
+  off), and, only if you paste a key, OpenAI's costs API or DeepSeek's balance API every 15 minutes.
+- **Keys** live in your login Keychain, nowhere else.
+- **Settings and history** (the mountain, titles) stay in the `TokenPet` UserDefaults domain on this
+  Mac; `defaults delete TokenPet` erases them.
+- The app never edits `~/.claude/settings.json`; you paste the status-line snippet yourself.
 
 ## How the numbers become a pet
 
@@ -177,13 +227,17 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 `--render <dir>` (PNG stills), `--icon-set <dir>`, `--scan-report` (prints what it read),
 `--anim-stats`. `TOKENPET_PREFS=<domain>` keeps a test run out of your settings.
 
-Character sheets: `swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors]`.
+Character sheets: `swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`.
+`--social` draws `docs/social-preview.png`; `--hero` draws the frames of `docs/hero.gif`, then:
+`ffmpeg -framerate 10 -i <dir>/hero-%03d.png -vf "split[a][b];[a]palettegen=max_colors=128:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 docs/hero.gif`.
+
+Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-- App code (`Sources/`, `bridge/`, `scripts/`, `Tests/`): MIT, see [LICENSE](LICENSE).
-- Grandpa Yugong and everything under `assets/` (including `docs/demo.gif`): all rights reserved,
-  with a personal-use grant, see [assets/LICENSE.md](assets/LICENSE.md) and
-  [assets/PROVENANCE.md](assets/PROVENANCE.md).
+- App code (`Package.swift`, `Sources/`, `bridge/`, `scripts/`, `Tests/`): MIT, see [LICENSE](LICENSE).
+- Grandpa Yugong and everything under `assets/` (and images made from it, such as the pictures in
+  `docs/`) are **not** covered by the MIT license: all rights reserved, with a personal-use grant, see
+  [assets/LICENSE.md](assets/LICENSE.md) and [assets/PROVENANCE.md](assets/PROVENANCE.md).
 
 [Changelog](CHANGELOG.md)

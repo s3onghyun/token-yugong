@@ -6,7 +6,6 @@ import AppKit
 //   #7 the family's thatched house  #8 the family banner (농기)  #9 auspicious clouds
 //   #10 golden shovel, an open road with a milestone, and once, the finale (both mountains carried off)
 // The menu bar shows only #1, #2, #3, #8 and #10. Grandpa's face, hat and clothes never change.
-// First drawn as a review sheet (firstmate data/yugong-title-items), same palette and pixel helpers.
 
 private func hx(_ h: UInt32) -> NSColor {
     NSColor(srgbRed: CGFloat((h >> 16) & 0xFF) / 255, green: CGFloat((h >> 8) & 0xFF) / 255, blue: CGFloat(h & 0xFF) / 255, alpha: 1)

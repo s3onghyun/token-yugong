@@ -1,11 +1,11 @@
 #!/bin/sh
-# Builds build/YugongPet.app: release binary, pixel app icon, the status-line bridge, ad-hoc signature.
+# Builds build/TokenYugong.app: release binary, pixel app icon, the status-line bridge, ad-hoc signature.
 # Not notarized. Nothing is installed; move the app wherever you like (e.g. /Applications).
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 version=${VERSION:-$(tr -d '\r\n' < "$root/VERSION")}
 bundle_identifier=${TOKENPET_BUNDLE_IDENTIFIER:-dev.yugongpet.app}
-app="$root/build/YugongPet.app"
+app="$root/build/TokenYugong.app"
 
 # SwiftPM does not make a universal executable in one invocation. Build both macOS
 # architectures in separate scratch directories, then combine them with lipo.
@@ -50,8 +50,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key><string>$bundle_identifier</string>
-  <key>CFBundleName</key><string>Yugong Pet</string>
-  <key>CFBundleDisplayName</key><string>Yugong Pet</string>
+  <key>CFBundleName</key><string>Token Yugong</string>
+  <key>CFBundleDisplayName</key><string>Token Yugong</string>
   <key>CFBundleExecutable</key><string>TokenPet</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>

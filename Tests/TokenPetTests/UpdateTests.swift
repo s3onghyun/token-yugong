@@ -65,7 +65,7 @@ import Testing
 
     /// Nothing about the user goes out: no system language, no identifiers.
     @Test func sendsOnlyFixedHeaders() {
-        #expect(Update.headers(v("0.2.0")) == ["User-Agent": "YugongPet/0.2.0", "Accept": "application/vnd.github+json", "Accept-Language": "en"])
+        #expect(Update.headers(v("0.2.0")) == ["User-Agent": "TokenYugong/0.2.0", "Accept": "application/vnd.github+json", "Accept-Language": "en"])
         #expect(Update.latestAPI.absoluteString == "https://api.github.com/repos/s3onghyun/token-yugong/releases/latest")
     }
 }

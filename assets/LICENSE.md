@@ -2,16 +2,17 @@
 
 Everything in this `assets/` folder (character drawings, sprite files, and the code that
 draws a specific character, such as `characters/yugong/*.swift`) is **not** under the
-app's MIT license.
+app's MIT license. The MIT license in the repository root (`LICENSE`) covers only the app code:
+`Package.swift`, `Sources/`, `bridge/`, `scripts/` and `Tests/`.
 
 ## Current status: all rights reserved
 
-Grandpa Yugong (pixel art), his magpie, his son, his grandson, the neighbour's boy and the app icon are a
-**prototype design** awaiting the owner's final, human-authored version (see `PROVENANCE.md`).
+Grandpa Yugong (pixel art), his magpie, his family, the visitors from the tale, the scenes and the
+app icon are the **final** Token Yugong designs (how they were made: `PROVENANCE.md`).
 The earlier sketches in `archive/` are superseded. The same terms cover images made from these
-assets, such as `docs/demo.gif` and screenshots.
+assets, such as `docs/hero.gif`, `docs/social-preview.png` and the other pictures in `docs/`.
 
-Copyright (c) 2026 the TokenPet owner. All rights reserved.
+Copyright (c) 2026 Seonghyun (Joshua) Hong. All rights reserved.
 
 ### Personal-use grant
 
@@ -23,7 +24,7 @@ You may not, without written permission: redistribute the assets or builds that 
 another product or project, or use them commercially. Removing or replacing `assets/` with your
 own character is fine; the app code itself is MIT.
 
-## Planned split once the character is final
+## Planned split
 
 | What | Where | License |
 |---|---|---|

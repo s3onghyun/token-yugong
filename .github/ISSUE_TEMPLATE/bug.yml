@@ -1,0 +1,41 @@
+name: Bug report
+description: Something in Token Yugong doesn't work or shows the wrong number.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Token Yugong version
+      description: Settings shows it under the update check, e.g. Token Yugong 0.2.1.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac model
+      placeholder: macOS 15.5, MacBook Air M2
+    validations:
+      required: true
+  - type: checkboxes
+    id: tools
+    attributes:
+      label: Which AIs does the family watch?
+      options:
+        - label: Claude Code
+        - label: Codex
+        - label: Gemini CLI
+        - label: OpenAI or DeepSeek API
+  - type: textarea
+    id: scan
+    attributes:
+      label: Scan report (optional)
+      description: |
+        Output of `TokenYugong.app/Contents/MacOS/TokenPet --scan-report` (or `swift run -c release TokenPet --scan-report`).
+        It prints limits, token counts and states only, no prompts or paths. Look it over before pasting.
+      render: text
