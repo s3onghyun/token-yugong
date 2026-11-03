@@ -11,9 +11,16 @@ if command -v jq >/dev/null 2>&1; then
   rl=$(printf '%s' "$input" | jq -c '.rate_limits // empty' 2>/dev/null)
   pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
 else
-  # `--` keeps the stdin filename (`-`) from being parsed as a plutil option on newer macOS.
-  rl=$(printf '%s' "$input" | plutil -extract rate_limits json -o - -- - 2>/dev/null)
-  pct=$(printf '%s' "$rl" | plutil -extract five_hour.used_percentage raw -o - -- - 2>/dev/null)
+  # plutil's handling of stdin (`-`) differs between supported macOS releases.
+  # Use a private file instead, so the no-jq path is stable on every supported macOS.
+  input_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-bridge.XXXXXX") || exit 0
+  /bin/chmod 600 "$input_file"
+  trap '/bin/rm -f "$input_file"' 0 1 2 15
+  printf '%s' "$input" > "$input_file"
+  rl=$(plutil -extract rate_limits json -o - "$input_file" 2>/dev/null)
+  pct=$(plutil -extract rate_limits.five_hour.used_percentage raw -o - "$input_file" 2>/dev/null)
+  /bin/rm -f "$input_file"
+  trap - 0 1 2 15
 fi
 if [ -n "$rl" ] && [ "$rl" != "null" ]; then
   mkdir -p "$dir"
