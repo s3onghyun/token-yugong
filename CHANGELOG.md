@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+- Clicking Grandpa in the menu bar opened the popover on another display (or under the mini window)
+  instead of under the icon you clicked. macOS 26 draws menu-bar items as Control Center copies on
+  every display, while the app's own item window stays on one display or parked off-screen, and the
+  popover was anchored to that window. A click in a menu bar now opens it right there.
+
 ### Added
 - The Yugong window: the popover's **Window** button (창으로 보기) opens the scene, the mountain, the
   title and every meter in a window of its own. Drag it to any display, resize it (the content scales),

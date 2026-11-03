@@ -162,6 +162,11 @@ changes. The popover header shows the headline as `24% · 04:40`.
 | The item has no frame yet | No verdict; look again later |
 
 Checked 2 s after launch and again 1 s after the item moves or the screens change.
+
+A click in a menu bar opens the popover under the mouse, on that display (`BarFit.clickAnchor`):
+macOS 26 shows the item as Control Center copies on every display while the app's own item window
+stays on one display or off-screen. With the mouse on the item itself, or not in a menu bar
+(keyboard, VoiceOver), the popover opens from the item, or the mini window when the item is hidden.
 The first time it is hidden, one notification says so (never again; saved).
 The **mini window** setting: *when the menu bar is full* (default) shows a small floating window
 with the same pet only while the item is hidden; *always*; or *never*. Opening the app again

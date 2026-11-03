@@ -220,3 +220,35 @@ import Testing
         #expect(ScenePlace.fit(CGRect(x: 1, y: 2, width: 3, height: 4), screens: []) == CGRect(x: 1, y: 2, width: 3, height: 4))
     }
 }
+
+/// The three displays of the bug report (macOS 26): MacBook, an LG above it, a vertical LG at the left.
+@Suite struct MenuBarClick {
+    let screens: [(frame: CGRect, visible: CGRect)] = [
+        (CGRect(x: 0, y: 0, width: 1728, height: 1117), CGRect(x: 0, y: 0, width: 1728, height: 1085)),
+        (CGRect(x: 0, y: 1117, width: 1920, height: 1080), CGRect(x: 0, y: 1117, width: 1920, height: 1050)),
+        (CGRect(x: -1080, y: 20, width: 1080, height: 1920), CGRect(x: -1080, y: 20, width: 1080, height: 1890)),
+    ]
+    let itemOnTheLG = CGRect(x: 1467, y: 2167, width: 75, height: 30)   // where the app's own item window sat
+
+    @Test func clickOnTheItemItselfUsesTheItem() {
+        #expect(BarFit.clickAnchor(mouse: CGPoint(x: 1500, y: 2180), item: itemOnTheLG, screens: screens) == nil)
+    }
+
+    @Test func clickOnAnotherDisplaysCopyOpensThere() {
+        // the MacBook's menu bar, where Control Center draws its copy of the item
+        #expect(BarFit.clickAnchor(mouse: CGPoint(x: 1300, y: 1100), item: itemOnTheLG, screens: screens)
+                == CGRect(x: 1299, y: 1085, width: 2, height: 32))
+        // the vertical monitor's bar
+        #expect(BarFit.clickAnchor(mouse: CGPoint(x: -420, y: 1930), item: itemOnTheLG, screens: screens)
+                == CGRect(x: -421, y: 1910, width: 2, height: 30))
+        // the item window parked off-screen (it reads as hidden): still the clicked bar, not the mini window
+        let parked = CGRect(x: -4137, y: 2167, width: 73, height: 30)
+        #expect(BarFit.clickAnchor(mouse: CGPoint(x: 1500, y: 2180), item: parked, screens: screens)
+                == CGRect(x: 1499, y: 2167, width: 2, height: 30))
+    }
+
+    @Test func keyboardOrVoiceOverKeepsTheUsualAnchor() {
+        #expect(BarFit.clickAnchor(mouse: CGPoint(x: 800, y: 500), item: itemOnTheLG, screens: screens) == nil)   // mouse not in a bar
+        #expect(BarFit.clickAnchor(mouse: CGPoint(x: 9000, y: 9000), item: itemOnTheLG, screens: screens) == nil) // nowhere
+    }
+}

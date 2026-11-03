@@ -198,6 +198,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         item.button?.action = #selector(toggleFromBar)
         item.button?.imagePosition = .imageLeading
         popover.behavior = .transient
+        NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
+            self?.anchorPanel?.orderOut(nil)
+        }
         let host = NSHostingController(rootView: PopoverView(model: model))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
@@ -550,7 +553,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         animTimer?.tolerance = wait * 0.1
     }
 
-    @objc func toggleFromBar() { toggle(from: nil) }
+    @objc func toggleFromBar() { toggle(from: barAnchor()) }
+
+    /// The view to open the popover from after a click in the menu bar: the clicked display's bar
+    /// (BarFit.clickAnchor), not wherever the app's own item window sits. nil = the usual anchor.
+    private var anchorPanel: NSPanel?
+    func barAnchor() -> NSView? {
+        let screens = NSScreen.screens.map { (frame: $0.frame, visible: $0.visibleFrame) }
+        guard let r = BarFit.clickAnchor(mouse: NSEvent.mouseLocation, item: item.button?.window?.frame ?? .zero, screens: screens)
+        else { return nil }
+        let p = anchorPanel ?? NSPanel(contentRect: r, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        p.isOpaque = false; p.backgroundColor = .clear; p.ignoresMouseEvents = true; p.hasShadow = false
+        p.level = .statusBar; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        p.setFrame(r, display: false)
+        p.orderFrontRegardless()
+        anchorPanel = p
+        return p.contentView
+    }
     func toggle(from v: NSView?) { popover.isShown ? popover.performClose(nil) : show(from: v) }
 
     /// Opens the popover under the bar item, or under the mini window when the bar has no room.
@@ -561,6 +580,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Prefs.store.set(true, forKey: "barHintShown")   // found him: no hint needed
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+        print("popover opened at \(popover.contentViewController?.view.window?.frame ?? .zero)")   // scripts check where it went
         applySharing()
     }
 }
