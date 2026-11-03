@@ -31,7 +31,27 @@ All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
 ## Install
 
-Needs macOS 13 or later and the Swift toolchain (Xcode or the Command Line Tools).
+Needs macOS 13 or later.
+
+### Download the app
+
+1. Download `YugongPet-<version>-macos-universal.zip` and its `.sha256` file from the latest
+   [GitHub Release](https://github.com/s3onghyun/token-yugong/releases).
+2. In Terminal, verify the download (replace `<version>` with the release version):
+
+   ```sh
+   shasum -a 256 -c YugongPet-<version>-macos-universal.zip.sha256
+   ```
+
+3. Double-click the ZIP, then move `YugongPet.app` to `/Applications`.
+4. The app is ad-hoc signed but **not notarized** yet. On its first launch, Control-click the app
+   and choose **Open**, then choose **Open** again. If macOS blocks it first, go to **System
+   Settings → Privacy & Security** and choose **Open Anyway**. Notarization will be added in a
+   future release.
+
+### Build from source
+
+For a local build, install the Swift toolchain (Xcode or the Command Line Tools), then:
 
 ```sh
 ./scripts/bundle.sh          # builds build/YugongPet.app (ad-hoc signed, not notarized)

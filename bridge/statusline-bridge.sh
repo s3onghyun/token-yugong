@@ -11,8 +11,20 @@ if command -v jq >/dev/null 2>&1; then
   rl=$(printf '%s' "$input" | jq -c '.rate_limits // empty' 2>/dev/null)
   pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
 else
-  rl=$(printf '%s' "$input" | plutil -extract rate_limits json -o - - 2>/dev/null)
-  pct=$(printf '%s' "$rl" | plutil -extract five_hour.used_percentage raw -o - - 2>/dev/null)
+  # plutil's handling of stdin (`-`) differs between supported macOS releases.
+  # Use private files instead, so the no-jq path is stable on every supported macOS.
+  input_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-bridge.XXXXXX") || exit 0
+  limits_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-limits.XXXXXX") || exit 0
+  pct_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-pct.XXXXXX") || exit 0
+  /bin/chmod 600 "$input_file" "$limits_file" "$pct_file"
+  trap '/bin/rm -f "$input_file" "$limits_file" "$pct_file"' 0 1 2 15
+  printf '%s' "$input" > "$input_file"
+  plutil -extract rate_limits json -o "$limits_file" "$input_file" 2>/dev/null
+  rl=$(/bin/cat "$limits_file")
+  plutil -extract five_hour.used_percentage raw -o "$pct_file" "$limits_file" 2>/dev/null
+  pct=$(/bin/cat "$pct_file")
+  /bin/rm -f "$input_file" "$limits_file" "$pct_file"
+  trap - 0 1 2 15
 fi
 if [ -n "$rl" ] && [ "$rl" != "null" ]; then
   mkdir -p "$dir"
