@@ -92,7 +92,8 @@ either (its tokens are read from `~/.gemini/tmp`).
 budget in USD and paste an **Admin key** (OpenAI reports costs only to Admin keys). The meter is
 this month's spend ÷ the budget, asked every 15 minutes. For DeepSeek, paste an API key to see the
 balance; DeepSeek does not report spend, so its meter says "don't know". Keys go into the login
-Keychain only. These two are the only times the app uses the network.
+Keychain only. These two and the once-a-day update check (below) are the only times the app
+uses the network.
 
 ## When the menu bar is full
 
@@ -103,10 +104,25 @@ Grandpa notices, tells you once with a notification, and moves into a small floa
 
 ## Settings
 
-Gear button in the popover: language (system, 한국어, English), the menu-bar number (percent used,
+Gear button in the popover: language (System, English, 한국어, 日本語, 简体中文; it changes at once, no
+restart), the menu-bar number (percent used,
 time to reset, reset time or none) and whether Grandpa is shown next to it, the family (which AI
-each member watches, the OpenAI budget, API keys), mini window, open at login (off by default, opt-in only), and the guide. Everything is stored in the
+each member watches, the OpenAI budget, API keys), mini window, open at login (off by default, opt-in only), update checks, and the guide. Everything is stored in the
 UserDefaults domain `TokenPet`; `defaults delete TokenPet` resets it, including the mountain.
+
+The Japanese and Chinese texts are AI-assisted translations; corrections are welcome (each string is
+one `L.t(en, ko, ja, zh)` call, and `./test.sh` fails on a missing or wrong-script translation).
+
+## Updates
+
+Once a day the app asks GitHub for the latest release: one HTTPS GET to
+`api.github.com/repos/s3onghyun/token-yugong/releases/latest`, with only `User-Agent: YugongPet/<version>`,
+`Accept` and a fixed `Accept-Language: en`, no cookies and no cache. Nothing about you or your usage is
+sent, and there is no telemetry. When a newer version is out, the popover shows a row with **Release
+page** and **Skip this version**, and you get one notification for that version. The app never
+downloads or installs anything itself: download the new ZIP, check its `.sha256` and replace the app
+as in [Install](#install). Settings › *Check for updates (once a day)* turns it off; *Check now* asks
+at once.
 
 ## How the numbers become a pet
 
@@ -117,7 +133,8 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 ## For development
 
 `swift run -c release TokenPet` with flags: `--demo lively|steady|straining|resting|morning|cutscene|cycle`,
-`--tempo idle|low|high|veryHigh`, `--visitor wifeDoubting|wifeCheering|zhisou`, `--weekly-only`, `--lang en|ko`,
+`--tempo idle|low|high|veryHigh`, `--visitor wifeDoubting|wifeCheering|zhisou`, `--weekly-only`, `--lang en|ko|ja|zh|pseudo`
+(`pseudo`: every string about 40% longer and accented, to find truncation with `--render`),
 `--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,
 `--settings`, `--guide`, `--pretend-hidden` (try the mini-window fallback),
 `--render <dir>` (PNG stills), `--icon-set <dir>`, `--scan-report` (prints what it read),

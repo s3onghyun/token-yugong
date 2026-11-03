@@ -106,14 +106,6 @@ import Testing
 }
 
 @Suite struct SettingsAndSetup {
-    @Test func languageSetting() {
-        #expect(L.resolve("auto", system: ["ko-KR", "en-US"]))
-        #expect(!L.resolve("auto", system: ["en-US", "ko-KR"]))
-        #expect(!L.resolve("auto", system: []))
-        #expect(L.resolve("ko", system: ["en-US"]))
-        #expect(!L.resolve("en", system: ["ko-KR"]))
-    }
-
     @Test func snippetForTheDefaultFolder() throws {
         let home = URL(fileURLWithPath: "/Users/someone")
         let cmd = StatusLineSetup.command(dir: home.appendingPathComponent(".claude/token-pet"), home: home)

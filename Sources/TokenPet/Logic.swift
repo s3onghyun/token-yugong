@@ -207,15 +207,26 @@ enum Visitors {
     static func lines(_ v: Visitor) -> (String, String) {
         switch v {
         case .wifeDoubting:
-            return (L.t("Grandma\nAnd where will you dump all that earth?", "할머니\n그 흙은 다 어디다 버리려고?"),
-                    L.t("Off the tail of the Bohai Sea, ho ho!", "발해 끝에 버리면 되지, 허허!"))
+            return (L.t("Grandma\nAnd where will you dump all that earth?",
+                        "할머니\n그 흙은 다 어디다 버리려고?",
+                        "おばあさん\nその土、いったいどこに捨てるつもり？",
+                        "奶奶\n这么多土石，往哪儿放呀？"),
+                    L.t("Off the tail of the Bohai Sea, ho ho!", "발해 끝에 버리면 되지, 허허!", "渤海の果てに捨てればよい、ほっほっ！", "投到渤海的尽头去，呵呵！"))
         case .wifeCheering:
-            return (L.t("Grandma\nIt really is shrinking! Go on, dear!", "할머니\n어머, 정말 줄었네! 힘내요, 영감!"),
-                    L.t("See? One shovel at a time.", "거봐요, 한 삽씩이면 된다니까."))
+            return (L.t("Grandma\nIt really is shrinking! Go on, dear!",
+                        "할머니\n어머, 정말 줄었네! 힘내요, 영감!",
+                        "おばあさん\nまあ、本当に減ってる！がんばって、あなた！",
+                        "奶奶\n哎呀，真的变小了！老头子，加油！"),
+                    L.t("See? One shovel at a time.", "거봐요, 한 삽씩이면 된다니까.", "ほれ見なさい、ひとすくいずつじゃ。", "看吧，一锹一锹来就行。"))
         case .zhisou:
-            return (L.t("Zhisou\nTold you so, ho ho! Not one blade of grass moved.", "지수 영감\n거봐라, 허허! 풀 한 포기도 못 뽑겠구먼."),
+            return (L.t("Zhisou\nTold you so, ho ho! Not one blade of grass moved.",
+                        "지수 영감\n거봐라, 허허! 풀 한 포기도 못 뽑겠구먼.",
+                        "智叟\nほれ見たことか、ほっほっ！草一本動かせんわい。",
+                        "智叟\n早说了吧，呵呵！连一根草都动不了。"),
                     L.t("Sons, then grandsons, on and on for ever. The mountain won't grow!",
-                        "아들, 손자, 자자손손 끝이 없지. 산은 더 자라지 않는다네!"))
+                        "아들, 손자, 자자손손 끝이 없지. 산은 더 자라지 않는다네!",
+                        "子から孫へ、子々孫々尽きることはない。山はこれ以上高くならんのじゃ！",
+                        "子又生孙，孙又生子，子子孙孙无穷尽。山可不会再长高！"))
         }
     }
 }

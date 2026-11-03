@@ -26,19 +26,19 @@ enum Role: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var name: String {
         switch self {
-        case .grandpa: return L.t("Grandpa", "할아버지")
-        case .son: return L.t("Son", "아들")
-        case .grandson: return L.t("Grandson", "손주")
-        case .boy: return L.t("Neighbour's boy", "이웃집 아이")
+        case .grandpa: return L.t("Grandpa", "할아버지", "おじいさん", "爷爷")
+        case .son: return L.t("Son", "아들", "息子", "儿子")
+        case .grandson: return L.t("Grandson", "손주", "孫", "孙子")
+        case .boy: return L.t("Neighbour's boy", "이웃집 아이", "隣の子", "邻家小孩")
         }
     }
     /// What his meter is drawn as.
     var meter: String {
         switch self {
-        case .grandpa: return L.t("carrier", "지게")
-        case .son: return L.t("stone heap", "돌 더미")
-        case .grandson: return L.t("basket", "바구니")
-        case .boy: return L.t("little basket", "삼태기")
+        case .grandpa: return L.t("carrier", "지게", "背負子", "背架")
+        case .son: return L.t("stone heap", "돌 더미", "石の山", "石堆")
+        case .grandson: return L.t("basket", "바구니", "かご", "筐")
+        case .boy: return L.t("little basket", "삼태기", "小かご", "簸箕")
         }
     }
 }
@@ -184,7 +184,18 @@ enum Keychain {
 
 /// Fetches spend and balances for the billed providers in the family, at most every 15 minutes each.
 final class BudgetClient {
-    struct State { var spent: Double?; var balance: String?; var problem: String?; var at: Date }
+    struct State { var spent: Double?; var balance: String?; var problem: Problem?; var at: Date }
+    /// Worded when shown, so it follows a language change.
+    enum Problem {
+        case noKey, rejected, noAnswer(Int)
+        var text: String {
+            switch self {
+            case .noKey: return L.t("no API key yet", "API 키 없음", "APIキー未設定", "尚无 API 密钥")
+            case .rejected: return L.t("key not accepted", "키가 거부됨", "キーが拒否されました", "密钥被拒绝")
+            case .noAnswer(let code): return L.t("no answer (\(code))", "응답 없음 (\(code))", "応答なし (\(code))", "无响应 (\(code))")
+            }
+        }
+    }
     private(set) var state: [Provider: State] = [:]
     private var asked: [Provider: Date] = [:]
     static let every: TimeInterval = 15 * 60
@@ -192,7 +203,7 @@ final class BudgetClient {
     func refresh(_ providers: [Provider], now: Date = Date(), done: @escaping () -> Void) {
         for p in providers where p.billed && now.timeIntervalSince(asked[p] ?? .distantPast) >= Self.every {
             asked[p] = now
-            guard let key = Keychain.key(p) else { state[p] = State(problem: L.t("no API key yet", "API 키 없음"), at: now); continue }
+            guard let key = Keychain.key(p) else { state[p] = State(problem: .noKey, at: now); continue }
             fetch(p, key: key, now: now) { [weak self] s in DispatchQueue.main.async { self?.state[p] = s; done() } }
         }
     }
@@ -207,7 +218,7 @@ final class BudgetClient {
             URLSession.shared.dataTask(with: req) { d, r, _ in then(d, (r as? HTTPURLResponse)?.statusCode ?? 0) }.resume()
         }
         func failed(_ code: Int) -> State {
-            State(problem: code == 401 || code == 403 ? L.t("key not accepted", "키가 거부됨") : L.t("no answer (\(code))", "응답 없음 (\(code))"), at: now)
+            State(problem: code == 401 || code == 403 ? .rejected : .noAnswer(code), at: now)
         }
         switch p {
         case .openai:
