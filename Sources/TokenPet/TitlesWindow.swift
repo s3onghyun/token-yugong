@@ -55,9 +55,10 @@ struct TitleCard: View {
 
     var body: some View {
         let r = Titles.rank(lifetime)
-        HStack(spacing: 18) {
-            Image(nsImage: Yugong.scene(SceneInfo(state: .lively, carrier: 0.5, mountainLeft: mountainLeft, grandson: nil, night: false),
-                                        t: 0.9, size: PopoverView.sceneSize))
+        var info = SceneInfo(state: .lively, carrier: 0.5, mountainLeft: mountainLeft, grandson: nil, night: false)
+        info.titles = r + 1   // the card shows every reward earned, whatever the props setting
+        return HStack(spacing: 18) {
+            Image(nsImage: Yugong.scene(info, t: 0.9, size: PopoverView.sceneSize))
                 .interpolation(.none)
                 .frame(width: PopoverView.sceneSize.width, height: PopoverView.sceneSize.height)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -132,6 +133,14 @@ struct TitlesView: View {
             Text(L.t("Titles: every token carried, all mountains together", "칭호: 옮긴 토큰 모두 (산 전부 합쳐서)",
                      "称号: 運んだトークンの合計(すべての山)", "称号: 搬运的令牌总数(所有山合计)"))
                 .font(.caption.weight(.bold)).foregroundColor(.secondary)
+            Text(L.t("Each title adds something to Grandpa's scene, and it stays.", "칭호마다 할아버지 장면에 무언가 하나씩 생기고, 계속 남아요.",
+                     "称号ごとに、おじいさんの場面に何かが一つ増えて、ずっと残ります。", "每个称号都会让爷爷的场景多一样东西，并一直保留。"))
+                .font(.caption).foregroundColor(.secondary)
+            if r == Titles.ladder.count - 1 {
+                Button(L.t("Watch the finale again", "마지막 장면 다시 보기", "最後の場面をもう一度見る", "再看一遍最终场景")) {
+                    model.replayFinale(); model.openWindow?()
+                }
+            }
             ForEach(Titles.ladder.indices, id: \.self) { i in
                 row(earned: i <= r, name: Titles.ladder[i].name(), note: Fmt.tokens(Int(Titles.ladder[i].tokens)))
             }

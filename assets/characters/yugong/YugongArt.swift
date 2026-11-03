@@ -30,6 +30,8 @@ struct Pen {
     let pal: Palette
     /// device pixels per unit, used to express widths in whole pixels
     var ppu: CGFloat
+    /// titles earned, 0...10: which reward gear Grandpa carries (TitleGear)
+    var titles = 1
 
     var ol: CGFloat { px(1) }
     func px(_ n: CGFloat) -> CGFloat { n / ppu }
@@ -114,20 +116,20 @@ enum YugongArt {
     // MARK: - figure
 
     static func figure(_ state: PetState, t: Double, carrier: Double, night: Bool,
-                       size: CGFloat, menuBar: Bool, tempo: Tempo = .working) -> NSImage {
+                       size: CGFloat, menuBar: Bool, tempo: Tempo = .working, titles: Int = 1) -> NSImage {
         let (pose, k) = YugongRig.pose(state, t: t, night: night, tempo: tempo)
         let fill = CGFloat(min(1.2, max(0, carrier)))
         let n = Int(menuBar ? size : (size / 3).rounded())
-        let cg = pixelFigure(pose, k: k, fill: fill, grid: n, menuBar: menuBar, bird: !menuBar)
+        let cg = pixelFigure(pose, k: k, fill: fill, grid: n, menuBar: menuBar, bird: !menuBar, titles: titles)
         return crisp(cg, size: NSSize(width: size, height: size))
     }
 
     /// Pixel figure: flat body from the rig, outlined, then the hand-placed head on top.
-    static func pixelFigure(_ pose: YPose, k: CGFloat, fill: CGFloat, grid n: Int, menuBar: Bool, bird: Bool) -> CGImage? {
+    static func pixelFigure(_ pose: YPose, k: CGFloat, fill: CGFloat, grid n: Int, menuBar: Bool, bird: Bool, titles: Int = 1) -> CGImage? {
         var spot: HeadSpot?
         return pixelLayer(n, n, { c in
             c.scaleBy(x: CGFloat(n) / 100, y: CGFloat(n) / 100)
-            let pen = Pen(c: c, mb: menuBar || n < 30, pal: .pixel, ppu: CGFloat(n) / 100)
+            let pen = Pen(c: c, mb: menuBar || n < 30, pal: .pixel, ppu: CGFloat(n) / 100, titles: titles)
             spot = draw(pen, pose, k: k, fill: fill, bird: bird)
         }, after: { c in
             if let s = spot {
@@ -290,6 +292,7 @@ enum YugongArt {
         let rimA = J(13, -30 + dy), rimB = J(34, -35 + dy), botB = J(31, -6 + dy * 0.5), botA = J(16, -4 + dy * 0.5)
         let basket = pn.path([rimA, rimB, botB, botA], closed: true)
         let h = (3 + 21 * fill) * (fill < 0.04 ? 0 : 1)
+        TitleGear.behindBasket(pn, J)
         if h > 0 {
             let mid = mul(add(rimA, rimB), 0.5)
             let up = rot(CGPoint(x: 2, y: -h * 1.8), onGround ? -6 : 0)
@@ -315,6 +318,7 @@ enum YugongArt {
         }
         pn.tube([J(13, 16), J(18.5, -52)], pole, pal.wood)
         pn.tube([J(9, -18), J(17, -18)], pole * 0.7, pal.wood, edge: !mb)
+        TitleGear.onPoles(pn, J)
     }
 
     static func drawShovel(_ pn: Pen, _ p: YPose, k: CGFloat) {
@@ -322,12 +326,13 @@ enum YugongArt {
         let d = p.toolDir, n = CGPoint(x: d.y, y: -d.x)
         let top = p.toolTop
         let base = add(top, mul(d, 40))
-        let bw: CGFloat = 1.35        // a broad blade so it reads in pixels
+        let bw: CGFloat = mb ? 1.35 : 1.55   // a broad blade so it reads in pixels
         pn.tube([add(top, mul(n, 3.2)), add(top, mul(n, -3.2))], mb ? 3.6 : 2.6, pal.woodDark)   // T-grip
         pn.tube([top, base], mb ? 4.2 : 3.4, pal.wood)
         let blade = pn.path([add(base, mul(n, 5.2 * bw)), add(add(base, mul(d, 8 * bw)), mul(n, 4.2 * bw)), add(base, mul(d, 14 * bw)),
                              add(add(base, mul(d, 8 * bw)), mul(n, -4.2 * bw)), add(base, mul(n, -5.2 * bw))], closed: true)
-        pn.shape(blade, pal.iron)
+        pn.shape(blade, TitleGear.blade(pn), edge: false)   // no inner edge: in the scene it would be all outline
+        TitleGear.bladeGlint(pn, base: base, d: d, n: n)
         if p.clump == .onBlade {
             pn.ellipse(add(add(base, mul(d, 7)), mul(n, p.toolAng > 90 ? 3 : -3)), 9, 6, pal.earth)
         }

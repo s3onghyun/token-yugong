@@ -54,7 +54,8 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: 10) {
             scene(s)
             HStack(alignment: .firstTextBaseline) {
-                Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!", "山が動いていく！", "山在移动！") : stateTitle(s.state))
+                Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!", "山が動いていく！", "山在移动！")
+                     : model.finaleDue ? L.t("The mountains are moving!", "두 산이 옮겨져요!", "二つの山が動いていく！", "两座山在移动！") : stateTitle(s.state))
                     .font(.system(.headline, design: .rounded))
                 Spacer()
                 if let d = BarText.detail(s, now: clockNow) {
@@ -187,6 +188,11 @@ struct PopoverView: View {
                                                         "앱 번들에서만 (scripts/bundle.sh)",
                                                         "アプリバンドルでのみ（scripts/bundle.sh）",
                                                         "仅限应用包（scripts/bundle.sh）"))
+            Toggle(L.t("Hide background props", "배경 소품 숨기기", "背景の小物を隠す", "隐藏背景小物件"), isOn: $model.hideProps)
+                .help(L.t("The title rewards in the sky, on the horizon and on the ground. Grandpa's own gear stays.",
+                          "칭호로 생긴 하늘·지평선·땅의 소품을 감춰요. 할아버지의 연장은 그대로예요.",
+                          "称号でもらった空・地平線・地面の小物を隠します。おじいさんの道具はそのままです。",
+                          "隐藏称号带来的天空、地平线和地面上的小物件。爷爷自己的工具不变。"))
             Toggle(L.t("Open the Yugong window when the app starts",
                        "앱이 열릴 때 우공 창도 열기",
                        "アプリ起動時に愚公ウィンドウも開く",
@@ -249,17 +255,24 @@ struct PopoverView: View {
         func fill(_ r: Role) -> Double? { model.family.roles[r] == nil ? nil : s.members[r]?.fill ?? 0 }   // assigned but unknown: an empty meter
         var i = SceneInfo(state: s.state, carrier: s.carrier, mountainLeft: model.mountainLeft, grandson: fill(.grandson),
                           night: s.state == .resting || model.night,
-                          cutscene: model.cutsceneDue ? (cutsceneT ?? model.cutsceneStart.map { min(1, Date().timeIntervalSince($0) / 4.5) }
+                          cutscene: playing ? (cutsceneT ?? model.cutsceneStart.map { min(1, Date().timeIntervalSince($0) / 4.5) }
                                                          ?? (t / 7).truncatingRemainder(dividingBy: 1)) : nil)
         i.tempo = model.tempo
         i.son = fill(.son); i.boy = fill(.boy)
         i.visitor = model.visitor
+        i.titles = model.rewards
+        i.props = !model.hideProps
+        i.finale = !model.cutsceneDue && model.finaleDue
+        if !playing, case .rank(let r)? = model.awards.first { i.sparkle = r + 1 }   // the new reward glints while the magpie tells
         return i
     }
 
+    /// A cutscene is on: a mountain milestone or the #10 finale.
+    private var playing: Bool { model.cutsceneDue || model.finaleDue }
+
     @ViewBuilder private func scene(_ s: Snapshot) -> some View {
-        let night = !model.cutsceneDue && (s.state == .resting || model.night)   // the cutscene sky is always golden
-        let award = model.cutsceneDue ? nil : model.awards.first   // the cutscene comes first
+        let night = !playing && (s.state == .resting || model.night)   // the cutscene sky is always golden
+        let award = playing ? nil : model.awards.first   // the cutscene comes first
         let visit = award == nil ? model.visitor.map(Visitors.lines) : nil
         ZStack(alignment: .topTrailing) {
             Group {
@@ -281,13 +294,14 @@ struct PopoverView: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             if award == nil {   // during a celebration the magpie has the floor
-                bubble(model.cutsceneDue ? cutsceneLine : visit?.1 ?? speech(s), size: model.cutsceneDue || visit != nil ? 12 : 13, night: night)
-                    .frame(maxWidth: model.cutsceneDue ? 250 : visit != nil ? 158 : 150, alignment: .trailing)   // the cutscene line stays above his head
+                bubble(model.cutsceneDue ? cutsceneLine : model.finaleDue ? finaleLine : visit?.1 ?? speech(s), size: playing || visit != nil ? 12 : 13, night: night)
+                    .frame(maxWidth: playing ? 250 : visit != nil ? 158 : 150, alignment: .trailing)   // the cutscene line stays above his head
                     .padding(10)
             }
-            if model.cutsceneDue {
-                Button { model.finishCutscene() } label: {
-                    Text(L.t("On to the next mountain", "다음 산으로", "次の山へ", "去下一座山"))
+            if playing {
+                Button { model.cutsceneDue ? model.finishCutscene() : model.finishFinale() } label: {
+                    Text(model.cutsceneDue ? L.t("On to the next mountain", "다음 산으로", "次の山へ", "去下一座山")
+                                           : L.t("Walk the open road", "탁 트인 길로", "開けた道へ", "走上大路"))
                         .font(.caption.weight(.bold)).foregroundColor(.white)
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(Capsule().fill(Color(red: 0.75, green: 0.28, blue: 0.23)))
@@ -379,6 +393,13 @@ struct PopoverView: View {
             "하늘이 감동해 과아씨의 두 아들을 보내 산을 업어 가게 했어요!",
             "天が心を打たれ、夸娥氏の二人の息子に山を背負って運ばせました！",
             "天帝被感动，派夸娥氏的两个儿子把山背走了！")
+    }
+
+    private var finaleLine: String {
+        L.t("Kua'e's two sons carry the mountains away: one to the east, one to the south. The road is open!",
+            "과아씨의 두 아들이 산 하나는 동쪽, 하나는 남쪽으로 옮겨요. 이제 길이 막힘없이 뚫렸어요!",
+            "夸娥氏の二人の息子が、山を一つは東へ、一つは南へ運びます。道がまっすぐ開けました！",
+            "夸娥氏的两个儿子把一座山背到东边，一座背到南边。从此道路畅通！")
     }
 
     private func stateTitle(_ st: PetState) -> String {

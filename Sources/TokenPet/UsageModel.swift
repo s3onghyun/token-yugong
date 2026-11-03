@@ -221,8 +221,29 @@ final class UsageModel: ObservableObject {
         if demoCutscene { demoCutscene = false; objectWillChange.send(); return }
         mountain.nextMountain()
     }
-    /// The celebration was seen.
-    func dismissAward() { if !awards.isEmpty { awards.removeFirst() } }
+    /// The celebration was seen. The finale, if it waited for it, plays from the top.
+    func dismissAward() {
+        if !awards.isEmpty { awards.removeFirst() }
+        if finaleDue { cutsceneStart = Date() }
+    }
+
+    /// Titles earned, 0...10: how many rewards the scene shows (LOGIC.md "Title rewards").
+    var rewards: Int { Titles.rank(lifetime) + 1 }
+    /// Demo: the #10 finale (`--demo finale`); a replay from the titles window.
+    var demoFinale = false
+    private(set) var finaleReplay = false
+    /// The one-time #10 finale: after the mountain cutscene and the title's celebration, never in other demos.
+    var finaleDue: Bool {
+        demoFinale || finaleReplay
+            || (demo == nil && !demoCycle && demoLifetime == nil && !cutsceneDue && awards.isEmpty && titles.finaleDue(lifetime))
+    }
+    func finishFinale() {
+        cutsceneStart = nil
+        if demoFinale || finaleReplay { demoFinale = false; finaleReplay = false; objectWillChange.send(); return }
+        titles.finaleSeen = true
+        titles.save()
+    }
+    func replayFinale() { finaleReplay = true; cutsceneStart = Date(); objectWillChange.send() }
     /// Demo: celebrate this award (stills and recordings).
     func demoAward(_ a: Award?) { awards = a.map { [$0] } ?? [] }
     /// Set by the app: opens the titles window.
@@ -285,9 +306,9 @@ final class UsageModel: ObservableObject {
         }
     }
 
-    /// Who from the tale is in the scene right now (nobody during the cutscene).
+    /// Who from the tale is in the scene right now (nobody during a cutscene).
     var visitor: Visitor? {
-        if cutsceneDue { return nil }
+        if cutsceneDue || finaleDue { return nil }
         return demoVisitor ?? Visitors.who(snap, changedAt: changedAt, carried: 1 - mountainLeft, mountain: mountain.index, now: Date())
     }
 
@@ -369,6 +390,11 @@ final class UsageModel: ObservableObject {
     /// The floating mini window: only while the menu-bar item is hidden (default), always, or never.
     @Published var miniMode: MiniMode = MiniMode(rawValue: Prefs.store.string(forKey: "miniWindow") ?? "") ?? .auto {
         didSet { Prefs.store.set(miniMode.rawValue, forKey: "miniWindow") }
+    }
+
+    /// Hide the title rewards in the background (sky, horizon, ground); Grandpa's gear stays. Off by default.
+    @Published var hideProps: Bool = Prefs.store.bool(forKey: "rewards.hideProps") {
+        didSet { Prefs.store.set(hideProps, forKey: "rewards.hideProps") }
     }
 
     /// Open the Yugong window when the app starts (with "Open at login": at login). Off by default.

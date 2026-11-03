@@ -137,6 +137,35 @@ cache writes count; this Mac measured ~12M a day over 8 days of logs).
 | Restart | Ranks celebrated, achievements (with the time earned), active days and the watched week are saved in `titles.*` |
 | Title card | The pixel scene, the title, tokens in all, mountains moved, achievements; no name, account or date. Saved as PNG only where you choose; nothing is sent |
 
+## Title rewards
+
+Each title adds one thing to the picture, automatically, and it stays (rewards = rank + 1, from the
+tokens in all; nothing new is stored). Grandpa's face, hat and clothes never change: only his gear and
+the world around him. Drawn in `assets/characters/yugong/YugongRewards.swift`; `YugongSheet <dir> --rewards`
+renders every title before and after.
+
+| # | Reward | Where it shows | From the tale (列子·湯問) |
+|---|---|---|---|
+| — | Before the first title the shovel is wooden, blade too | menu bar · scene | |
+| 1 | The iron-bladed shovel | menu bar · scene | 叩石墾壤: breaking stone, turning soil |
+| 2 | A teal tassel on the carrier's pole | menu bar · scene | 荷擔者: the one who carries |
+| 3 | A pickaxe tucked in the carrier; broken stones at the dig face | menu bar · scene | 叩石 |
+| 4 | Two baskets (삼태기), one full of earth, one tipped | scene | 箕畚 |
+| 5 | The Bohai Sea on the horizon, with an islet of dumped earth | scene | 投諸渤海之尾 |
+| 6 | Terraced fields, ripe, on the carved slope | scene | |
+| 7 | The family's thatched house (smoke; a lit window at night) | scene | 懲山北之塞，出入之迂 |
+| 8 | The family banner (농기); in the menu bar a white flag on the carrier | menu bar · scene | 子子孫孫無窮匱 |
+| 9 | Two auspicious clouds, left of the sun (the speech bubble covers the right) | scene | 帝感其誠 |
+| 10 | Golden shovel; an open road with a milestone; once, the finale | menu bar (shovel) · scene | 命夸娥氏二子負二山…無隴斷焉 |
+
+| When | Then |
+|---|---|
+| Settings › *Hide background props* | The scene drops 3–9 and the road (sky, horizon, ground); the gear on Grandpa stays. The title card always shows everything earned |
+| Someone stands where a prop goes | The prop takes the first clear spot of a few (the house moves to the mountain's foot when the grandson is out; with the son, one basket stands between him and Grandpa); with the whole family out, the least covered one |
+| A title is celebrated | Its reward twinkles (four little stars) until "Thanks, magpie" |
+| The top title, after its celebration and any mountain cutscene | The finale plays once from the start (golden sky, like the cutscene): Kua'e's two sons lift this mountain and a second one and carry them off in opposite directions, one east, one south (one west on screen, it is a side view), leaving the open road. "Walk the open road" ends it; `titles.finale` keeps it from playing again. The titles window's *Watch the finale again* replays it in the Yugong window |
+| Demos | `--demo finale`; `--lifetime <tokens>` shows that many rewards |
+
 ## Menu bar
 
 The item shows Grandpa and a number beside him. The number is the **headline** window (the

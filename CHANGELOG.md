@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+- The mini window (shown when the menu bar has no room) draws Grandpa at twice the bar size, pixel for
+  pixel, with a larger number, so it no longer reads as a lone number, and hovering says *Click to see
+  Grandpa Yugong* (눌러서 우공 보기). An older, smaller saved mini window grows to the new size in place.
+- The scene's shovel blade is drawn without its inner outline, so its colour (wood, iron, gold) reads.
+
 ### Fixed
 - Clicking Grandpa in the menu bar opened the popover on another display (or under the mini window)
   instead of under the icon you clicked. macOS 26 draws menu-bar items as Control Center copies on
@@ -9,6 +15,18 @@
   popover was anchored to that window. A click in a menu bar now opens it right there.
 
 ### Added
+- Title rewards: every title now adds one thing to the scene, automatically, and it stays. Before the
+  first title the shovel is wooden; then the iron blade (#1), a teal tassel on the carrier (#2), a
+  pickaxe and broken stones (#3), two baskets (#4), the Bohai Sea with an islet of dumped earth (#5),
+  terraced fields on the carved slope (#6), the family's thatched house (#7), the family banner (#8),
+  auspicious clouds (#9), and a golden shovel with an open road and a milestone (#10). #1, #2, #3, #8
+  and #10 show in the menu bar too; Grandpa's face, hat and clothes never change. Props step aside
+  for whoever stands in the scene, a new reward twinkles while the magpie announces it, and the title
+  card shows them. Settings › *Hide background props* (배경 소품 숨기기) keeps only Grandpa's gear.
+- The finale: after the top title's celebration, once, Kua'e's two sons carry both mountains off, one
+  east and one south, and leave the open road. *Watch the finale again* in the titles window replays it
+  in the Yugong window; `--demo finale` shows it in a demo. `YugongSheet <dir> --rewards` renders every
+  title before and after for review.
 - The Yugong window: the popover's **Window** button (창으로 보기) opens the scene, the mountain, the
   title and every meter in a window of its own. Drag it to any display, resize it (the content scales),
   or pick small, medium or large, a normal window, always on top or on the desktop, and the opacity
