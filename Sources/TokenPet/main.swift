@@ -7,7 +7,7 @@ import UserNotifications
 // Usage:
 //   TokenPet [--lang en|ko|ja|zh|pseudo] [--demo lively|steady|straining|resting|morning|cutscene|cycle] [--open]
 //            [--bridge <limits.json>] [--logs <dir>] [--tempo idle|low|high|veryHigh] [--visitor wifeDoubting|wifeCheering|zhisou]
-//            [--lifetime <tokens>] [--award rank:<0-9>|feat:<name>] [--titles]
+//            [--lifetime <tokens>] [--award rank:<0-9>|feat:<name>] [--titles] [--window]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
 //   TokenPet --scan-report      scan local logs once, print what the pet would show, then exit
 
@@ -179,7 +179,8 @@ struct StageView: View {
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     let bar = BarMirror()
     var mini: MiniWindow?
-    var miniForced = false          // shown on request (app reopened) although the setting says off
+    var sceneWindow: SceneWindow?   // the big scene in a window of its own; also the fallback when the bar has no room
+    var hint: NSPopover?            // one-time "click Grandpa" hint under the bar item
     var barHidden = false           // the menu-bar item is off-screen or behind the notch
     var guide: NSWindow?
     var sinks: [AnyCancellable] = []
@@ -197,11 +198,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         item.button?.action = #selector(toggleFromBar)
         item.button?.imagePosition = .imageLeading
         popover.behavior = .transient
+        NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
+            self?.anchorPanel?.orderOut(nil)
+        }
         let host = NSHostingController(rootView: PopoverView(model: model))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
         model.openGuide = { [weak self] in self?.popover.performClose(nil); self?.showGuide() }
         model.openTitles = { [weak self] in self?.popover.performClose(nil); self?.showTitles() }
+        model.openWindow = { [weak self] in self?.popover.performClose(nil); self?.showWindow() }
         model.onAward = { a in Notify.post(id: "award-\(a)", title: L.t("A new title from the magpie", "까치가 새 칭호를 물어 왔어요", "カササギが新しい称号を運んできました", "喜鹊带来了新称号"),
                                            body: a.announcement.replacingOccurrences(of: "\n", with: " ")) }
         Notify.setUp(self)
@@ -227,14 +232,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         scheduleAnim()
         sinks.append(model.$barText.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } })
         sinks.append(model.$barGrandpa.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.scheduleAnim() } })
-        sinks.append(model.$miniMode.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.miniForced = false; self?.updateMini() } })
+        sinks.append(model.$miniMode.dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.updateMini() } })
         sinks.append(model.$language.dropFirst().sink { [weak self] _ in   // live: AppKit text built once follows too
-            DispatchQueue.main.async { guard let self else { return }; self.guide?.title = self.guideTitle; self.titlesWindow?.title = self.titlesTitle; self.scheduleAnim() }
+            DispatchQueue.main.async { guard let self else { return }; self.guide?.title = self.guideTitle; self.titlesWindow?.title = self.titlesTitle
+                self.sceneWindow?.title = self.guideTitle; self.scheduleAnim() }
         })
         sinks.append(model.$mountain.sink { m in DispatchQueue.main.async { AppDelegate.milestoneNotice(m) } })
         let demoRun = arg("--demo") != nil || args.contains("--stage")
         if args.contains("--guide") || (!demoRun && !Prefs.store.bool(forKey: "onboarded")) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.showGuide() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.showGuide() }   // the hint follows when it closes
+        } else if !demoRun {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.showHint() }   // after checkBar; once per user
+        }
+        if args.contains("--window") || (!demoRun && model.windowAtLaunch) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                self.showWindow(activate: args.contains("--window"))
+                if let w = self.sceneWindow, args.contains("--window") { print("scene window \(w.windowNumber)") }
+            }
         }
         sharingSink = model.$hideFromCapture.sink { [weak self] _ in DispatchQueue.main.async { self?.applySharing() } }
         if args.contains("--stage") {
@@ -288,6 +302,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         stage?.sharingType = t
         mini?.sharingType = t
         titlesWindow?.sharingType = t
+        sceneWindow?.sharingType = t
     }
 
     // RunCat-style menu bar: each routine loop is drawn once into bitmaps, merged into runs of the
@@ -356,11 +371,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var barChecked = false
 
     func updateMini() {
-        let want = miniForced || model.miniMode.shows(barHidden: barHidden)
+        let want = model.miniMode.shows(barHidden: barHidden)
         if want, mini == nil {
             let m = MiniWindow()
             m.pet.onClick = { [weak self] v in self?.toggle(from: v) }
-            m.pet.onHide = { [weak self] in self?.miniForced = false; model.miniMode = .off }
+            m.pet.onHide = { model.miniMode = .off }
+            m.pet.onWindow = { [weak self] in self?.showWindow() }
             m.update(image: lastImage, title: lastTitle)
             mini = m
         }
@@ -410,6 +426,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 Prefs.store.set(true, forKey: "onboarded"); w?.close(); _ = self
             })
             w.center()
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self?.showHint() }
+            }
             guide = w
         }
         Prefs.store.set(true, forKey: "onboarded")   // shown once by itself; Settings reopens it
@@ -418,11 +437,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         applySharing()
     }
 
-    /// Opening the app again (Finder, Spotlight) brings Grandpa up, even when the bar has no room for him.
+    /// Opening the app again (Finder, Spotlight) brings Grandpa up; when the bar has no room for him
+    /// (and no mini window to hang the popover from), in the Yugong window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if barHidden && mini?.isVisible != true { miniForced = true; updateMini() }
-        show()
+        if barHidden && mini?.isVisible != true { showWindow() } else { show() }
         return false
+    }
+
+    func showWindow(activate: Bool = true) {
+        if sceneWindow == nil { sceneWindow = SceneWindow(model: model) }
+        sceneWindow?.title = guideTitle
+        sceneWindow?.present(activate: activate)
+        applySharing()
+    }
+
+    /// Once per user: a small bubble under the bar item saying he can be clicked. Not needed once
+    /// the popover has been opened; with no room in the bar, the window opens instead.
+    func showHint() {
+        guard !Prefs.store.bool(forKey: "barHintShown"), !popover.isShown else { return }
+        Prefs.store.set(true, forKey: "barHintShown")
+        if barHidden { if mini?.isVisible != true { showWindow() }; return }
+        guard let b = item.button, b.window != nil else { return }
+        let p = NSPopover()
+        p.behavior = .transient
+        p.contentViewController = NSHostingController(rootView:
+            Label(L.t("Click Grandpa to see his mountain", "우공을 눌러 보세요", "おじいさんをクリックしてみてください", "点一下爷爷看看"),
+                  systemImage: "hand.point.up.left.fill")
+                .font(.callout.weight(.semibold)).padding(12))
+        p.show(relativeTo: b.bounds, of: b, preferredEdge: .minY)
+        hint = p
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak p] in p?.performClose(nil) }
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
@@ -509,15 +553,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         animTimer?.tolerance = wait * 0.1
     }
 
-    @objc func toggleFromBar() { toggle(from: nil) }
+    @objc func toggleFromBar() { toggle(from: barAnchor()) }
+
+    /// The view to open the popover from after a click in the menu bar: the clicked display's bar
+    /// (BarFit.clickAnchor), not wherever the app's own item window sits. nil = the usual anchor.
+    private var anchorPanel: NSPanel?
+    func barAnchor() -> NSView? {
+        let screens = NSScreen.screens.map { (frame: $0.frame, visible: $0.visibleFrame) }
+        guard let r = BarFit.clickAnchor(mouse: NSEvent.mouseLocation, item: item.button?.window?.frame ?? .zero, screens: screens)
+        else { return nil }
+        let p = anchorPanel ?? NSPanel(contentRect: r, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        p.isOpaque = false; p.backgroundColor = .clear; p.ignoresMouseEvents = true; p.hasShadow = false
+        p.level = .statusBar; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        p.setFrame(r, display: false)
+        p.orderFrontRegardless()
+        anchorPanel = p
+        return p.contentView
+    }
     func toggle(from v: NSView?) { popover.isShown ? popover.performClose(nil) : show(from: v) }
 
     /// Opens the popover under the bar item, or under the mini window when the bar has no room.
     func show(from v: NSView? = nil) {
         guard let anchor = v ?? ((barHidden && mini?.isVisible == true) ? mini?.pet : item.button) else { return }
         if model.cutsceneDue && model.cutsceneStart == nil { model.cutsceneStart = Date() }   // play it once from the top
+        hint?.performClose(nil); hint = nil
+        Prefs.store.set(true, forKey: "barHintShown")   // found him: no hint needed
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+        print("popover opened at \(popover.contentViewController?.view.window?.frame ?? .zero)")   // scripts check where it went
         applySharing()
     }
 }

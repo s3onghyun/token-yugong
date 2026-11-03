@@ -99,19 +99,36 @@ balance; DeepSeek does not report spend, so its meter says "don't know". Keys go
 Keychain only. These two and the once-a-day update check (below) are the only times the app
 uses the network.
 
+## The Yugong window
+
+Click Grandpa in the menu bar for the popover: the scene, the mountain, his title and every meter.
+The first launch points at him once ("Click Grandpa to see his mountain"). The popover's **Window**
+button opens the same scene in a window of its own that stays on the desktop:
+
+![The Yugong window](docs/yugong-window.png)
+
+Drag it anywhere (another display too, a vertical one included) and drag its corner to resize: the
+content scales and keeps its proportions. The ⋯ button in its title bar (or a right-click) picks
+small, medium or large, a normal window, *always on top* or *on the desktop* (under every app
+window, on every Space), and the opacity. Esc or the close button hides it. Size, place, level
+and opacity are remembered; if its display is gone, it comes back on the main screen. Settings ›
+*Open the Yugong window when the app starts* (off by default) opens it at launch, and with *Open at
+login*, at login. While the window is closed or covered the scene stops drawing (no CPU).
+
 ## When the menu bar is full
 
 macOS quietly hides menu-bar icons that do not fit, or puts them behind the camera notch.
 Grandpa notices, tells you once with a notification, and moves into a small floating window
 (drag it anywhere; right-click to hide it). Settings › Mini window: *when the menu bar is full*
-(default), *always* or *never*. Opening the app again always brings him up.
+(default), *always* or *never*. Opening the app again always brings him up: the popover, or the
+Yugong window when the bar has no room and the mini window is off.
 
 ## Settings
 
 Gear button in the popover: language (System, English, 한국어, 日本語, 简体中文; it changes at once, no
 restart), the menu-bar number (percent used,
 time to reset, reset time or none) and whether Grandpa is shown next to it, the family (which AI
-each member watches, the OpenAI budget, API keys), mini window, open at login (off by default, opt-in only), update checks, and the guide. Everything is stored in the
+each member watches, the OpenAI budget, API keys), mini window, open at login (off by default, opt-in only), the Yugong window at start, update checks, and the guide. Everything is stored in the
 UserDefaults domain `TokenPet`; `defaults delete TokenPet` resets it, including the mountain.
 
 The Japanese and Chinese texts are AI-assisted translations; corrections are welcome (each string is
@@ -137,7 +154,7 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 ## For development
 
 `swift run -c release TokenPet` with flags: `--demo lively|steady|straining|resting|morning|cutscene|cycle`,
-`--lifetime <tokens>`, `--award rank:<0-9>|feat:<name>`, `--titles` (open the titles window),
+`--lifetime <tokens>`, `--award rank:<0-9>|feat:<name>`, `--titles` (open the titles window), `--window` (open the Yugong window),
 `--tempo idle|low|high|veryHigh`, `--visitor wifeDoubting|wifeCheering|zhisou`, `--weekly-only`, `--lang en|ko|ja|zh|pseudo`
 (`pseudo`: every string about 40% longer and accented, to find truncation with `--render`),
 `--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,

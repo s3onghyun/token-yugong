@@ -98,6 +98,11 @@ struct OnboardingView: View {
                      "今はあなたのメニューバーに住み、Claude Code で使うトークンをひとすくいずつ運んでいます。",
                      "如今他住在你的菜单栏里，你在 Claude Code 中用掉的每个 token 都是他又挖下的一锹土。"))
                 .fixedSize(horizontal: false, vertical: true)
+            Text(L.t("Click him in the menu bar to see this scene and your numbers. Its “Window” button keeps him on your desktop.",
+                     "메뉴바의 할아버지를 눌러 보세요. 이 장면과 숫자가 나와요. ‘창으로 보기’를 누르면 바탕화면에 계속 띄워 둘 수 있어요.",
+                     "メニューバーのおじいさんをクリックすると、この場面と数字が出ます。「ウィンドウ」ボタンでデスクトップに出しておけます。",
+                     "点击菜单栏里的爷爷，就能看到这个场景和数字。点“窗口”按钮可以把他一直留在桌面上。"))
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

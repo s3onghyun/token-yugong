@@ -19,6 +19,20 @@ enum BarFit {
         return false
     }
 
+    /// Where a click on the menu-bar item should open the popover. macOS 26 draws status items as
+    /// Control Center copies in the menu bar of every display, while the app's own item window stays
+    /// on one display (or parked off-screen when it reads as hidden), so a popover anchored to that
+    /// window opens on another display than the one clicked, or under the mini window. nil = the
+    /// mouse is on the item itself (or not in any menu bar: keyboard, VoiceOver), use the item as
+    /// before; else a thin anchor at the mouse, spanning that screen's menu bar.
+    static func clickAnchor(mouse: CGPoint, item: CGRect, screens: [(frame: CGRect, visible: CGRect)]) -> CGRect? {
+        if item.insetBy(dx: -2, dy: -2).contains(mouse) { return nil }
+        guard let s = screens.first(where: { $0.frame.contains(mouse) }) else { return nil }
+        let bar = s.frame.maxY - s.visible.maxY > 0 ? s.frame.maxY - s.visible.maxY : 24   // auto-hidden bar: no inset
+        guard mouse.y >= s.frame.maxY - bar else { return nil }
+        return CGRect(x: mouse.x - 1, y: s.frame.maxY - bar, width: 2, height: bar)
+    }
+
     /// The notch strip from NSScreen's auxiliary areas (macOS 12+): the gap between the usable
     /// menu-bar areas left and right of the camera.
     static func notch(frame: CGRect, left: CGRect?, right: CGRect?) -> CGRect? {

@@ -162,14 +162,24 @@ changes. The popover header shows the headline as `24% · 04:40`.
 | The item has no frame yet | No verdict; look again later |
 
 Checked 2 s after launch and again 1 s after the item moves or the screens change.
+
+A click in a menu bar opens the popover under the mouse, on that display (`BarFit.clickAnchor`):
+macOS 26 shows the item as Control Center copies on every display while the app's own item window
+stays on one display or off-screen. With the mouse on the item itself, or not in a menu bar
+(keyboard, VoiceOver), the popover opens from the item, or the mini window when the item is hidden.
 The first time it is hidden, one notification says so (never again; saved).
 The **mini window** setting: *when the menu bar is full* (default) shows a small floating window
 with the same pet only while the item is hidden; *always*; or *never*. Opening the app again
 (Finder, Spotlight, the notification) opens the popover; if the item is hidden it opens under the
-mini window, which then shows even when set to never.
+mini window, or, with the mini window off, the Yugong window (the popover's scene in a window of
+its own) opens instead.
+
+The **Yugong window** remembers its frame; on opening, a frame whose display is gone moves to the
+main screen (top right), and one partly off its screen is pulled fully onto it (`ScenePlace.fit`).
 
 Drawing stops when nobody can see the pet: display asleep, user switched out, or neither the bar
-item nor the mini window is on screen.
+item nor the mini window is on screen. The Yugong window's scene shows a still picture while the
+window is closed, minimized or fully covered (occlusion), so its 8 fps timeline stops.
 
 ## Settings (UserDefaults domain `TokenPet`, shared by `swift run` and the app)
 
