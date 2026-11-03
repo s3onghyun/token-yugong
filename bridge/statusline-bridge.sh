@@ -11,8 +11,9 @@ if command -v jq >/dev/null 2>&1; then
   rl=$(printf '%s' "$input" | jq -c '.rate_limits // empty' 2>/dev/null)
   pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
 else
-  rl=$(printf '%s' "$input" | plutil -extract rate_limits json -o - - 2>/dev/null)
-  pct=$(printf '%s' "$rl" | plutil -extract five_hour.used_percentage raw -o - - 2>/dev/null)
+  # `--` keeps the stdin filename (`-`) from being parsed as a plutil option on newer macOS.
+  rl=$(printf '%s' "$input" | plutil -extract rate_limits json -o - -- - 2>/dev/null)
+  pct=$(printf '%s' "$rl" | plutil -extract five_hour.used_percentage raw -o - -- - 2>/dev/null)
 fi
 if [ -n "$rl" ] && [ "$rl" != "null" ]; then
   mkdir -p "$dir"
