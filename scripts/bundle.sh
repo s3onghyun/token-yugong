@@ -28,6 +28,7 @@ set -- $bins
 if [ "$#" -eq 1 ]; then
   bin=$1
 else
+  mkdir -p "$root/build"
   bin="$root/build/TokenPet-universal"
   lipo -create "$@" -output "$bin"
 fi
