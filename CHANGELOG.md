@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- The Yugong window: the popover's **Window** button (창으로 보기) opens the scene, the mountain, the
+  title and every meter in a window of its own. Drag it to any display, resize it (the content scales),
+  or pick small, medium or large, a normal window, always on top or on the desktop, and the opacity
+  from its ⋯ button or a right-click. Esc closes it. Size, place, level and opacity are remembered,
+  and a window whose display is gone comes back on the main screen. Settings › *Open the Yugong
+  window when the app starts* (off by default). It draws nothing while closed or covered.
+- Finding Grandpa: the first-run guide says to click him in the menu bar, and a one-time hint under
+  the bar item says so too (shown once, also to existing users; skipped once the popover was opened).
+  Opening the app again with no room in the bar and the mini window off now opens the Yugong window,
+  and the mini window's right-click menu can open it. `--window` opens it in a demo.
 - Japanese (日本語) and Simplified Chinese (简体中文) alongside English and Korean: Settings › Language
   is System, English, 한국어, 日本語 or 简体中文, and a change shows at once without a restart (the guide
   window title, the mini window and the menu-bar clock follow too). System picks the first of your

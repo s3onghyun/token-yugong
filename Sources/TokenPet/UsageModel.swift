@@ -229,6 +229,8 @@ final class UsageModel: ObservableObject {
     var openTitles: (() -> Void)?
     /// Set by the app: opens the first-run guide again (Settings).
     var openGuide: (() -> Void)?
+    /// Opens the big scene in a window of its own (SceneWindow).
+    var openWindow: (() -> Void)?
 
     static func readBridge(_ url: URL) -> Reading? {
         guard let data = try? Data(contentsOf: url) else { return nil }
@@ -367,6 +369,11 @@ final class UsageModel: ObservableObject {
     /// The floating mini window: only while the menu-bar item is hidden (default), always, or never.
     @Published var miniMode: MiniMode = MiniMode(rawValue: Prefs.store.string(forKey: "miniWindow") ?? "") ?? .auto {
         didSet { Prefs.store.set(miniMode.rawValue, forKey: "miniWindow") }
+    }
+
+    /// Open the Yugong window when the app starts (with "Open at login": at login). Off by default.
+    @Published var windowAtLaunch: Bool = Prefs.store.bool(forKey: "sceneWindow.atLaunch") {
+        didSet { Prefs.store.set(windowAtLaunch, forKey: "sceneWindow.atLaunch") }
     }
 
     /// Launch at login is opt-in only: the app never registers itself. Needs the .app bundle.

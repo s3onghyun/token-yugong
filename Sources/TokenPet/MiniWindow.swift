@@ -57,6 +57,7 @@ final class MiniView: NSView {
     }
     var onClick: ((NSView) -> Void)?
     var onHide: (() -> Void)?
+    var onWindow: (() -> Void)?
     private var dragged = false
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
 
@@ -109,6 +110,8 @@ final class MiniView: NSView {
 
     override func rightMouseDown(with event: NSEvent) {
         let m = NSMenu()
+        m.addItem(withTitle: L.t("Show Yugong window", "우공 창으로 보기", "愚公ウィンドウを表示", "显示愚公窗口"),
+                  action: #selector(window_), keyEquivalent: "").target = self
         m.addItem(withTitle: L.t("Hide mini window",
                                  "작은 창 숨기기",
                                  "ミニウィンドウを隠す",
@@ -117,6 +120,7 @@ final class MiniView: NSView {
         NSMenu.popUpContextMenu(m, with: event, for: self)
     }
     @objc private func hide() { onHide?() }
+    @objc private func window_() { onWindow?() }
 }
 
 /// Local notifications. They need the .app bundle; under `swift run` they go to stderr instead.

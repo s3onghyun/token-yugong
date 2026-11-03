@@ -44,6 +44,7 @@ struct PopoverView: View {
     var fixedT: TimeInterval? = nil  // set when rendering stills
     var now: Date? = nil
     var cutsceneT: Double? = nil     // stills: freeze the cutscene at this progress
+    var inWindow = false             // shown in the Yugong window (SceneWindow), not the popover
 
     static let sceneSize = CGSize(width: 292, height: 176)
     @State var showSettings = args.contains("--settings")   // demo: open with settings shown
@@ -126,6 +127,14 @@ struct PopoverView: View {
             HStack {
                 Button { showSettings.toggle() } label: { Image(systemName: showSettings ? "gearshape.fill" : "gearshape") }
                     .buttonStyle(.plain).foregroundColor(.secondary).help(L.t("Settings", "설정", "設定", "设置"))
+                if !inWindow {
+                    Button { model.openWindow?() } label: { Label(L.t("Window", "창으로 보기", "ウィンドウ", "窗口"), systemImage: "macwindow") }
+                        .buttonStyle(.plain).foregroundColor(.accentColor).fixedSize()
+                        .help(L.t("Show Grandpa in a window of his own: resize it, keep it on top or on the desktop",
+                                  "할아버지를 따로 창으로 띄워요. 크기를 바꾸고, 항상 위나 바탕화면에 둘 수 있어요",
+                                  "おじいさんを別のウィンドウで表示します。大きさを変えたり、常に手前やデスクトップに置けます",
+                                  "在单独的窗口中显示爷爷：可以调整大小、置顶或放在桌面上"))
+                }
                 if model.demo != nil || model.demoCycle || model.demoCutscene {
                     Text(L.t("Demo data", "데모 데이터", "デモデータ", "演示数据")).font(.caption.weight(.semibold))
                         .padding(.horizontal, 6).padding(.vertical, 2)
@@ -178,6 +187,10 @@ struct PopoverView: View {
                                                         "앱 번들에서만 (scripts/bundle.sh)",
                                                         "アプリバンドルでのみ（scripts/bundle.sh）",
                                                         "仅限应用包（scripts/bundle.sh）"))
+            Toggle(L.t("Open the Yugong window when the app starts",
+                       "앱이 열릴 때 우공 창도 열기",
+                       "アプリ起動時に愚公ウィンドウも開く",
+                       "应用启动时同时打开愚公窗口"), isOn: $model.windowAtLaunch)
             if login == .requiresApproval {
                 Text(L.t("Allow it in System Settings › General › Login Items.",
                          "시스템 설정 › 일반 › 로그인 항목에서 허용해 주세요.",

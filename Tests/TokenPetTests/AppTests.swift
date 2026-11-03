@@ -197,3 +197,26 @@ import Testing
         #expect(next.index == 1 && next.tokens == 300 && abs(next.left - 0.7) < 1e-9)
     }
 }
+
+@Suite struct YugongWindowPlace {
+    let main = CGRect(x: 0, y: 0, width: 1512, height: 944)
+    let vertical = CGRect(x: -1080, y: -400, width: 1080, height: 1895)   // portrait monitor at the left
+
+    @Test func staysWhereItWasSaved() {
+        let f = CGRect(x: -900, y: 300, width: 320, height: 560)
+        #expect(ScenePlace.fit(f, screens: [main, vertical]) == f)   // on the vertical monitor, untouched
+        let m = CGRect(x: 600, y: 200, width: 480, height: 700)
+        #expect(ScenePlace.fit(m, screens: [main, vertical]) == m)
+    }
+
+    @Test func monitorGoneMovesToTheMainScreen() {
+        let f = CGRect(x: -900, y: 300, width: 320, height: 560)
+        #expect(ScenePlace.fit(f, screens: [main]) == CGRect(x: 1512 - 320 - 20, y: 944 - 560 - 20, width: 320, height: 560))
+    }
+
+    @Test func halfOffScreenIsPulledInAndShrunkToFit() {
+        #expect(ScenePlace.fit(CGRect(x: 1400, y: 800, width: 320, height: 560), screens: [main]) == CGRect(x: 1192, y: 384, width: 320, height: 560))
+        #expect(ScenePlace.fit(CGRect(x: 100, y: 0, width: 480, height: 2000), screens: [main]).height == 944)
+        #expect(ScenePlace.fit(CGRect(x: 1, y: 2, width: 3, height: 4), screens: []) == CGRect(x: 1, y: 2, width: 3, height: 4))
+    }
+}
