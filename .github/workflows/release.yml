@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check tag and version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          test "$TAG" = "v$(tr -d '\r\n' < VERSION)"
+      - name: Test
+        env:
+          TOKENPET_PREFS: dev.yugongpet.release-ci
+        run: ./test.sh
+      - name: Build universal app and release archive
+        run: ./scripts/release-artifacts.sh
+      - name: Extract release notes
+        run: ./scripts/changelog-notes.sh "$(tr -d '\r\n' < VERSION)" > release-notes.md
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            --title "Yugong Pet $VERSION" \
+            --notes-file release-notes.md \
+            dist/*.zip dist/*.sha256

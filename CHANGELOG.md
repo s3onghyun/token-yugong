@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 (2026-11-03)
+
 ### Added
 - The family: pick which AI Grandpa watches, and give his son, his grandson and the neighbour's
   boy one each (Settings › Family). Two new pixel characters: the son, breaking rock with a
@@ -33,6 +35,11 @@
 ### Removed
 - The ink-wash style. Grandpa Yugong, and every character after him, is pixel art only: the
   style picker in the popover, the `--style` flag and the ink drawing code are gone.
+
+### Release
+- First public downloadable build: a universal macOS app archive, ad-hoc signed but not notarized.
+- GitHub Actions builds and tests every push and pull request, and version tags publish a ZIP with
+  a SHA-256 checksum.
 
 ## 0.1.0 (2026-11-02)
 

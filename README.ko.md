@@ -29,7 +29,27 @@ Claude Code 사용량을 보여 줍니다.
 
 ## 설치
 
-macOS 13 이상과 Swift(Xcode 또는 Command Line Tools)가 필요합니다.
+macOS 13 이상이 필요합니다.
+
+### 앱 내려받기
+
+1. 최신 [GitHub Release](https://github.com/s3onghyun/token-yugong/releases)에서
+   `YugongPet-<version>-macos-universal.zip`과 `.sha256` 파일을 함께 내려받습니다.
+2. 터미널에서 내려받은 파일을 확인합니다(`<version>`은 릴리스 버전으로 바꾸세요).
+
+   ```sh
+   shasum -a 256 -c YugongPet-<version>-macos-universal.zip.sha256
+   ```
+
+3. ZIP 파일을 더블 클릭해 푼 다음 `YugongPet.app`을 `/Applications`로 옮깁니다.
+4. 이 앱은 ad-hoc 서명 상태이며 아직 **공증(notarization)** 되지 않았습니다. 처음 실행할 때
+   앱을 Control-클릭하고 **열기**를 누른 뒤 한 번 더 **열기**를 누르세요. macOS가 먼저 막으면
+   **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누르세요. 공증은 이후
+   릴리스에 추가할 예정입니다.
+
+### 소스에서 빌드
+
+로컬 빌드에는 Swift(Xcode 또는 Command Line Tools)가 필요합니다.
 
 ```sh
 ./scripts/bundle.sh          # build/YugongPet.app 생성 (ad-hoc 서명, 공증 안 됨)
