@@ -103,6 +103,12 @@ struct PopoverView: View {
                               "미리보기용 가상 상태입니다.",
                               "プレビュー用の仮の状態です。",
                               "预览用的模拟状态。") : source(main, s.known ? s.captured : nil))
+            if !s.demo && main == .claude && model.accountNote {
+                note(L.t("Account change detected: showing the new Claude account's limits.",
+                         "계정 바뀜 감지: 새 Claude 계정의 한도를 보여 줘요.",
+                         "アカウントの切り替えを検出：新しい Claude アカウントのリミットを表示します。",
+                         "检测到账号切换：显示新 Claude 账号的额度。"))
+            }
             if !s.demo {
                 Text(L.t("Shovel speed: \(Int(model.pace.smoothed.rounded())) output tokens/min (last 3 min, this Mac)",
                          "삽질 속도: 분당 출력 토큰 \(Int(model.pace.smoothed.rounded())) (최근 3분, 이 Mac)",

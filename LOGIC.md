@@ -19,7 +19,8 @@ app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup
 | Output tokens with timestamps | `~/.claude/projects/**/*.jsonl` (`message.usage`), Codex `token_count` events, Gemini CLI `~/.gemini/tmp/*/chats/session-*.json` | shovel speed only |
 | Tokens: Claude input + output + cache writes; Codex input without the cached part + output; Gemini `total` | the same logs | the mountain only |
 
-No saved limit state, and token counts never become a limit percentage. The network is used
+No saved limit state beyond which Claude account is current and its last numbers (see "Another
+account"), and token counts never become a limit percentage. The network is used
 only for an OpenAI or DeepSeek member you set up: the request carries your key (kept in the
 login Keychain, never in a file or the settings) and nothing else leaves the Mac. The update check
 (below) is the one other request.
@@ -62,6 +63,25 @@ the time left (`2h 3m`; the clock in the *reset time* style), and the source lin
 reading is (`16:57 · 6분 전`). One notification when Grandpa's limit is used up (with the reset time)
 and one when it resets; the last state is saved, so a restart does not repeat them (Settings, on by
 default). A used-up **weekly** limit is a long rest: a full moon instead of the crescent.
+
+### Another account
+
+Claude Code tells the status line no account, and every session writes the same `limits.json`.
+After `/login` to another account, sessions started before it keep the old account and keep
+writing its numbers and logging its refusals. So the app tells accounts apart by the **weekly
+reset time** (each account's week resets at its own time) and keeps which one is current and its
+numbers in the settings (`claude.account`: reset times and percentages only, no name or id).
+
+| When | Then |
+|---|---|
+| A reading with another weekly reset, not this account's next week (the current reset has not passed, or the new one is earlier) | **Account switch**: the new account is current; nothing of the old one's windows is kept. The popover says "계정 바뀜 감지" for 10 minutes, the wife comes to ask, and the limit notification is not sent for the switch itself |
+| A reading of the account switched away from, while the current one reported in the last 30 minutes | Ignored |
+| The same, the current account silent for 30 minutes or more | A switch back to it |
+| A reading without a weekly window | Cannot be told apart: taken as the current account |
+| A reading of the current account | Merged window by window: a window the reading lacks is kept until it resets (an idle session drops its 5-hour window), and within one window the percent only grows (an idle session's numbers are older) |
+| A limit hit logged before the switch | Not the new account's: ignored |
+| After a switch, a hit whose window the current reading shows with another reset that has not passed, or does not show at all (a weekly-only account) | The old account's: ignored |
+| Before any switch, a hit whose window a reading taken after it shows with another reset | Ignored |
 
 ## Family
 
