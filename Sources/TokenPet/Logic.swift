@@ -5,13 +5,13 @@ import TokenPetAssets
 // no clock, no saved state, so every rule has a unit test (Tests/TokenPetTests).
 
 /// One limit window: percent used (0...100) and when it resets.
-struct Meter: Equatable {
+struct Meter: Equatable, Codable {
     var pct: Double
     var resetsAt: Date?
 }
 
 /// One reading of the official limits. Any window may be absent.
-struct Reading: Equatable {
+struct Reading: Equatable, Codable {
     var five: Meter?
     var week: Meter?
     var at: Date            // when the tool reported these numbers
@@ -85,12 +85,22 @@ enum Limits {
     /// The status-line reading with the logged limit hits on top: a hit fills its window to 100% until
     /// it resets, unless Claude answered again after it (another account, extra usage) or the reading
     /// already shows a later window. Hits that reset more than `Logic.morningFor` ago are over.
-    static func apply(_ hits: [Hit], to reading: Reading?, lastAnswer: Date?, now: Date) -> Reading? {
+    /// After an account switch (`Accounts`), the old account's hits are not the new one's: those logged
+    /// before it, and later ones the newer reading shows as another window or (no such window) not at all.
+    static func apply(_ hits: [Hit], to reading: Reading?, lastAnswer: Date?, now: Date, switchedAt: Date? = nil) -> Reading? {
         var r = reading
-        for h in hits where h.resetsAt > now.addingTimeInterval(-Logic.morningFor) && (lastAnswer.map { $0 <= h.time } ?? true) {
+        for h in hits where h.resetsAt > now.addingTimeInterval(-Logic.morningFor) && (lastAnswer.map { $0 <= h.time } ?? true)
+                            && (switchedAt.map { $0 < h.time } ?? true) {
             var x = r ?? Reading(five: nil, week: nil, at: h.time)
             let old = h.week ? x.week : x.five
             if let o = old?.resetsAt, o > h.resetsAt.addingTimeInterval(60) { continue }   // a newer window
+            if let rd = reading {
+                // another account's hit: the reading shows another window that has not reset (since a switch;
+                // before one, only a reading taken after the hit tells), or after a switch no such window
+                let shown = h.week ? rd.week : rd.five
+                let other = shown?.resetsAt.map { !Accounts.same($0, h.resetsAt) && (switchedAt != nil ? $0 > now : rd.at > h.time) } ?? false
+                if other || (shown == nil && switchedAt != nil) { continue }
+            }
             let full = Meter(pct: 100, resetsAt: h.resetsAt)
             if h.week { x.week = full } else { x.five = full }
             x.at = max(x.at, h.time)
@@ -102,6 +112,48 @@ enum Limits {
     static let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
     }()
+}
+
+/// Which Claude account the bridge readings belong to (LOGIC.md "Another account"). The status line
+/// names no account, so an account is told by its weekly reset time. After a /login, sessions started
+/// before it keep the old account and keep writing the one bridge file: while the new account is in
+/// use, readings of the one switched away from are ignored. One account's sessions are merged window
+/// by window, since an idle session's numbers are older and can lack the 5-hour window.
+struct Accounts: Equatable, Codable {
+    static let quiet: TimeInterval = 30 * 60   // the current account silent this long: the other one is back in use
+    var week: Date?          // the current account's weekly reset
+    var previous: Date?      // the account switched away from
+    var switchedAt: Date?
+    var seen: Date?          // the current account's newest reading
+    var reading: Reading?    // its windows, merged
+
+    /// nil = an old account's reading and nothing of the current one since the app started.
+    mutating func take(_ r: Reading) -> Reading? {
+        if let w = r.week?.resetsAt {
+            if let cur = week, !Self.same(w, cur), !(cur <= r.at && w > cur) {   // not this account's next week
+                if let p = previous, Self.same(w, p), let s = seen, r.at.timeIntervalSince(s) < Self.quiet { return reading }
+                previous = cur; switchedAt = r.at; reading = nil
+            }
+            week = w
+        }
+        reading = Self.merge(reading, r)
+        seen = max(seen ?? r.at, r.at)
+        return reading
+    }
+
+    static func same(_ a: Date, _ b: Date) -> Bool { abs(a.timeIntervalSince(b)) <= 60 }
+
+    /// `n` is the newer reading. A window it lacks is kept while it has not reset; within one window the percent only grows.
+    static func merge(_ o: Reading?, _ n: Reading) -> Reading {
+        guard let o else { return n }
+        func window(_ a: Meter?, _ b: Meter?) -> Meter? {
+            guard let a, let ra = a.resetsAt, ra > n.at else { return b }
+            guard let b else { return a }
+            guard let rb = b.resetsAt, same(ra, rb) else { return b }
+            return Meter(pct: max(a.pct, b.pct), resetsAt: rb)
+        }
+        return Reading(five: window(o.five, n.five), week: window(o.week, n.week), at: max(o.at, n.at), month: n.month)
+    }
 }
 
 /// Weekly-only accounts: the week (counted back from its reset) is 7 equal days, and by the end

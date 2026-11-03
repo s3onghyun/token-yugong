@@ -34,6 +34,7 @@ if args.contains("--scan-report") {
     func t(_ d: Date?) -> String { d.map { Fmt.clock($0) } ?? "-" }
     print(String(format: "scanned %.1f MB in %.2fs; %d usage events", Double(sc.bytesRead) / 1e6, sc.lastScanSeconds, sc.events.count))
     print("claude: " + (s.known ? "official, captured \(t(s.captured))" : "don't know (no usable status-line reading)"))
+    if model.accountNote { print("account change detected") }
     if let f = s.five { print("5h: \(Fmt.pct(f.pct)) resets \(t(f.resetsAt))") }
     if let w = s.week { print("week: \(Fmt.pct(w.pct)) resets \(t(w.resetsAt))") }
     if let d = s.daily { print(String(format: "no 5-hour window: today's share %.0f%%, day %@ - %@", d.fill * 100, t(d.dayStart), t(d.dayEnd))) }

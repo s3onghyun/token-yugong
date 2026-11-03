@@ -117,6 +117,16 @@ struct MountainLedger {
     }
 }
 
+/// Which Claude account is current and its numbers, saved so a restart still ignores the old account's
+/// sessions. Only reset times and percentages: Claude Code gives the status line no account name or id.
+extension Accounts {
+    static func load(_ d: UserDefaults = Prefs.store) -> Accounts {
+        d.data(forKey: "claude.account").flatMap { try? JSONDecoder().decode(Accounts.self, from: $0) } ?? Accounts()
+    }
+
+    func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.account") }
+}
+
 // MARK: - Model
 
 final class UsageModel: ObservableObject {
@@ -157,6 +167,8 @@ final class UsageModel: ObservableObject {
     let budgets = BudgetClient()
     private let queue = DispatchQueue(label: "tokenpet.scan", qos: .utility)
     private var claude: Reading?
+    private var accounts = Accounts.load()
+    private var accountJustSwitched = false
     private var timer: Timer?
 
     init(bridgeURL: URL, logsRoot: URL) {
@@ -181,7 +193,7 @@ final class UsageModel: ObservableObject {
             geminiReader.scan()
             let b = Self.readBridge(bridgeURL)
             DispatchQueue.main.async { [self] in
-                claude = b
+                take(b)
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
@@ -198,7 +210,8 @@ final class UsageModel: ObservableObject {
     /// The latest reading for an AI; nil = nothing to read (Gemini, DeepSeek spend, no key or budget yet).
     func reading(_ p: Provider) -> Reading? {
         switch p {
-        case .claude: return Limits.apply(Array(scanner.hits.values), to: claude, lastAnswer: scanner.events.last?.time, now: Date())
+        case .claude: return Limits.apply(Array(scanner.hits.values), to: claude, lastAnswer: scanner.events.last?.time, now: Date(),
+                                          switchedAt: accounts.switchedAt)
         case .codex: return codexReader.reading
         case .gemini, .deepseek: return nil
         case .openai: return budgets.state[.openai].flatMap { st in st.spent.flatMap { Budget.reading(spent: $0, budget: openAIBudget, at: st.at) } }
@@ -210,7 +223,7 @@ final class UsageModel: ObservableObject {
         scanner.scan()
         codexReader.scan()
         geminiReader.scan()
-        claude = Self.readBridge(bridgeURL)
+        take(Self.readBridge(bridgeURL))
         mountain.absorb(allEvents)
         recompute()
     }
@@ -254,6 +267,18 @@ final class UsageModel: ObservableObject {
     var openGuide: (() -> Void)?
     /// Opens the big scene in a window of its own (SceneWindow).
     var openWindow: (() -> Void)?
+
+    /// A bridge reading, sorted by account (`Accounts`). A switch brings the wife to ask about it.
+    private func take(_ b: Reading?) {
+        let before = accounts.switchedAt
+        claude = b.flatMap { accounts.take($0) }
+        accounts.save()
+        guard accounts.switchedAt != before else { return }
+        changedAt = Date()
+        accountJustSwitched = true
+    }
+    /// "Account change detected" in the popover, for as long as the wife asks about it.
+    var accountNote: Bool { accounts.switchedAt.map { Date().timeIntervalSince($0) < Visitors.afterChange } ?? false }
 
     static func readBridge(_ url: URL) -> Reading? {
         guard let data = try? Data(contentsOf: url) else { return nil }
@@ -305,8 +330,9 @@ final class UsageModel: ObservableObject {
         // one notification when the limit is used up and one when it resets, even across a restart
         if snap.known, snap.resting != Prefs.store.bool(forKey: "limit.resting") {
             Prefs.store.set(snap.resting, forKey: "limit.resting")
-            if notifyLimits { onLimit?(snap) }
+            if notifyLimits && !accountJustSwitched { onLimit?(snap) }   // another account is not a used-up or reset limit
         }
+        accountJustSwitched = false
         if let p = Visitors.plan(family, snap) {
             if let old = Prefs.store.string(forKey: "visitors.plan"), old != p { changedAt = now }
             Prefs.store.set(p, forKey: "visitors.plan")

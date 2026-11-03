@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- After switching the Claude account (`/login`), Yugong kept showing the old account. Claude Code
+  sessions started before the switch keep the old account, keep writing its numbers into the one
+  bridge file and keep logging its refused requests, so the old 5-hour window, its 99% and its rest
+  came back over the new account's numbers. The status line carries no account, so the app now tells
+  accounts apart by their weekly reset time: on a new one it switches, says *Account change
+  detected* (계정 바뀜 감지) in the popover, and ignores the old account's readings and limit hits
+  while the new one is in use (30 minutes of silence from it lets the old one back, for a switch
+  back). An account with only a weekly window no longer picks up the old account's 5-hour limit.
+  Sessions of one account are merged, so an idle session no longer drops the 5-hour window or brings
+  back an older percent. Only reset times and percentages are kept, on this Mac.
+
 ## 0.2.1 (2026-11-03)
 
 ### Changed
