@@ -21,6 +21,14 @@ enum Fmt {
                                 "\(m / 60)小时\(m % 60)分钟后") }
         return L.t("in \(m)m", "\(m)분 뒤", "\(m)分後", "\(m)分钟后")
     }
+    /// "3m ago", "2h 5m ago": how old a reading is.
+    static func ago(_ d: Date, now: Date = Date()) -> String {
+        let m = max(0, Int(now.timeIntervalSince(d) / 60))
+        if m >= 60 { return L.t("\(m / 60)h \(m % 60)m ago", "\(m / 60)시간 \(m % 60)분 전", "\(m / 60)時間\(m % 60)分前", "\(m / 60)小时\(m % 60)分钟前") }
+        return L.t("\(m)m ago", "\(m)분 전", "\(m)分前", "\(m)分钟前")
+    }
+    /// A percent used: 100% only when the window is really full, so 99.5 reads 99% and never "100% but still digging".
+    static func pct(_ p: Double) -> String { p >= 100 ? "100%" : "\(min(99, Int(p.rounded())))%" }
     /// Compact time left for the menu bar: "5d 2h", "3h 12m", "12m".
     static func left(_ d: Date, now: Date = Date()) -> String {
         let m = max(0, Int(d.timeIntervalSince(now) / 60))
@@ -177,6 +185,10 @@ struct PopoverView: View {
                 Text(L.t("Never", "끔", "表示しない", "从不")).tag(MiniMode.off)
             }
             familySettings
+            Toggle(L.t("Notify when the limit is used up and when it resets",
+                       "한도가 다 찼을 때와 다시 풀릴 때 알림",
+                       "リミットに達したときと戻ったときに通知",
+                       "额度用完和重置时通知"), isOn: $model.notifyLimits)
             let login = model.launchAtLogin
             Toggle(L.t("Open at login",
                        "로그인할 때 열기",
@@ -263,6 +275,7 @@ struct PopoverView: View {
         i.titles = model.rewards
         i.props = !model.hideProps
         i.finale = !model.cutsceneDue && model.finaleDue
+        i.longRest = s.resting && (s.week?.pct ?? 0) >= 100
         if !playing, case .rank(let r)? = model.awards.first { i.sparkle = r + 1 }   // the new reward glints while the magpie tells
         return i
     }
@@ -412,7 +425,10 @@ struct PopoverView: View {
                                                               "今日の取り分超え・ゆっくりと",
                                                               "超过今日份额 · 慢慢来")
                                                         : L.t("Grandpa is straining", "할아버지 힘에 부쳐요", "おじいさん、息が上がっています", "爷爷有点吃力")
-        case .resting:   return L.t("Carrier full: resting", "지게 가득 · 쉬는 중", "背負子いっぱい・休憩中", "背架满了 · 休息中")
+        case .resting:
+            guard let w = model.snap.wakeAt else { return L.t("Carrier full: resting", "지게 가득 · 쉬는 중", "背負子いっぱい・休憩中", "背架满了 · 休息中") }
+            let u = Fmt.until(w, now: clockNow)
+            return L.t("Resting · back \(u)", "쉬는 중 · \(u) 다시 퍼요", "休憩中・\(u)に再開", "休息中 · \(u)接着挖")
         case .morning:   return L.t("Morning! Fresh carrier", "아침이에요 · 지게 비움", "朝です・背負子は空っぽ", "早上好 · 背架清空了")
         }
     }
@@ -450,7 +466,7 @@ struct PopoverView: View {
                 Text(label).font(.subheadline.weight(.semibold))
                 Spacer()
                 if let m {
-                    Text("\(Int(m.pct.rounded()))%").font(.subheadline.monospacedDigit().weight(.semibold))
+                    Text(pace ? "\(Int(m.pct.rounded()))%" : Fmt.pct(m.pct)).font(.subheadline.monospacedDigit().weight(.semibold))
                 } else {
                     Text(L.t("don't know", "모름", "わからない", "不知道")).font(.caption).foregroundColor(.secondary)
                 }
@@ -506,7 +522,7 @@ struct PopoverView: View {
 
     /// Where an AI's numbers come from, or why there are none. `at` = when the numbers were reported.
     private func source(_ p: Provider, _ at: Date?) -> String {
-        let when = at.map { Fmt.clock($0, now: clockNow) } ?? ""
+        let when = at.map { Fmt.clock($0, now: clockNow) + " · " + Fmt.ago($0, now: clockNow) } ?? ""
         let budget = model.budgets.state[p]
         switch p {
         case .claude:

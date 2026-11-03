@@ -8,7 +8,11 @@ Grandpa Yugong (우공 할아버지), from the old tale of the ninety-year-old m
 mountains one shovel at a time, lives in your Mac menu bar and shows your Claude Code usage:
 
 - **The carrier (지게) is your 5-hour limit.** Earth heaps up in his A-frame carrier. When it is
-  full he sits down and naps, and the menu bar shows when he starts again.
+  full he sits down and naps, the menu bar counts down to the reset, and one notification says so
+  (another when it resets). A used-up weekly limit is a long rest under a full moon.
+
+  ![Resting after the 5-hour limit (crescent) and the weekly limit (full moon)](docs/limit-reached.png)
+
 - **Accounts with only a weekly limit** (verified Ultra): the carrier is the weekly limit, and he naps
   only when it runs out. Today's fair share (1/7 of the week, unused days carry over) sets his pace:
   past it he sweats and asks you to take it slow. No 5-hour meter is ever invented.
@@ -79,6 +83,9 @@ Or run without a bundle: `swift run -c release TokenPet` (no notifications or op
 Claude Code hands its status-line command your official limits (`rate_limits.five_hour` and
 `rate_limits.seven_day`: used %, reset time). The bridge script saves only that object to
 `~/.claude/token-pet/limits.json`; no prompts, paths or session ids, no network.
+The status line only reports successful responses, so it stops at 99% when a limit runs out; the
+app also reads the refusal Claude Code writes to its own session log (`usage_limit_reached`, with
+the window and reset time) to show 100% and let Grandpa rest.
 
 **Copy snippet** in the guide (or Settings › How it works) copies the bridge into
 `~/.claude/token-pet/` and this onto the clipboard. Paste it into the top-level object of

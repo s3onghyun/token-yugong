@@ -127,7 +127,11 @@ extension YugongArt {
             }
             c.setFillColor(NSColor(srgbRed: 1, green: 0.96, blue: 0.8, alpha: 1).cgColor)
             let mx = floor(W * 0.38)
-            for (x, y, w) in [(2, 0, 2), (1, 1, 2), (0, 2, 2), (0, 3, 2), (0, 4, 2), (1, 5, 2), (2, 6, 2)] as [(CGFloat, CGFloat, CGFloat)] {
+            // a crescent; the full moon while the weekly limit is used up (a long rest)
+            let moon: [(CGFloat, CGFloat, CGFloat)] = info.longRest && info.cutscene == nil
+                ? [(2, 0, 3), (1, 1, 5), (0, 2, 7), (0, 3, 7), (0, 4, 7), (1, 5, 5), (2, 6, 3)]
+                : [(2, 0, 2), (1, 1, 2), (0, 2, 2), (0, 3, 2), (0, 4, 2), (1, 5, 2), (2, 6, 2)]
+            for (x, y, w) in moon {
                 c.fill(CGRect(x: mx + x, y: 3 + y, width: w, height: 1))
             }
         } else {

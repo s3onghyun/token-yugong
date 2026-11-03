@@ -75,7 +75,8 @@ import Testing
         #expect(BarText.percent.text(s, cutscene: true, now: now) == "✨")             // a mountain is done
         s.known = true; s.five = Meter(pct: 100, resetsAt: now + 3600); s.resting = true; s.wakeAt = now + 3600
         #expect(BarText.timeLeft.text(s, cutscene: false, now: now) == "1h 0m")       // resting: when he starts again
-        #expect(BarText.percent.text(s, cutscene: false, now: now) == Fmt.clock(now + 3600, now: now))
+        #expect(BarText.percent.text(s, cutscene: false, now: now) == "1h 0m")        // the countdown, not a frozen 99%
+        #expect(BarText.resetClock.text(s, cutscene: false, now: now) == Fmt.clock(now + 3600, now: now))
         s.wakeAt = nil
         #expect(BarText.percent.text(s, cutscene: false, now: now) == "?")
     }

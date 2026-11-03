@@ -34,8 +34,8 @@ if args.contains("--scan-report") {
     func t(_ d: Date?) -> String { d.map { Fmt.clock($0) } ?? "-" }
     print(String(format: "scanned %.1f MB in %.2fs; %d usage events", Double(sc.bytesRead) / 1e6, sc.lastScanSeconds, sc.events.count))
     print("claude: " + (s.known ? "official, captured \(t(s.captured))" : "don't know (no usable status-line reading)"))
-    if let f = s.five { print("5h: \(Int(f.pct.rounded()))% resets \(t(f.resetsAt))") }
-    if let w = s.week { print("week: \(Int(w.pct.rounded()))% resets \(t(w.resetsAt))") }
+    if let f = s.five { print("5h: \(Fmt.pct(f.pct)) resets \(t(f.resetsAt))") }
+    if let w = s.week { print("week: \(Fmt.pct(w.pct)) resets \(t(w.resetsAt))") }
     if let d = s.daily { print(String(format: "no 5-hour window: today's share %.0f%%, day %@ - %@", d.fill * 100, t(d.dayStart), t(d.dayEnd))) }
     if s.resting { print("resting until \(s.wakeAt.map { Fmt.clock($0) } ?? "?")") }
     if let p = s.projected { print(String(format: "projected by reset: %.0f%%", p)) }
@@ -214,6 +214,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         model.openWindow = { [weak self] in self?.popover.performClose(nil); self?.showWindow() }
         model.onAward = { a in Notify.post(id: "award-\(a)", title: L.t("A new title from the magpie", "까치가 새 칭호를 물어 왔어요", "カササギが新しい称号を運んできました", "喜鹊带来了新称号"),
                                            body: a.announcement.replacingOccurrences(of: "\n", with: " ")) }
+        model.onLimit = { s in
+            guard s.resting else {
+                return Notify.post(id: "limit-reset", title: L.t("Grandpa picked up his shovel again", "할아버지가 다시 삽을 들었어요", "おじいさんがまたシャベルを手に取りました", "爷爷又拿起了铁锹"),
+                                   body: L.t("The limit has reset. Back to digging!", "한도가 풀렸어요. 다시 파 볼까요!", "リミットが戻りました。また掘りましょう！", "额度已重置，接着挖吧！"))
+            }
+            let week = (s.week?.pct ?? 0) >= 100
+            let when = s.wakeAt.map { Fmt.clock($0) } ?? "?"
+            Notify.post(id: "limit-hit", title: L.t("Grandpa sat down to rest", "할아버지가 쉬러 앉았어요", "おじいさんが腰を下ろして休みます", "爷爷坐下来歇歇了"),
+                        body: week ? L.t("The weekly limit is used up. Back to digging at \(when).", "주간 한도를 다 썼어요. \(when)에 다시 퍼요.",
+                                         "週間リミットを使い切りました。\(when)にまた掘ります。", "本周额度用完了。\(when) 再接着挖。")
+                                   : L.t("The 5-hour limit is used up. Back to digging at \(when).", "5시간 한도를 다 썼어요. \(when)에 다시 퍼요.",
+                                         "5時間リミットを使い切りました。\(when)にまた掘ります。", "5 小时额度用完了。\(when) 再接着挖。"))
+        }
         Notify.setUp(self)
 
         model.captureAllowedForDemo = args.contains("--allow-capture")
