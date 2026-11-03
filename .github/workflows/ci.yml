@@ -10,8 +10,14 @@ permissions:
 jobs:
   test:
     runs-on: macos-14
+    env:
+      # macos-14 includes this full Xcode; do not mix its newer Testing.framework
+      # with the Command Line Tools compiler selected by the image by default.
+      DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Show selected Xcode
+        run: xcodebuild -version
       - name: Build release executable
         run: swift build -c release --product TokenPet
       - name: Run unit tests
