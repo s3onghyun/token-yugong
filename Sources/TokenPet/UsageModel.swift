@@ -129,6 +129,8 @@ final class UsageModel: ObservableObject {
     @Published private(set) var awards: [Award] = []
     /// Set by the app: a notification per award.
     var onAward: ((Award) -> Void)?
+    /// Set by the app: Grandpa's limit was just used up (true) or has reset (false).
+    var onLimit: ((Snapshot) -> Void)?
     /// Demo override for every token carried (`--lifetime <tokens>`).
     var demoLifetime: Double?
     var lifetime: Double { demoLifetime ?? mountain.lifetime }
@@ -196,7 +198,7 @@ final class UsageModel: ObservableObject {
     /// The latest reading for an AI; nil = nothing to read (Gemini, DeepSeek spend, no key or budget yet).
     func reading(_ p: Provider) -> Reading? {
         switch p {
-        case .claude: return claude
+        case .claude: return Limits.apply(Array(scanner.hits.values), to: claude, lastAnswer: scanner.events.last?.time, now: Date())
         case .codex: return codexReader.reading
         case .gemini, .deepseek: return nil
         case .openai: return budgets.state[.openai].flatMap { st in st.spent.flatMap { Budget.reading(spent: $0, budget: openAIBudget, at: st.at) } }
@@ -300,6 +302,11 @@ final class UsageModel: ObservableObject {
             awards += new
             new.forEach { onAward?($0) }
         }
+        // one notification when the limit is used up and one when it resets, even across a restart
+        if snap.known, snap.resting != Prefs.store.bool(forKey: "limit.resting") {
+            Prefs.store.set(snap.resting, forKey: "limit.resting")
+            if notifyLimits { onLimit?(snap) }
+        }
         if let p = Visitors.plan(family, snap) {
             if let old = Prefs.store.string(forKey: "visitors.plan"), old != p { changedAt = now }
             Prefs.store.set(p, forKey: "visitors.plan")
@@ -395,6 +402,11 @@ final class UsageModel: ObservableObject {
     /// Hide the title rewards in the background (sky, horizon, ground); Grandpa's gear stays. Off by default.
     @Published var hideProps: Bool = Prefs.store.bool(forKey: "rewards.hideProps") {
         didSet { Prefs.store.set(hideProps, forKey: "rewards.hideProps") }
+    }
+
+    /// A notification when Grandpa's limit is used up and when it resets. On by default.
+    @Published var notifyLimits: Bool = Prefs.store.object(forKey: "limit.notify") as? Bool ?? true {
+        didSet { Prefs.store.set(notifyLimits, forKey: "limit.notify") }
     }
 
     /// Open the Yugong window when the app starts (with "Open at login": at login). Off by default.

@@ -11,6 +11,7 @@ app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup
 | Input | Where it comes from | Used for |
 |---|---|---|
 | Claude `five_hour`, `seven_day`: used %, reset time | Claude Code's status line JSON, saved by `bridge/statusline-bridge.sh` with its capture time | the meter of whoever watches Claude |
+| Claude limit hits: `five_hour` or `seven_day`, reset time | the rejected request Claude Code logs in `~/.claude/projects/**/*.jsonl` (`apiError: usage_limit_reached`, `apiErrorParams.rate_limit_info`) | that window is at 100% (see "Limit reached") |
 | Codex 5-hour (300 min) and weekly (10080 min) windows | newest `rate_limits` line in `~/.codex/sessions/**/*.jsonl` | the meter of whoever watches Codex |
 | Gemini: nothing | Gemini CLI saves no limits or reset times on the Mac | its meter is always "don't know" |
 | OpenAI API: this month's spend in USD | `GET api.openai.com/v1/organization/costs` from the first day of the month (UTC), with an Admin key from the Keychain, every 15 minutes | its meter: spend ÷ the monthly budget typed in Settings |
@@ -40,6 +41,27 @@ are the 5-hour and weekly ones, or for a billed API the month's budget.
 
 The carrier is the limit that makes him rest: the 5-hour %, else the weekly %, else the month's
 budget %. The menu bar shows the same %.
+
+### Limit reached
+
+Claude Code's status line reports the last **successful** response, and the request that would
+reach 100% is the one that is refused, so the status line stops at 99% (or, as seen on this Mac,
+drops the 5-hour window). The refusal itself is in the session log, with the window and its reset
+time. The newest one per window (5-hour, weekly) sets that window to **100% until its reset**, so
+row 3 applies and he rests, unless:
+
+| When | Then |
+|---|---|
+| Claude answered after the refusal (another account, extra usage) | The hit is over; the reading stands |
+| The reading already shows a later window of the same kind (reset more than a minute after the hit's) | The reading stands |
+| The hit's reset was more than 5 minutes ago | Forgotten (row 2 already made the window new and row 5 gave the morning) |
+
+Percentages are shown as `100%` only when a window is really full: 99.5 reads `99%`.
+While he rests the popover title counts down ("쉬는 중 · 2시간 3분 뒤 다시 퍼요"), the menu bar shows
+the time left (`2h 3m`; the clock in the *reset time* style), and the source line says how old the
+reading is (`16:57 · 6분 전`). One notification when Grandpa's limit is used up (with the reset time)
+and one when it resets; the last state is saved, so a restart does not repeat them (Settings, on by
+default). A used-up **weekly** limit is a long rest: a full moon instead of the crescent.
 
 ## Family
 
@@ -179,7 +201,7 @@ The item shows Grandpa and a number beside him. The number is the **headline** w
 | None | nothing |
 
 Before the style: `✨` while a mountain's cutscene is due, `?` without data, and while he rests
-the time he starts again (as time left in the *time to reset* style). The time styles show the
+the time left until he starts again (as the clock time in the *reset time* style). The time styles show the
 percent when the reset time is unknown. **Grandpa in the menu bar** can be turned off; with no
 number as well, Grandpa stays, so the item is never empty. The text is redrawn only when it
 changes. The popover header shows the headline as `24% · 04:40`.
@@ -224,6 +246,7 @@ window is closed, minimized or fully covered (occlusion), so its 8 fps timeline 
 | Mini window | When the menu bar is full |
 | Open at login | **Off.** Only the user can turn it on (SMAppService, app bundle only); the app never registers itself |
 | Hide from screen sharing | On |
+| Notify when the limit is used up and when it resets | On |
 
 ## Claude Code setup
 

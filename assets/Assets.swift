@@ -50,6 +50,8 @@ public struct SceneInfo {
     public var finale = false
     /// A title just earned (1...10): its reward glints during the celebration.
     public var sparkle: Int? = nil
+    /// The weekly limit is used up: a long rest under a full moon.
+    public var longRest = false
 
     public init(state: PetState, carrier: Double, mountainLeft: Double, grandson: Double?, night: Bool, cutscene: Double? = nil) {
         self.state = state; self.carrier = carrier; self.mountainLeft = mountainLeft

@@ -61,6 +61,44 @@ enum Limits {
         return Meter(pct: min(p, 100), resetsAt: (w["resets_at"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) })
     }
 
+    /// Claude Code logs the rejected request when a limit is used up (`apiError: usage_limit_reached`).
+    /// The status line never shows it: its numbers come from the last *successful* response, so they stop at 99.
+    struct Hit: Equatable {
+        var time: Date
+        var week: Bool          // seven_day; else five_hour
+        var resetsAt: Date
+    }
+
+    /// One Claude Code log line, decoded. nil unless it is a 5-hour or weekly limit rejection.
+    static func hit(_ o: [String: Any]) -> Hit? {
+        guard o["apiError"] as? String == "usage_limit_reached",
+              let info = (o["apiErrorParams"] as? [String: Any])?["rate_limit_info"] as? [String: Any],
+              let reset = (info["resetsAt"] as? NSNumber)?.doubleValue,
+              let time = (o["timestamp"] as? String).flatMap(iso.date(from:)) else { return nil }
+        switch info["rateLimitType"] as? String {
+        case "five_hour": return Hit(time: time, week: false, resetsAt: Date(timeIntervalSince1970: reset))
+        case "seven_day": return Hit(time: time, week: true, resetsAt: Date(timeIntervalSince1970: reset))
+        default: return nil
+        }
+    }
+
+    /// The status-line reading with the logged limit hits on top: a hit fills its window to 100% until
+    /// it resets, unless Claude answered again after it (another account, extra usage) or the reading
+    /// already shows a later window. Hits that reset more than `Logic.morningFor` ago are over.
+    static func apply(_ hits: [Hit], to reading: Reading?, lastAnswer: Date?, now: Date) -> Reading? {
+        var r = reading
+        for h in hits where h.resetsAt > now.addingTimeInterval(-Logic.morningFor) && (lastAnswer.map { $0 <= h.time } ?? true) {
+            var x = r ?? Reading(five: nil, week: nil, at: h.time)
+            let old = h.week ? x.week : x.five
+            if let o = old?.resetsAt, o > h.resetsAt.addingTimeInterval(60) { continue }   // a newer window
+            let full = Meter(pct: 100, resetsAt: h.resetsAt)
+            if h.week { x.week = full } else { x.five = full }
+            x.at = max(x.at, h.time)
+            r = x
+        }
+        return r
+    }
+
     static let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
     }()

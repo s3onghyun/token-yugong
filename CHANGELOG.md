@@ -9,12 +9,23 @@
 - The scene's shovel blade is drawn without its inner outline, so its colour (wood, iron, gold) reads.
 
 ### Fixed
+- Grandpa never rested when a Claude limit was used up: the meter stayed at 99% and he kept digging.
+  Claude Code's status line reports the last successful response, and the request that would reach
+  100% is refused, so 100% never arrived (sometimes the 5-hour window vanished instead). The app now
+  also reads the refusal Claude Code logs (`usage_limit_reached`, with the window and its reset time):
+  the meter shows 100%, he sits down to rest, Zhisou comes to gloat, and the menu bar counts down to
+  the reset. If Claude answers again (another account, extra usage) the refusal no longer counts.
+  A percentage rounds up to 100% only when the window is really full (99.5 reads 99%).
 - Clicking Grandpa in the menu bar opened the popover on another display (or under the mini window)
   instead of under the icon you clicked. macOS 26 draws menu-bar items as Control Center copies on
   every display, while the app's own item window stays on one display or parked off-screen, and the
   popover was anchored to that window. A click in a menu bar now opens it right there.
 
 ### Added
+- When Grandpa's limit is used up: one notification with the reset time, and one when it resets
+  (Settings › *Notify when the limit is used up and when it resets*, on by default). The popover counts
+  down ("쉬는 중 · 2시간 3분 뒤 다시 퍼요"), the source line says how old the reading is, and a used-up
+  weekly limit rests under a full moon.
 - Title rewards: every title now adds one thing to the scene, automatically, and it stays. Before the
   first title the shovel is wooden; then the iron blade (#1), a teal tassel on the carrier (#2), a
   pickaxe and broken stones (#3), two baskets (#4), the Bohai Sea with an islet of dumped earth (#5),
