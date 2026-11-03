@@ -17,6 +17,13 @@
 - Tests: every `L.t` call in the sources must carry a non-empty translation in the right script, with the
   same values as the English; Korean-only strings outside `L.t` fail; version order, the daily throttle
   and the release parsing are covered.
+- Titles: ten ranks earned by every token carried (all mountains together), from 삽 든 손주
+  (100k, the first session) to 산을 옮긴 우공 (3B, months), shown with the progress to the next in
+  the popover; five achievements (full carrier, 7-day streak, a week kept under the limit, two AIs
+  on one day, up for a dawn reset). A promotion brings pixel confetti and the magpie's announcement
+  and one notification. The titles window (click the title row) lists earned and locked ones and
+  saves a title card as PNG: the pixel scene and totals, no personal data, nothing sent.
+  Rules and the curve in LOGIC.md › Titles. Demo flags: `--lifetime`, `--award`, `--titles`.
 
 ## 0.2.0 (2026-11-03)
 

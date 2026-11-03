@@ -101,6 +101,42 @@ weekly limit itself runs out (row 3), and the popover says when it resets. It ne
 | Tokens reach the mountain's size (1 billion) | The cutscene is due (saved, survives a restart): the menu bar shows ✨, one notification per mountain, and the popover plays the cutscene once from the start when opened: Kua'e's two sons, sent by the Heavenly Emperor, rise out of the earth holding the mountain up and carry it off to the left (4.5 s) |
 | "On to the next mountain" | The next mountain starts with the tokens beyond the size (Taihang, then Wangwu, then numbered) |
 
+## Titles
+
+Every token carried, all mountains together (`mountain index × size + tokens`, no new counter), earns a
+rank. Roughly ×3 at first, then by whole mountains, so the first title comes in the first session and
+the top one after months. The days column assumes ~10M counted tokens a day (a daily Claude Code user;
+cache writes count; this Mac measured ~12M a day over 8 days of logs).
+
+| # | Title (한국어) | Tokens in all | ~Days at 10M/day |
+|---|---|---|---|
+| 1 | Grandson with a Shovel (삽 든 손주) | 100k | the first hour |
+| 2 | Carrier Bearer (지게꾼) | 1M | the first afternoon |
+| 3 | Stone Breaker (돌 깨는 일꾼) | 10M | 1 |
+| 4 | Basket Master (삼태기 장인) | 40M | 4 |
+| 5 | Hauler to the Bohai Sea (발해까지 나르는 자) | 100M | 10 |
+| 6 | Carver of Mount Taihang (태행산을 깎는 자) | 300M | 30 |
+| 7 | Mover of Mount Wangwu (왕옥산을 옮기는 자) | 1B: Taihang is gone | 100 |
+| 8 | Heir of Yugong (우공의 후계자) | 1.5B | 150 |
+| 9 | One Who Moved Heaven (하늘도 감동한 자) | 2B: both mountains | 200 |
+| 10 | Yugong Who Moved the Mountains (산을 옮긴 우공) | 3B | 300 |
+
+| Achievement | Earned when |
+|---|---|
+| Full Carrier (지게 가득) | Grandpa's AI reports a window at 100% (he rests) |
+| Seven Days of Digging (이레 연속 삽질) | Tokens from any local CLI on 7 local days in a row (the last 30 days are kept) |
+| Kept to the Week (주간 한도 지킴이) | A weekly window ends, the next one starts (a start more than a day later; reset times wobble by seconds), and the one watched never reached 100% |
+| Two Shovels (두 삽으로) | Two of Claude Code, Codex and Gemini CLI have tokens on the same local day |
+| Up for the Dawn Reset (새벽 리셋을 지켜본 자) | The "morning" state (a reset in the last 5 minutes) is seen before 06:00 local time |
+
+| When | Then |
+|---|---|
+| A rank above the last one celebrated | One celebration for the highest reached (the first run with a full log gets one, not six): confetti and the magpie in the popover until "Thanks, magpie", and one notification |
+| A new achievement | The same, once |
+| Limits unknown | No limit-based achievement is claimed |
+| Restart | Ranks celebrated, achievements (with the time earned), active days and the watched week are saved in `titles.*` |
+| Title card | The pixel scene, the title, tokens in all, mountains moved, achievements; no name, account or date. Saved as PNG only where you choose; nothing is sent |
+
 ## Menu bar
 
 The item shows Grandpa and a number beside him. The number is the **headline** window (the

@@ -61,6 +61,8 @@ struct PopoverView: View {
                 }
             }
             mountainRow
+            Button { model.openTitles?() } label: { TitleProgress(lifetime: model.lifetime).contentShape(Rectangle()) }
+                .buttonStyle(.plain).help(L.t("All titles and achievements…", "칭호와 업적 모두 보기…", "称号と実績をすべて見る…", "查看全部称号与成就…"))
             let main = model.family.roles[.grandpa] ?? .claude
             Text("\(main.name) · \(Role.grandpa.name) \(Role.grandpa.meter)").font(.caption.weight(.bold)).foregroundColor(.secondary)
             if !s.known {
@@ -244,7 +246,8 @@ struct PopoverView: View {
 
     @ViewBuilder private func scene(_ s: Snapshot) -> some View {
         let night = !model.cutsceneDue && (s.state == .resting || model.night)   // the cutscene sky is always golden
-        let visit = model.visitor.map(Visitors.lines)
+        let award = model.cutsceneDue ? nil : model.awards.first   // the cutscene comes first
+        let visit = award == nil ? model.visitor.map(Visitors.lines) : nil
         ZStack(alignment: .topTrailing) {
             Group {
                 if let t = fixedT {
@@ -256,6 +259,7 @@ struct PopoverView: View {
                     }
                 }
             }
+            if let award { celebration(award, night: night) }
             if let visit {
                 // the visitor's bubble over her (his) head at the left; Grandpa answers in his
                 bubble(visit.0, size: 11, night: night)
@@ -263,9 +267,11 @@ struct PopoverView: View {
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            bubble(model.cutsceneDue ? cutsceneLine : visit?.1 ?? speech(s), size: model.cutsceneDue || visit != nil ? 12 : 13, night: night)
-                .frame(maxWidth: model.cutsceneDue ? 250 : visit != nil ? 158 : 150, alignment: .trailing)   // the cutscene line stays above his head
-                .padding(10)
+            if award == nil {   // during a celebration the magpie has the floor
+                bubble(model.cutsceneDue ? cutsceneLine : visit?.1 ?? speech(s), size: model.cutsceneDue || visit != nil ? 12 : 13, night: night)
+                    .frame(maxWidth: model.cutsceneDue ? 250 : visit != nil ? 158 : 150, alignment: .trailing)   // the cutscene line stays above his head
+                    .padding(10)
+            }
             if model.cutsceneDue {
                 Button { model.finishCutscene() } label: {
                     Text(L.t("On to the next mountain", "다음 산으로", "次の山へ", "去下一座山"))
@@ -280,6 +286,37 @@ struct PopoverView: View {
         }
         .frame(width: Self.sceneSize.width, height: Self.sceneSize.height)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// A new title: confetti over the scene, the magpie at the top left with the news, and a button to say thanks.
+    @ViewBuilder private func celebration(_ a: Award, night: Bool) -> some View {
+        Group {
+            if let t = fixedT {
+                Image(nsImage: TokenPetAssets.confetti(t: t, size: Self.sceneSize)).interpolation(.none)
+            } else {
+                TimelineView(.animation(minimumInterval: 1.0 / 8, paused: Motion.reduce)) { ctx in
+                    Image(nsImage: TokenPetAssets.confetti(t: ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 600),
+                                                           size: Self.sceneSize)).interpolation(.none)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        HStack(alignment: .top, spacing: 4) {
+            Image(nsImage: TokenPetAssets.magpie(size: 28, t: fixedT ?? 0)).interpolation(.none)
+            bubble(a.announcement, size: 11, night: night)
+        }
+        .frame(maxWidth: 230, alignment: .leading)
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        Button { model.dismissAward() } label: {
+            Text(L.t("Thanks, magpie", "고마워, 까치야", "ありがとう、カササギ", "谢谢你，喜鹊"))
+                .font(.caption.weight(.bold)).foregroundColor(.white)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(TitleCard.gold))
+        }
+        .buttonStyle(.plain)
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
 
     private func bubble(_ text: String, size: CGFloat, night: Bool) -> some View {
