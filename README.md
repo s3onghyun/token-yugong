@@ -119,9 +119,24 @@ The status line only reports successful responses, so it stops at 99% when a lim
 app also reads the refusal Claude Code writes to its own session log (`usage_limit_reached`, with
 the window and reset time) to show 100% and let Grandpa rest.
 
-**Copy snippet** in the guide (or Settings › How it works) copies the bridge into
-`~/.claude/token-pet/` and this onto the clipboard. Paste it into the top-level object of
-`~/.claude/settings.json` yourself; the app never edits that file:
+**One click:** press **Connect** in the guide (or Settings › How it works). The app shows the
+`statusLine` before and after, and only writes when you say so. **One command** (also for agents):
+
+```sh
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup            # add --dry-run to only look
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # put it back
+```
+
+Either way it copies the bridge into `~/.claude/token-pet/` and changes only the `statusLine` key of
+`~/.claude/settings.json`: every other byte stays, a backup goes to
+`~/.claude/token-pet/settings.json.<time>.bak`, running it again changes nothing, and a symlinked
+file stays a symlink. A status line you already have is kept: it becomes
+`sh ~/.claude/token-pet/statusline-bridge.sh --chain '<your command>'`, so it gets the same input and
+what it prints is still what you see; `--undo` gives your command back. No Claude Code on this Mac
+(no `~/.claude`)? It says so and writes nothing.
+
+Prefer to do it by hand? **Copy snippet** copies the bridge and this onto the clipboard, for the
+top-level object of `~/.claude/settings.json`:
 
 ```json
 "statusLine": {
@@ -130,9 +145,13 @@ the window and reset time) to show 100% and let Grandpa rest.
 }
 ```
 
-Already have a status line? Keep it and make its first line
-`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null`,
-then read the JSON from `$input`.
+(by hand, with a status line already there: `"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<your command>'"`).
+
+**Command line.** `TokenPet status [--json]` says whether Claude Code is connected and prints the last
+limits it reported; `TokenPet setup [--undo] [--dry-run] [--json]` is the setup above. With `--json`
+the output is one JSON object with stable keys (`result`, `before`, `after`, `backup`; `claude.connection`,
+`claude.reading.five_hour.used_percentage`, ...); errors go to stderr in plain words, exit 1, and as
+`{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`.
 
 The bridge uses `jq` when present (built into macOS 15+) and `plutil` otherwise.
 Codex needs no setup: its own logs (`~/.codex/sessions`) carry its limits. Gemini CLI needs none
@@ -212,7 +231,8 @@ Token Yugong reads files on your Mac and keeps everything there. No account, no 
   Mac; `defaults delete TokenPet` erases them. What the app read from the bridge (hashed account,
   percentages, reset times) is logged to `~/Library/Application Support/TokenPet/claude-readings.log`
   (at most two files of 512 KB), so a wrong account can be traced; delete it any time.
-- The app never edits `~/.claude/settings.json`; you paste the status-line snippet yourself.
+- The app edits `~/.claude/settings.json` only when you press **Connect** (after showing the change) or run
+  `TokenPet setup`, and then only its `statusLine`, with a backup; `TokenPet setup --undo` reverses it.
 
 ## How the numbers become a pet
 
@@ -229,7 +249,7 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 `--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,
 `--settings`, `--guide`, `--pretend-hidden` (try the mini-window fallback),
 `--render <dir>` (PNG stills), `--icon-set <dir>`, `--scan-report` (prints what it read),
-`--anim-stats`. `TOKENPET_PREFS=<domain>` keeps a test run out of your settings.
+`--anim-stats`; `status` and `setup` (Command line, above). `HOME=<dir>` runs it all against a throwaway home. `TOKENPET_PREFS=<domain>` keeps a test run out of your settings.
 
 Character sheets: `swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`.
 `--social` draws `docs/social-preview.png`; `--hero` draws the frames of `docs/hero.gif`, then:

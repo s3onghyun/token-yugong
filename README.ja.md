@@ -118,9 +118,23 @@ Claude Code は、ステータスラインのコマンドに公式のリミッ�
 Claude Code が自分のセッションログに書く拒否（`usage_limit_reached`、ウィンドウとリセット時刻つき）も読み取り、
 100% を表示しておじいさんを休ませます。
 
-ガイド（または設定 › *使い方と Claude Code の接続…*）の **スニペットをコピー** は、ブリッジを
-`~/.claude/token-pet/` にコピーし、次の内容をクリップボードに入れます。これを `~/.claude/settings.json` の
-一番外側のオブジェクトに自分で貼り付けてください。アプリがこのファイルを書き換えることはありません：
+**ワンクリック：** ガイド（または設定 › *使い方と Claude Code の接続…*）で **接続** を押します。変更前と変更後の
+`statusLine` を見せ、了承したときだけ書き込みます。**コマンド 1 行**（エージェントもこれを使います）：
+
+```sh
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup            # --dry-run を付けると見るだけ
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # 元に戻す
+```
+
+どちらもブリッジを `~/.claude/token-pet/` にコピーし、`~/.claude/settings.json` の `statusLine` キーだけを
+変えます。ほかのバイトはそのまま、バックアップは `~/.claude/token-pet/settings.json.<時刻>.bak`、もう一度
+実行しても何も変わらず、シンボリックリンクはリンクのまま残ります。すでにあるステータスラインは残します：
+`sh ~/.claude/token-pet/statusline-bridge.sh --chain '<元のコマンド>'` になり、同じ入力を受け取って、表示は
+元の出力のままです。`--undo` で元のコマンドに戻ります。この Mac に Claude Code がない（`~/.claude` がない）
+ときは、そう伝えて何も書きません。
+
+手で設定したい場合は **スニペットをコピー** で、ブリッジと次の内容をクリップボードに入れ、
+`~/.claude/settings.json` の一番外側のオブジェクトに貼り付けてください：
 
 ```json
 "statusLine": {
@@ -129,9 +143,13 @@ Claude Code が自分のセッションログに書く拒否（`usage_limit_reac
 }
 ```
 
-すでにステータスラインを使っている場合は、それを残したまま 1 行目を
-`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null` にし、
-JSON は `$input` から読んでください。
+（手で設定し、ステータスラインがすでにある場合：`"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<元のコマンド>'"`）
+
+**コマンドライン。** `TokenPet status [--json]` は Claude Code との接続と最後に届いたリミットを表示し、
+`TokenPet setup [--undo] [--dry-run] [--json]` は上の接続です。`--json` ではキーが固定された JSON オブジェクトを
+1 つ出力します（`result`、`before`、`after`、`backup`、`claude.connection`、`claude.reading.five_hour.used_percentage` など）。
+エラーは stderr にわかりやすい言葉で出し、終了コード 1、
+`{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}` を返します。
 
 ブリッジは `jq` があればそれを使い（macOS 15 以降は標準搭載）、なければ `plutil` を使います。
 Codex は設定不要です。Codex 自身のログ（`~/.codex/sessions`）にリミットが記録されています。Gemini CLI も
@@ -207,7 +225,8 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
   `defaults delete TokenPet` で消去できます。アプリがブリッジから読んだ値（アカウントのハッシュ、%、リセット時刻）は
   `~/Library/Application Support/TokenPet/claude-readings.log`（512 KB のファイル最大 2 つ）に記録され、
   アカウントの取り違えを後から追えます。いつ削除しても構いません。
-- アプリは `~/.claude/settings.json` を書き換えません。ステータスラインのスニペットは自分で貼り付けてください。
+- アプリが `~/.claude/settings.json` を書き換えるのは、**接続** を押したとき（変更内容を見せたあと）か
+  `TokenPet setup` を実行したときだけで、そのときも `statusLine` だけをバックアップ付きで変えます。`TokenPet setup --undo` で戻せます。
 
 ## 数字がペットになるまで
 
@@ -223,7 +242,7 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
 （`pseudo`：すべての文字列を約 40% 長くしてアクセント記号を付け、`--render` で文字の切れを見つける）、
 `--stage`（録画用に、メニューバー項目とポップオーバーを1つのウィンドウに）、`--allow-capture`、`--open`、
 `--settings`、`--guide`、`--pretend-hidden`（ミニウィンドウへの切り替えを試す）、
-`--render <dir>`（PNG 静止画）、`--icon-set <dir>`、`--scan-report`（読み取った内容を表示）、
+`--render <dir>`（PNG 静止画）、`--icon-set <dir>`、`--scan-report`（読み取った内容を表示）、`status`・`setup`（上のコマンドライン）、
 `--anim-stats`。`TOKENPET_PREFS=<domain>` を指定すると、テスト実行が自分の設定に影響しません。
 
 キャラクターシート：`swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`。

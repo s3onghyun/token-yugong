@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+- One-click and one-command Claude Code setup. **Connect** in the guide shows the `statusLine`
+  before and after and writes it into `~/.claude/settings.json` only when you agree;
+  `TokenPet setup` (in `TokenYugong.app/Contents/MacOS/`) does the same from a terminal or an agent,
+  `--dry-run` only shows it, `--undo` (or **Undo** in the guide) puts it back. Only the `statusLine`
+  member changes, every other byte of the file stays, a backup goes next to `limits.json`, running it
+  twice changes nothing, and a symlinked settings file stays a link. A status line you already have is
+  kept: the bridge's new `--chain '<command>'` passes it the same input and shows its output. Without
+  Claude Code (no `~/.claude`) it says so and writes nothing.
+- A command line for agents: `TokenPet status --json` (connected or not, the last limits) and
+  `TokenPet setup --json`, with stable keys, plain-language errors on stderr and exit code 1.
+
 ### Changed
 - The popover is compact again, close to the first releases (about 510 points tall instead of 650 with
   the 5-hour and weekly meters and one more AI): the scene, the state and headline, the mountain,

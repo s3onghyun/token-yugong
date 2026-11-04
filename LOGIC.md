@@ -281,7 +281,17 @@ window is closed, minimized or fully covered (occlusion), so its 8 fps timeline 
 
 ## Claude Code setup
 
-The app never edits `~/.claude/settings.json`. "Copy snippet" copies the bridge script into the
+"Connect" (the guide) and `TokenPet setup` write the `statusLine` into `~/.claude/settings.json`
+(ClaudeConnect): only that member's text changes, inserted before the first member with the file's own
+spacing, so `setup --undo` cuts it back out byte for byte. The new file must parse and every other
+top-level key must be equal, or nothing is written. The old file goes to `settings.json.<time>.bak`
+next to `limits.json`; a symlink is written through; the permissions stay. An existing command `X`
+becomes `<bridge> --chain 'X'` (the bridge pipes its input to `sh -c X` and shows its output and exit
+status); undo unquotes `X` back. A command that mentions the bridge in another form is the user's own
+chain: left alone. No `~/.claude` = Claude Code is not set up: an error, nothing made. A command `X`
+written with escapes such as `\/` comes back with the same value, not the same bytes.
+
+"Copy snippet" copies the bridge script into the
 folder that holds `limits.json` and puts this on the clipboard, to paste into the top-level object:
 `"statusLine": {"type": "command", "command": "sh ~/.claude/token-pet/statusline-bridge.sh"}`
 (another folder gets `TOKENPET_DIR='…' sh '…/statusline-bridge.sh'`, quoted). The bridge reads the
