@@ -240,7 +240,7 @@ struct PopoverView: View {
             familySettings
             Toggle(L.t("Notify when the limit is used up and when it resets",
                        "한도가 다 찼을 때와 다시 풀릴 때 알림",
-                       "リミットに達したときと戻ったときに通知",
+                       "リミットに達したときとリセットされたときに通知",
                        "额度用完和重置时通知"), isOn: $model.notifyLimits)
             let login = model.launchAtLogin
             Toggle(L.t("Open at login",
@@ -581,7 +581,7 @@ struct PopoverView: View {
         case .claude:
             return at != nil ? L.t("Limits from Claude Code's status line, as of \(when) (they can only have grown since).",
                                    "Claude Code 상태줄의 공식 한도 · \(when) 기준 (그 뒤로는 늘었을 수만 있어요)",
-                                   "Claude Code のステータスラインの公式リミット・\(when)時点（その後は増えたかもしれません）",
+                                   "Claude Code のステータスラインの公式リミット・\(when)時点（その後は増えることはあっても減りません）",
                                    "来自 Claude Code 状态栏的官方额度，截至 \(when)（之后只可能增加）。")
                              : L.t("No limits from Claude Code yet. Connect its status line (Settings › How it works); until then he says he doesn't know.",
                                    "아직 Claude Code 한도 정보가 없어요. 상태줄을 연결하면 보여요(설정 › 사용법과 Claude Code 연결). 그 전에는 모른다고 말해요.",
@@ -599,7 +599,7 @@ struct PopoverView: View {
         case .gemini:
             return L.t("Gemini CLI keeps no limits on this Mac, so he can't say how full it is. Its tokens still move the mountain.",
                        "Gemini CLI는 이 Mac에 한도를 남기지 않아서 얼마나 찼는지 몰라요. 토큰은 산 옮기기에 들어가요.",
-                       "Gemini CLI はこの Mac にリミットを残さないので、どれだけ詰まったかはわかりません。トークンは山を移すのに数えます。",
+                       "Gemini CLI はこの Mac にリミットを残さないので、どれだけ使ったかはわかりません。それでもトークンは山を動かします。",
                        "Gemini CLI 不在这台 Mac 上记录额度，所以不知道用了多少。它的 token 仍会用来搬山。")
         case .openai:
             if let pr = budget?.problem { return "OpenAI: \(pr.text)" }
@@ -623,7 +623,7 @@ struct PopoverView: View {
             if let b = budget?.balance {
                 return L.t("DeepSeek reports only the balance (\(b)), not what was spent, so he can't say how full it is.",
                            "DeepSeek은 잔액(\(b))만 알려 주고 쓴 돈은 알려 주지 않아서 얼마나 찼는지 몰라요.",
-                           "DeepSeek は残高（\(b)）だけを伝え、使った金額は教えてくれないので、どれだけ詰まったかはわかりません。",
+                           "DeepSeek は残高（\(b)）だけを伝え、使った金額は教えてくれないので、どれだけ使ったかはわかりません。",
                            "DeepSeek 只报告余额（\(b)），不报告花了多少，所以不知道用了多少。")
             }
             return L.t("DeepSeek reports only a balance, never the spend. Add a key to see the balance (Settings › Family).",

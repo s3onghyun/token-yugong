@@ -225,7 +225,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         model.onLimit = { s in
             guard s.resting else {
                 return Notify.post(id: "limit-reset", title: L.t("Grandpa picked up his shovel again", "할아버지가 다시 삽을 들었어요", "おじいさんがまたシャベルを手に取りました", "爷爷又拿起了铁锹"),
-                                   body: L.t("The limit has reset. Back to digging!", "한도가 풀렸어요. 다시 파 볼까요!", "リミットが戻りました。また掘りましょう！", "额度已重置，接着挖吧！"))
+                                   body: L.t("The limit has reset. Back to digging!", "한도가 풀렸어요. 다시 파 볼까요!", "リミットがリセットされました。また掘りましょう！", "额度已重置，接着挖吧！"))
             }
             let week = (s.week?.pct ?? 0) >= 100
             let when = s.wakeAt.map { Fmt.clock($0) } ?? "?"

@@ -7,9 +7,9 @@ extension Award {
     var announcement: String {
         switch self {
         case .rank(let r): return L.t("Caw caw! A new title:\n\(Titles.ladder[r].name())", "깍깍! 새 칭호예요\n\(Titles.ladder[r].name())",
-                                           "カチカチ! 新しい称号です\n\(Titles.ladder[r].name())", "喳喳! 新称号\n\(Titles.ladder[r].name())")
+                                           "カチカチ！新しい称号です\n\(Titles.ladder[r].name())", "喳喳！新称号\n\(Titles.ladder[r].name())")
         case .feat(let f): return L.t("Caw caw! An achievement:\n\(Titles.name(f))", "깍깍! 업적이에요\n\(Titles.name(f))",
-                                           "カチカチ! 実績です\n\(Titles.name(f))", "喳喳! 新成就\n\(Titles.name(f))")
+                                           "カチカチ！実績です\n\(Titles.name(f))", "喳喳！新成就\n\(Titles.name(f))")
         }
     }
 }
@@ -63,15 +63,15 @@ struct TitleCard: View {
                 .frame(width: PopoverView.sceneSize.width, height: PopoverView.sceneSize.height)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 6) {
-                Text(L.t("Token Yugong", "토큰 우공", "トークン愚公", "令牌愚公")).font(.caption.weight(.bold)).foregroundColor(.white.opacity(0.6))
+                Text(L.t("Token Yugong", "토큰 우공", "トークン愚公", "Token 愚公")).font(.caption.weight(.bold)).foregroundColor(.white.opacity(0.6))
                 Text(r >= 0 ? Titles.ladder[r].name() : L.t("No title yet", "아직 칭호 없음", "まだ称号なし", "还没有称号"))
                     .font(.system(size: 22, weight: .heavy, design: .rounded)).foregroundColor(Self.gold)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(L.t("Title \(r + 1) of \(Titles.ladder.count)", "칭호 \(Titles.ladder.count)단계 중 \(r + 1)단계",
-                         "称号 \(Titles.ladder.count)段階中 \(r + 1)段階", "称号 第\(r + 1)级 / 共\(Titles.ladder.count)级"))
+                         "称号 全\(Titles.ladder.count)段階中 \(r + 1)段階目", "称号 第\(r + 1)级 / 共\(Titles.ladder.count)级"))
                     .font(.caption.weight(.semibold)).foregroundColor(.white.opacity(0.8))
                 Spacer(minLength: 4)
-                stat(L.t("Tokens carried", "옮긴 토큰", "運んだトークン", "搬运的令牌"), Fmt.tokens(Int(lifetime)))
+                stat(L.t("Tokens carried", "옮긴 토큰", "運んだトークン", "搬运的 token"), Fmt.tokens(Int(lifetime)))
                 stat(L.t("Mountains moved", "옮긴 산", "移した山", "移走的山"), "\(mountainsMoved)")
                 stat(L.t("Achievements", "업적", "実績", "成就"), "\(feats) / \(Feat.allCases.count)")
             }
@@ -126,12 +126,12 @@ struct TitlesView: View {
                 .frame(width: TitleCard.size.width * 0.75, height: TitleCard.size.height * 0.75, alignment: .topLeading)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             HStack {
-                Button(L.t("Save the title card as PNG…", "칭호 카드를 PNG로 저장…", "称号カードをPNGで保存…", "将称号卡存为PNG…")) { saveCard() }
+                Button(L.t("Save the title card as PNG…", "칭호 카드를 PNG로 저장…", "称号カードを PNG で保存…", "将称号卡存为 PNG…")) { saveCard() }
                 if let saved { Text(saved).font(.caption).foregroundColor(.secondary) }
         }
             Divider()
             Text(L.t("Titles: every token carried, all mountains together", "칭호: 옮긴 토큰 모두 (산 전부 합쳐서)",
-                     "称号: 運んだトークンの合計(すべての山)", "称号: 搬运的令牌总数(所有山合计)"))
+                     "称号：運んだトークンの合計（すべての山）", "称号：搬运的 token 总数（所有山合计）"))
                 .font(.caption.weight(.bold)).foregroundColor(.secondary)
             Text(L.t("Each title adds something to Grandpa's scene, and it stays.", "칭호마다 할아버지 장면에 무언가 하나씩 생기고, 계속 남아요.",
                      "称号ごとに、おじいさんの場面に何かが一つ増えて、ずっと残ります。", "每个称号都会让爷爷的场景多一样东西，并一直保留。"))
@@ -172,6 +172,6 @@ struct TitlesView: View {
         guard p.runModal() == .OK, let url = p.url, let data = TitleCard.png(model) else { return }
         do { try data.write(to: url); saved = L.t("Saved.", "저장했어요.", "保存しました。", "已保存。") }
         catch { saved = L.t("Could not save: \(error.localizedDescription)", "저장하지 못했어요: \(error.localizedDescription)",
-                                 "保存できませんでした: \(error.localizedDescription)", "无法保存: \(error.localizedDescription)") }
+                                 "保存できませんでした：\(error.localizedDescription)", "无法保存：\(error.localizedDescription)") }
     }
 }
