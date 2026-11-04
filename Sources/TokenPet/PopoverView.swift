@@ -59,19 +59,36 @@ struct PopoverView: View {
     /// Off: the compact popover (scene, meters, pace, actions). On: title, sources, account, speed, capture. Remembered.
     @AppStorage("popover.more", store: Prefs.store) var showMore = args.contains("--more")
 
+    /// The Yugong window's ⋯ › Compact: only the scene and its headline. Remembered.
+    @AppStorage("sceneWindow.compact", store: Prefs.store) var compactWindow = false
+
     var body: some View {
-        let s = model.snap
-        VStack(alignment: .leading, spacing: 10) {
-            scene(s)
-            HStack(alignment: .firstTextBaseline) {
-                Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!", "山が動いていく！", "山在移动！")
-                     : model.finaleDue ? L.t("The mountains are moving!", "두 산이 옮겨져요!", "二つの山が動いていく！", "两座山在移动！") : stateTitle(s.state))
-                    .font(.system(.headline, design: .rounded))
-                Spacer()
-                if let d = BarText.detail(s, now: clockNow) {
-                    Text(d).font(.subheadline.monospacedDigit().weight(.semibold)).foregroundColor(.secondary)
-                }
+        if inWindow && compactWindow {
+            VStack(alignment: .leading, spacing: 10) { scene(model.snap); headline(model.snap) }
+                .padding(14)
+                .frame(width: 320)
+        } else {
+            full
+        }
+    }
+
+    private func headline(_ s: Snapshot) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!", "山が動いていく！", "山在移动！")
+                 : model.finaleDue ? L.t("The mountains are moving!", "두 산이 옮겨져요!", "二つの山が動いていく！", "两座山在移动！") : stateTitle(s.state))
+                .font(.system(.headline, design: .rounded))
+            Spacer()
+            if let d = BarText.detail(s, now: clockNow) {
+                Text(d).font(.subheadline.monospacedDigit().weight(.semibold)).foregroundColor(.secondary)
             }
+        }
+    }
+
+    private var full: some View {
+        let s = model.snap
+        return VStack(alignment: .leading, spacing: 10) {
+            scene(s)
+            headline(s)
             mountainRow
             let main = model.family.roles[.grandpa] ?? .claude
             Text("\(main.name) · \(Role.grandpa.name) \(Role.grandpa.meter)").font(.caption.weight(.bold)).foregroundColor(.secondary)

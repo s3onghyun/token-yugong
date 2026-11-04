@@ -20,6 +20,7 @@ his carrier fills with your 5-hour limit, he naps when it runs out, and the moun
 
 **Install** (macOS 13+, Apple silicon or Intel): download `TokenYugong-<version>-macos-universal.zip` from
 [Releases](https://github.com/s3onghyun/token-yugong/releases/latest), unzip, move `TokenYugong.app` to Applications.
+Or with Homebrew: `brew install --cask s3onghyun/tap/token-yugong`.
 It is not notarized yet, so the first launch needs one approval: see [First launch](#first-launch).
 Then [connect Claude Code](#connect-claude-code) (one snippet; Codex needs nothing).
 
@@ -69,6 +70,14 @@ All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
 Needs macOS 13 or later.
 
+### Homebrew
+
+```sh
+brew install --cask s3onghyun/tap/token-yugong
+```
+
+`brew upgrade --cask token-yugong` updates it. The first launch still needs one approval ([First launch](#first-launch)).
+
 ### Download the app
 
 1. Download `TokenYugong-<version>-macos-universal.zip` and its `.sha256` file from the latest
@@ -105,8 +114,9 @@ git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 
-The first launch shows a short guide. Its last page has a **Copy snippet** button for the
-Claude Code status line (below). Quit from the popover.
+The first launch shows a short guide (three pages, about 30 seconds, **Skip** any time): what Grandpa
+shows, **Connect** for the Claude Code status line (below), and where Settings are. Settings ›
+*How it works and Claude Code setup…* opens it again. Quit from the popover.
 
 Or run without a bundle: `swift run -c release TokenPet` (no notifications or open-at-login there).
 
@@ -176,7 +186,7 @@ button opens the same scene in a window of its own that stays on the desktop:
 
 Drag it anywhere (another display too, a vertical one included) and drag its corner to resize: the
 content scales and keeps its proportions. The ⋯ button in its title bar (or a right-click) picks
-small, medium or large, a normal window, *always on top* or *on the desktop* (under every app
+small, medium or large, *compact* (the scene and its headline only), a normal window, *always on top* or *on the desktop* (under every app
 window, on every Space), and the opacity. Esc or the close button hides it. Size, place, level
 and opacity are remembered; if its display is gone, it comes back on the main screen. Settings ›
 *Open the Yugong window when the app starts* (off by default) opens it at launch, and with *Open at

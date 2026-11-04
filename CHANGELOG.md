@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- Homebrew: `brew install --cask s3onghyun/tap/token-yugong` (from the
+  [s3onghyun/homebrew-tap](https://github.com/s3onghyun/homebrew-tap) tap, bumped to each new release).
+- *Compact* in the Yugong window's ⋯ menu (and right-click): only the scene and its headline, for a
+  small window on the desktop. Remembered; unticking it brings the meters and actions back.
 - One-click and one-command Claude Code setup. **Connect** in the guide shows the `statusLine`
   before and after and writes it into `~/.claude/settings.json` only when you agree;
   `TokenPet setup` (in `TokenYugong.app/Contents/MacOS/`) does the same from a terminal or an agent,
@@ -15,6 +19,10 @@
   `TokenPet setup --json`, with stable keys, plain-language errors on stderr and exit code 1.
 
 ### Changed
+- The first-run guide takes about 30 seconds: what Grandpa shows (the carrier, his pace, the mountain)
+  on one page, **Connect** for Claude Code, then where Settings and the Yugong window's ⋯ menu are.
+  **Skip** on every page; it still shows once by itself and Settings › *How it works and Claude Code
+  setup…* opens it again.
 - The popover is compact again, close to the first releases (about 510 points tall instead of 650 with
   the 5-hour and weekly meters and one more AI): the scene, the state and headline, the mountain,
   every meter and the pace, any update or account-change notice, and one row of actions. The ⌄
