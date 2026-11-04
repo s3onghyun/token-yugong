@@ -5,6 +5,7 @@
 # $TOKENPET_DIR/limits.json. No prompts, paths, session ids, or credentials are stored,
 # and nothing goes over the network. To tell Claude accounts apart, it adds a short SHA-256 hash of
 # the signed-in account's id (oauthAccount.accountUuid in .claude.json); the id itself is never stored.
+# `--chain '<command>'` keeps a status line you already had: it gets the same JSON and its output is shown.
 dir="${TOKENPET_DIR:-$HOME/.claude/token-pet}"
 cfg="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
 cfg="${cfg:-$HOME/.claude.json}"
@@ -37,6 +38,10 @@ if [ -n "$rl" ] && [ "$rl" != "null" ]; then
   mkdir -p "$dir"
   printf '{"captured_at":%s,%s"rate_limits":%s}\n' "$(date +%s)" "${account:+\"account\":\"$account\",}" "$rl" > "$dir/limits.json.tmp" &&
     mv "$dir/limits.json.tmp" "$dir/limits.json"
+fi
+if [ "$1" = "--chain" ] && [ -n "$2" ]; then
+  printf '%s' "$input" | sh -c "$2"
+  exit $?
 fi
 [ -n "$pct" ] && printf '🐾 5h %.0f%%' "$pct"
 exit 0

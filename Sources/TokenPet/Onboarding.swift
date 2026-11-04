@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import TokenPetAssets
 
-/// Connecting Claude Code's status line to the pet. The app never edits ~/.claude/settings.json:
-/// it copies the bridge script next to limits.json and hands the user a snippet to paste.
+/// Connecting Claude Code's status line to the pet: the bridge script next to limits.json, and the
+/// settings.json snippet. ClaudeConnect writes that snippet in for you, after you see the change.
 enum StatusLineSetup {
     /// The bridge script shipped in the .app, or the one in the source tree under `swift run`.
     static var bundledBridge: URL? {
@@ -56,9 +56,11 @@ struct OnboardingView: View {
     var done: () -> Void
     @State var page = 0
     @State private var copied = false
+    @State private var linked = ClaudeConnect.State.notConnected
+    @State private var connectNote: String?
 
     private var dir: URL { model.bridgeURL.deletingLastPathComponent() }
-    private var snippet: String { StatusLineSetup.snippet(command: StatusLineSetup.command(dir: dir)) }
+    private var snippet: String { StatusLineSetup.snippet(command: StatusLineSetup.command(dir: dir, home: home)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -145,10 +147,10 @@ struct OnboardingView: View {
     private var connect: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L.t("Connect Claude Code", "Claude Code 연결", "Claude Code と接続", "连接 Claude Code")).font(.title2.bold())
-            Text(L.t("Claude Code tells its status line your official limits. Add this to the top level of ~/.claude/settings.json (the app never edits that file for you):",
-                     "Claude Code는 상태줄에 공식 한도를 알려 줘요. 아래를 ~/.claude/settings.json 맨 바깥 객체에 붙여 넣으세요(앱이 그 파일을 직접 고치지는 않아요):",
-                     "Claude Code はステータスラインに公式のリミットを渡します。これを ~/.claude/settings.json の一番外側のオブジェクトに追加してください（アプリがこのファイルを書き換えることはありません）：",
-                     "Claude Code 会把你的官方额度告诉它的状态栏。请把下面的内容加到 ~/.claude/settings.json 的最外层对象中（应用不会替你修改这个文件）："))
+            Text(L.t("Claude Code tells its status line your official limits. “Connect” adds this to ~/.claude/settings.json after showing you the change, with a backup; or paste it into the top level yourself:",
+                     "Claude Code는 상태줄에 공식 한도를 알려 줘요. ‘연결하기’를 누르면 바뀔 내용을 보여 준 뒤 백업하고 ~/.claude/settings.json에 넣어요. 직접 맨 바깥 객체에 붙여 넣어도 돼요:",
+                     "Claude Code はステータスラインに公式のリミットを渡します。「接続」を押すと、変更内容を見せてからバックアップを取り ~/.claude/settings.json に追加します。自分で一番外側のオブジェクトに貼ってもかまいません：",
+                     "Claude Code 会把你的官方额度告诉它的状态栏。点“连接”会先给你看改动，备份后再加到 ~/.claude/settings.json；也可以自己粘贴到最外层对象中："))
                 .fixedSize(horizontal: false, vertical: true)
             Text(snippet)
                 .font(.system(size: 11, design: .monospaced))
@@ -157,6 +159,11 @@ struct OnboardingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.07)))
             HStack {
+                if linked == .connected || linked == .chained {
+                    Button(L.t("Undo", "되돌리기", "元に戻す", "撤销")) { disconnectClaude() }
+                } else if linked == .notConnected {
+                    Button(L.t("Connect", "연결하기", "接続", "连接")) { connectClaude() }.buttonStyle(.borderedProminent)
+                }
                 Button {
                     StatusLineSetup.install(into: dir)
                     NSPasteboard.general.clearContents()
@@ -177,17 +184,57 @@ struct OnboardingView: View {
                      "コピーすると小さなブリッジスクリプトも \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")) に置きます。保存するのは rate_limits の数値だけで、プロンプトやパスは残さず、ネットワークも使いません。",
                      "复制时也会把一个小小的桥接脚本放到 \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))。它只保存 rate_limits 数值：不存提示词、不存路径、不联网。"))
                 .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
-            Text(L.t("Already have a status line? Keep it, and add this as its first line instead: input=$(cat); printf '%s' \"$input\" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null; then read the JSON from $input.",
-                     "이미 상태줄을 쓰고 있다면 그대로 두고, 그 스크립트 첫 줄에 input=$(cat); printf '%s' \"$input\" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null 를 넣은 뒤 JSON은 $input에서 읽으세요.",
-                     "すでにステータスラインを使っている場合はそのままにして、代わりにそのスクリプトの1行目に input=$(cat); printf '%s' \"$input\" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null を入れ、JSON は $input から読んでください。",
-                     "已经在用状态栏了？保留它，改为在脚本第一行加入 input=$(cat); printf '%s' \"$input\" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null，然后从 $input 读取 JSON。"))
-                .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+            Text(connectNote ?? L.t("Already have a status line? “Connect” keeps it: the bridge passes it the same input and shows what it prints. “Undo” puts it back as it was.",
+                     "이미 상태줄을 쓰고 있어도 ‘연결하기’는 그대로 살려 둬요. 브리지가 같은 입력을 넘기고 그 출력을 보여 줘요. ‘되돌리기’를 누르면 원래대로 돌아가요.",
+                     "すでにステータスラインがあっても「接続」はそのまま残します。ブリッジが同じ入力を渡し、その出力を表示します。「元に戻す」で元どおりになります。",
+                     "已经有状态栏了？“连接”会保留它：桥接脚本把同样的输入交给它，并显示它的输出。“撤销”会把它恢复原样。"))
+                .font(.caption).foregroundColor(connectNote == nil ? .secondary : .primary).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
             Text(L.t("The numbers arrive after Claude Code's next reply. Until then Grandpa honestly says he doesn't know.",
                      "숫자는 Claude Code가 다음에 답할 때 들어와요. 그 전까지 할아버지는 솔직하게 모른다고 해요.",
                      "数値は Claude Code が次に返答したときに届きます。それまでおじいさんは正直に「わからない」と言います。",
                      "数字会在 Claude Code 下次回复后到来。在那之前，爷爷会老实地说不知道。"))
                 .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
         }
+        .onAppear { linked = ClaudeConnect.state(home: home, dir: dir) }
+    }
+
+    /// Shows the statusLine before and after, and writes only when the user says so.
+    private func connectClaude() {
+        do {
+            let c = try ClaudeConnect.connect(home: home, dir: dir)   // first: it checks ~/.claude, which installing would make
+            guard StatusLineSetup.install(into: dir) else { throw ClaudeConnect.Problem.noBridge }
+            guard let c else { return linked = ClaudeConnect.state(home: home, dir: dir) }
+            let a = NSAlert()
+            a.messageText = L.t("Change ~/.claude/settings.json?", "~/.claude/settings.json을 바꿀까요?", "~/.claude/settings.json を変更しますか？", "要修改 ~/.claude/settings.json 吗？")
+            a.informativeText = "statusLine " + L.t("before", "지금", "変更前", "修改前") + ":\n\(c.before ?? "-")\n\nstatusLine " + L.t("after", "바뀐 뒤", "変更後", "修改后") + ":\n\(c.after ?? "-")\n\n"
+                + L.t("Everything else stays as it is. A backup goes to \(dir.path).",
+                      "나머지는 그대로예요. 백업은 \(dir.path)에 남겨요.",
+                      "ほかの設定はそのままです。バックアップは \(dir.path) に保存します。",
+                      "其他设置保持不变。备份保存在 \(dir.path)。")
+            a.addButton(withTitle: L.t("Connect", "연결하기", "接続", "连接"))
+            a.addButton(withTitle: L.t("Cancel", "취소", "キャンセル", "取消"))
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+            let backup = try ClaudeConnect.apply(c, backupDir: dir)
+            connectNote = L.t("Connected. Backup: \(backup?.lastPathComponent ?? "-")", "연결했어요. 백업: \(backup?.lastPathComponent ?? "-")",
+                              "接続しました。バックアップ：\(backup?.lastPathComponent ?? "-")", "已连接。备份：\(backup?.lastPathComponent ?? "-")")
+        } catch let p as ClaudeConnect.Problem {
+            connectNote = p.message
+        } catch {
+            connectNote = error.localizedDescription
+        }
+        linked = ClaudeConnect.state(home: home, dir: dir)
+    }
+
+    private func disconnectClaude() {
+        do {
+            if let c = try ClaudeConnect.disconnect(home: home, dir: dir) { try ClaudeConnect.apply(c, backupDir: dir) }
+            connectNote = L.t("Disconnected: your status line is as it was.", "되돌렸어요. 상태줄이 원래대로예요.", "元に戻しました。ステータスラインは元どおりです。", "已撤销，状态栏恢复原样。")
+        } catch let p as ClaudeConnect.Problem {
+            connectNote = p.message
+        } catch {
+            connectNote = error.localizedDescription
+        }
+        linked = ClaudeConnect.state(home: home, dir: dir)
     }
 
     @ViewBuilder private var status: some View {

@@ -90,7 +90,16 @@ open build/TokenYugong.app     # or move it to /Applications first
 Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.seven_day`：已用百分比、重置时间）传给它的状态栏命令。桥接脚本只把这个对象（外加账号哈希）保存到 `~/.claude/token-pet/limits.json`；不含提示词、路径或会话 ID，也不联网。
 状态栏只报告成功的响应，所以额度用完时会停在 99%；应用还会读取 Claude Code 写进自己会话日志的拒绝记录（`usage_limit_reached`，带有窗口和重置时间），从而显示 100% 并让爷爷休息。
 
-使用说明里（或 设置 › 使用说明）的 **复制代码片段** 会把桥接脚本复制到 `~/.claude/token-pet/`，并把下面这段放进剪贴板。请自己把它粘贴到 `~/.claude/settings.json` 的最外层对象中；应用从不修改这个文件：
+**一键：** 在使用说明（或 设置 › 使用说明）里点 **连接**。应用会先展示修改前后的 `statusLine`，你同意后才写入。**一条命令**（智能体也用它）：
+
+```sh
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup            # --dry-run 只看不改
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # 撤销
+```
+
+两种方式都会把桥接脚本复制到 `~/.claude/token-pet/`，并且只改 `~/.claude/settings.json` 里的 `statusLine` 键：其余字节保持不变，备份放在 `~/.claude/token-pet/settings.json.<时间>.bak`，再运行一次不会有任何改动，符号链接仍是符号链接。已有的状态栏会保留：它变成 `sh ~/.claude/token-pet/statusline-bridge.sh --chain '<原来的命令>'`，收到同样的输入，显示的仍是它原来的输出；`--undo` 会还原原来的命令。这台 Mac 上没有 Claude Code（没有 `~/.claude`）时，它会直接告诉你，什么也不写。
+
+想手动设置？**复制代码片段** 会复制桥接脚本，并把下面这段放进剪贴板，粘贴到 `~/.claude/settings.json` 的最外层对象中：
 
 ```json
 "statusLine": {
@@ -99,9 +108,9 @@ Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.
 }
 ```
 
-已经有状态栏了？保留它，把它的第一行改成
-`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null`，
-然后从 `$input` 读取 JSON。
+（手动设置且已有状态栏时：`"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<原来的命令>'"`）
+
+**命令行。** `TokenPet status [--json]` 显示 Claude Code 是否已连接以及最近一次收到的额度；`TokenPet setup [--undo] [--dry-run] [--json]` 就是上面的连接。加 `--json` 时输出一个键名固定的 JSON 对象（`result`、`before`、`after`、`backup`；`claude.connection`、`claude.reading.five_hour.used_percentage` 等）；错误用平实的话写到 stderr，退出码 1，并输出 `{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`。
 
 桥接脚本有 `jq` 时用 `jq`（macOS 15+ 自带），否则用 `plutil`。
 Codex 无需设置：它自己的日志（`~/.codex/sessions`）里就带有额度。Gemini CLI 也不需要（从 `~/.gemini/tmp` 读取它的 token）。
@@ -144,7 +153,7 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 - **网络：** 只有每天一次的更新检查（向 GitHub releases API 发一个 GET，可关闭），以及仅在你粘贴了密钥时，每 15 分钟查询一次 OpenAI 的费用 API 或 DeepSeek 的余额 API。
 - **密钥**只存在你的登录钥匙串里，别处没有。
 - **设置和历史**（大山、称号）保存在本机的 `TokenPet` UserDefaults 域中；`defaults delete TokenPet` 会清除它们。应用从桥接文件读到的内容（账号哈希、百分比、重置时间）记录在 `~/Library/Application Support/TokenPet/claude-readings.log`（最多两个 512 KB 文件），便于追查账号混淆；可随时删除。
-- 应用从不修改 `~/.claude/settings.json`；状态栏代码片段由你自己粘贴。
+- 只有在你点 **连接**（先展示改动）或运行 `TokenPet setup` 时，应用才会修改 `~/.claude/settings.json`，而且只改 `statusLine` 并留有备份；`TokenPet setup --undo` 可撤销。
 
 ## 数字如何变成宠物
 
@@ -158,7 +167,7 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 （`pseudo`：每条字符串加长约 40% 并带上变音符号，配合 `--render` 查找文字被截断的地方）、
 `--stage`（把菜单栏图标和弹出面板放进同一个窗口，便于录屏）、`--allow-capture`、`--open`、
 `--settings`、`--guide`、`--pretend-hidden`（试用小窗口回退）、
-`--render <dir>`（PNG 静帧）、`--icon-set <dir>`、`--scan-report`（打印读到的内容）、
+`--render <dir>`（PNG 静帧）、`--icon-set <dir>`、`--scan-report`（打印读到的内容）、`status`、`setup`（见上文命令行）、
 `--anim-stats`。`TOKENPET_PREFS=<domain>` 可以让测试运行不碰你的设置。
 
 角色设定图：`swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`。

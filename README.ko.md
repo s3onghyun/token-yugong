@@ -116,9 +116,23 @@ Claude Code는 상태줄 명령에 공식 한도(`rate_limits.five_hour`, `rate_
 Code가 자기 세션 기록에 남기는 거절(`usage_limit_reached`, 구간과 리셋 시각 포함)도 읽어서 100%로
 보여 주고 할아버지를 쉬게 합니다.
 
-안내(또는 설정 › 사용법과 Claude Code 연결)의 **스니펫 복사**를 누르면 브리지를
-`~/.claude/token-pet/`에 넣고 아래 내용을 클립보드에 복사합니다. `~/.claude/settings.json`의
-맨 바깥 객체에 직접 붙여 넣으세요. 앱은 이 파일을 고치지 않습니다.
+**클릭 한 번:** 안내(또는 설정 › 사용법과 Claude Code 연결)에서 **연결하기**를 누르세요. 바뀔
+`statusLine`을 먼저 보여 주고, 확인해야 씁니다. **명령 한 줄**(에이전트도 이걸 씁니다):
+
+```sh
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup            # --dry-run 을 붙이면 보기만
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # 되돌리기
+```
+
+어느 쪽이든 브리지를 `~/.claude/token-pet/`에 넣고 `~/.claude/settings.json`의 `statusLine` 키만
+바꿉니다. 나머지 바이트는 그대로이고, 백업은 `~/.claude/token-pet/settings.json.<시각>.bak`에 남고,
+다시 실행해도 바뀌는 게 없고, 심볼릭 링크는 링크로 남습니다. 이미 쓰던 상태줄은 살려 둡니다:
+`sh ~/.claude/token-pet/statusline-bridge.sh --chain '<원래 명령>'`이 되어 같은 입력을 받고, 화면에는
+원래 출력이 그대로 나옵니다. `--undo`는 원래 명령을 돌려놓습니다. 이 Mac에 Claude Code가
+없으면(`~/.claude` 없음) 그렇다고 알려 주고 아무것도 쓰지 않습니다.
+
+직접 하고 싶다면 **스니펫 복사**로 브리지와 아래 내용을 클립보드에 받아 `~/.claude/settings.json`
+맨 바깥 객체에 붙여 넣으세요.
 
 ```json
 "statusLine": {
@@ -127,9 +141,13 @@ Code가 자기 세션 기록에 남기는 거절(`usage_limit_reached`, 구간�
 }
 ```
 
-이미 상태줄을 쓰고 있다면 그대로 두고 그 스크립트 첫 줄을
-`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null`
-로 바꾼 뒤 JSON은 `$input`에서 읽으세요.
+(직접 하면서 상태줄이 이미 있다면: `"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<원래 명령>'"`)
+
+**명령줄.** `TokenPet status [--json]`은 Claude Code 연결 여부와 마지막으로 받은 한도를 보여 주고,
+`TokenPet setup [--undo] [--dry-run] [--json]`은 위의 연결입니다. `--json`이면 키가 고정된 JSON 객체
+하나를 출력합니다(`result`, `before`, `after`, `backup`; `claude.connection`,
+`claude.reading.five_hour.used_percentage` 등). 오류는 stderr에 쉬운 말로, 종료 코드 1, 그리고
+`{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`로 나옵니다.
 
 브리지는 `jq`가 있으면 쓰고(macOS 15부터 기본 포함), 없으면 `plutil`을 씁니다.
 Codex는 설정할 것이 없습니다. Codex 기록(`~/.codex/sessions`)에 한도가 들어 있습니다.
@@ -201,7 +219,8 @@ Token Yugong은 이 Mac의 파일을 읽고, 모든 것을 이 Mac에만 둡니�
   `defaults delete TokenPet`으로 지웁니다. 앱이 브리지에서 읽은 값(계정 해시, %, 리셋 시각)은
   `~/Library/Application Support/TokenPet/claude-readings.log`(512 KB 파일 최대 두 개)에 남겨
   계정이 엇갈렸을 때 따라가 볼 수 있습니다. 언제든 지워도 됩니다.
-- 앱은 `~/.claude/settings.json`을 고치지 않습니다. 상태줄 스니펫은 직접 붙여 넣습니다.
+- 앱은 **연결하기**를 눌렀을 때(바뀔 내용을 보여 준 뒤)나 `TokenPet setup`을 실행했을 때만
+  `~/.claude/settings.json`을 고치고, 그때도 `statusLine`만 백업과 함께 바꿉니다. `TokenPet setup --undo`로 되돌립니다.
 
 ## 숫자가 할아버지가 되는 방법
 

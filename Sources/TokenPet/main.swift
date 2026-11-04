@@ -10,6 +10,7 @@ import UserNotifications
 //            [--lifetime <tokens>] [--award rank:<0-9>|feat:<name>] [--titles] [--window]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
 //   TokenPet --scan-report      scan local logs once, print what the pet would show, then exit
+//   TokenPet status|setup ...   the command line for people and agents (CLI.swift), then exit
 
 setvbuf(stdout, nil, _IOLBF, 0)   // line-buffered, so scripts see "stage window N" at once
 let args = CommandLine.arguments
@@ -21,11 +22,17 @@ if let lang = arg("--lang") {   // this run only; the saved setting stays. "pseu
     if lang == "pseudo" { L.pseudo = true } else { L.lang = L.resolve(lang) }
 }
 
-let home = FileManager.default.homeDirectoryForCurrentUser
+// $HOME first (Foundation ignores it), so a test can run the app against a throwaway home
+let home = ProcessInfo.processInfo.environment["HOME"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
 let bridgeURL = URL(fileURLWithPath: arg("--bridge")
     ?? (ProcessInfo.processInfo.environment["TOKENPET_DIR"].map { $0 + "/limits.json" }
         ?? home.appendingPathComponent(".claude/token-pet/limits.json").path))
 let logsRoot = URL(fileURLWithPath: arg("--logs") ?? home.appendingPathComponent(".claude/projects").path)
+if let r = CLI.run(Array(args.dropFirst()), home: home, bridge: bridgeURL) {
+    FileHandle.standardOutput.write(Data(r.out.utf8))
+    FileHandle.standardError.write(Data(r.err.utf8))
+    exit(r.code)
+}
 let model = UsageModel(bridgeURL: bridgeURL, logsRoot: logsRoot)
 
 if args.contains("--scan-report") {
