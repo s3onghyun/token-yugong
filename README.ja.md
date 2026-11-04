@@ -113,7 +113,7 @@ open build/TokenYugong.app     # or move it to /Applications first
 
 Claude Code は、ステータスラインのコマンドに公式のリミット（`rate_limits.five_hour` と
 `rate_limits.seven_day`：使用率 %、リセット時刻）を渡します。ブリッジスクリプトはそのオブジェクトだけを
-`~/.claude/token-pet/limits.json` に保存します。プロンプト、パス、セッション ID は保存せず、ネットワークも使いません。
+`~/.claude/token-pet/limits.json` に保存します（ほかはアカウントのハッシュだけ）。プロンプト、パス、セッション ID は保存せず、ネットワークも使いません。
 ステータスラインは成功した応答しか報告しないため、リミットを使い切ると 99% で止まります。そこでアプリは、
 Claude Code が自分のセッションログに書く拒否（`usage_limit_reached`、ウィンドウとリセット時刻つき）も読み取り、
 100% を表示しておじいさんを休ませます。
@@ -194,7 +194,7 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
 
 | 読むもの | 理由 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | ステータスラインのブリッジが書き込む Claude Code の公式リミット（使用率 %、リセット時刻。プロンプト、パス、セッション ID は含まない） |
+| `~/.claude/token-pet/limits.json` | ステータスラインのブリッジが書き込む Claude Code の公式リミット（使用率 %、リセット時刻。プロンプト、パス、セッション ID は含まない）。Claude アカウントを見分けるため、ブリッジは `~/.claude.json` の `oauthAccount.accountUuid` を読み、その SHA-256 ハッシュ 12 文字だけを書きます |
 | Claude Code のセッションログ（`~/.claude/projects`） | おじいさんのペースと山のためのトークン数、そしてリミットいっぱいを 100% と表示するための `usage_limit_reached` 拒否 |
 | `~/.codex/sessions` | Codex 自身のリミットとトークン数 |
 | `~/.gemini/tmp` | Gemini CLI のトークン数 |
@@ -203,7 +203,9 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
   キーを貼り付けた場合に限り、15 分ごとの OpenAI の costs API または DeepSeek の残高 API だけです。
 - **キー** はログインキーチェーンにだけ保存され、ほかには置きません。
 - **設定と履歴**（山、称号）は、この Mac の UserDefaults ドメイン `TokenPet` に残ります。
-  `defaults delete TokenPet` で消去できます。
+  `defaults delete TokenPet` で消去できます。アプリがブリッジから読んだ値（アカウントのハッシュ、%、リセット時刻）は
+  `~/Library/Application Support/TokenPet/claude-readings.log`（512 KB のファイル最大 2 つ）に記録され、
+  アカウントの取り違えを後から追えます。いつ削除しても構いません。
 - アプリは `~/.claude/settings.json` を書き換えません。ステータスラインのスニペットは自分で貼り付けてください。
 
 ## 数字がペットになるまで

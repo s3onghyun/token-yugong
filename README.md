@@ -113,7 +113,7 @@ Or run without a bundle: `swift run -c release TokenPet` (no notifications or op
 ## Connect Claude Code
 
 Claude Code hands its status-line command your official limits (`rate_limits.five_hour` and
-`rate_limits.seven_day`: used %, reset time). The bridge script saves only that object to
+`rate_limits.seven_day`: used %, reset time). The bridge script saves only that object (and a hash of the account) to
 `~/.claude/token-pet/limits.json`; no prompts, paths or session ids, no network.
 The status line only reports successful responses, so it stops at 99% when a limit runs out; the
 app also reads the refusal Claude Code writes to its own session log (`usage_limit_reached`, with
@@ -198,7 +198,7 @@ Token Yugong reads files on your Mac and keeps everything there. No account, no 
 
 | What it reads | Why |
 |---|---|
-| `~/.claude/token-pet/limits.json` | Claude Code's official limits, written by the status-line bridge (used %, reset time; no prompts, paths or session ids) |
+| `~/.claude/token-pet/limits.json` | Claude Code's official limits, written by the status-line bridge (used %, reset time; no prompts, paths or session ids). To tell Claude accounts apart, the bridge reads `oauthAccount.accountUuid` from `~/.claude.json` and writes only a 12-character SHA-256 hash of it |
 | Claude Code session logs (`~/.claude/projects`) | token counts for Grandpa's pace and the mountain, and the `usage_limit_reached` refusal so a full limit shows 100% |
 | `~/.codex/sessions` | Codex's own limits and token counts |
 | `~/.gemini/tmp` | Gemini CLI token counts |
@@ -207,7 +207,9 @@ Token Yugong reads files on your Mac and keeps everything there. No account, no 
   off), and, only if you paste a key, OpenAI's costs API or DeepSeek's balance API every 15 minutes.
 - **Keys** live in your login Keychain, nowhere else.
 - **Settings and history** (the mountain, titles) stay in the `TokenPet` UserDefaults domain on this
-  Mac; `defaults delete TokenPet` erases them.
+  Mac; `defaults delete TokenPet` erases them. What the app read from the bridge (hashed account,
+  percentages, reset times) is logged to `~/Library/Application Support/TokenPet/claude-readings.log`
+  (at most two files of 512 KB), so a wrong account can be traced; delete it any time.
 - The app never edits `~/.claude/settings.json`; you paste the status-line snippet yourself.
 
 ## How the numbers become a pet

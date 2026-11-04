@@ -67,20 +67,31 @@ default). A used-up **weekly** limit is a long rest: a full moon instead of the 
 ### Another account
 
 Claude Code tells the status line no account, and every session writes the same `limits.json`.
-After `/login` to another account, sessions started before it keep the old account and keep
-writing its numbers and logging its refusals. So the app tells accounts apart by the **weekly
-reset time** (each account's week resets at its own time) and keeps which one is current and its
-numbers in the settings (`claude.account`: reset times and percentages only, no name or id).
+After `/login` the running sessions use the new account, but each one keeps the numbers of its last
+answer until it answers again, and redraws them (an idle session writes the old account's numbers
+for hours). Claude Code also drops a window from the status line once it resets, so an idle
+session's numbers often lack the 5-hour window.
+
+The bridge names the signed-in account: a 12-character SHA-256 hash of `oauthAccount.accountUuid`
+in `.claude.json` (under `CLAUDE_CONFIG_DIR` when set). The id itself is never stored. Which numbers
+belong to which account is told by the **weekly reset time** (each account's week resets at its
+own time). Older bridges name no account; then the weekly reset alone decides. The app keeps which
+account is current, each named account's weekly reset and the merged numbers in the settings
+(`claude.account`: hashes, reset times and percentages only). An installed bridge older than the
+app is replaced at launch (settings.json is not touched).
 
 | When | Then |
 |---|---|
-| A reading with another weekly reset, not this account's next week (the current reset has not passed, or the new one is earlier) | **Account switch**: the new account is current; nothing of the old one's windows is kept. The popover says "계정 바뀜 감지" for 10 minutes, the wife comes to ask, and the limit notification is not sent for the switch itself |
-| A reading of the account switched away from, while the current one reported in the last 30 minutes | Ignored |
-| The same, the current account silent for 30 minutes or more | A switch back to it |
-| A reading without a weekly window | Cannot be told apart: taken as the current account |
-| A reading of the current account | Merged window by window: a window the reading lacks is kept until it resets (an idle session drops its 5-hour window), and within one window the percent only grows (an idle session's numbers are older) |
+| A reading naming another account than the current one | **Account switch** (a `/login`): it is current, lettered A, B, ... in the order first seen; nothing of the old one's windows is kept. The popover says "계정 바뀜 감지" for 10 minutes, the wife comes to ask, and the limit notification is not sent for the switch itself. The first named reading after an update is not a switch |
+| A named reading whose weekly reset is another named account's | That account's numbers from an idle session: ignored, however long the current one has been quiet |
+| A named reading with a weekly reset never seen, not the current account's next week | Ignored while the current account reported in the last 30 minutes; else it is the current account's week |
+| Unnamed: a reading with another weekly reset, not this account's next week (the current reset has not passed, or the new one is earlier) | Account switch, as above |
+| Unnamed: a reading of the account switched away from, while the current one reported in the last 30 minutes | Ignored |
+| Unnamed: the same, the current account silent for 30 minutes or more | A switch back to it |
+| Unnamed: a reading without a weekly window | Cannot be told apart: taken as the current account |
+| A reading of the current account | Merged window by window: a window the reading lacks is kept until it resets (an idle session's numbers can be older), and within one window the percent only grows. A window that has reset and that the reading lacks is a new, empty window (0%, reset not known yet), not a sign of an account without it: no "only weekly" note and no change of plan |
 | A limit hit logged before the switch | Not the new account's: ignored |
-| After a switch, a hit whose window the current reading shows with another reset that has not passed, or does not show at all (a weekly-only account) | The old account's: ignored |
+| After a switch, a hit whose window the current reading shows with another reset that has not passed, does not show at all (a weekly-only account), or shows empty after a reset | The old account's: ignored |
 | Before any switch, a hit whose window a reading taken after it shows with another reset | Ignored |
 
 ## Family

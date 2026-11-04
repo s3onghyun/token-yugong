@@ -16,6 +16,7 @@ struct Reading: Equatable, Codable {
     var week: Meter?
     var at: Date            // when the tool reported these numbers
     var month: Meter? = nil // a billed API: this month's spend against the budget
+    var account: String? = nil  // Claude: the signed-in account, hashed by the bridge (short hex); nil from older bridges
 }
 
 /// A family member other than Grandpa: his reading with passed resets applied, and his meter.
@@ -28,13 +29,16 @@ enum Limits {
     static let fiveLength: TimeInterval = 5 * 3600
     static let weekLength: TimeInterval = 7 * 86400
 
-    /// The file bridge/statusline-bridge.sh writes: {"captured_at": epoch, "rate_limits": {five_hour, seven_day}}.
-    /// nil = nothing usable (missing, corrupt, partial, or no window at all).
+    /// The file bridge/statusline-bridge.sh writes: {"captured_at": epoch, "account": "<hash>", "rate_limits": {five_hour, seven_day}}.
+    /// nil = nothing usable (missing, corrupt, partial, or no window at all). `account` is optional (older bridges).
     static func bridge(_ data: Data, fileDate: Date) -> Reading? {
         guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rl = o["rate_limits"] as? [String: Any] else { return nil }
         let at = (o["captured_at"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) } ?? fileDate
-        let r = Reading(five: meter(rl["five_hour"], "used_percentage"), week: meter(rl["seven_day"], "used_percentage"), at: at)
+        let account = (o["account"] as? String).flatMap { a in
+            (4...64).contains(a.count) && a.allSatisfy(\.isHexDigit) ? a.lowercased() : nil
+        }
+        let r = Reading(five: meter(rl["five_hour"], "used_percentage"), week: meter(rl["seven_day"], "used_percentage"), at: at, account: account)
         return r.five == nil && r.week == nil ? nil : r
     }
 
@@ -99,7 +103,7 @@ enum Limits {
                 // before one, only a reading taken after the hit tells), or after a switch no such window
                 let shown = h.week ? rd.week : rd.five
                 let other = shown?.resetsAt.map { !Accounts.same($0, h.resetsAt) && (switchedAt != nil ? $0 > now : rd.at > h.time) } ?? false
-                if other || (shown == nil && switchedAt != nil) { continue }
+                if other || (shown?.resetsAt == nil && switchedAt != nil) { continue }   // none, or one that reset and is empty
             }
             let full = Meter(pct: 100, resetsAt: h.resetsAt)
             if h.week { x.week = full } else { x.five = full }
@@ -114,11 +118,12 @@ enum Limits {
     }()
 }
 
-/// Which Claude account the bridge readings belong to (LOGIC.md "Another account"). The status line
-/// names no account, so an account is told by its weekly reset time. After a /login, sessions started
-/// before it keep the old account and keep writing the one bridge file: while the new account is in
-/// use, readings of the one switched away from are ignored. One account's sessions are merged window
-/// by window, since an idle session's numbers are older and can lack the 5-hour window.
+/// Which Claude account the bridge readings belong to (LOGIC.md "Another account"). Every Claude Code
+/// session writes the one bridge file. After a /login the sessions use the new account, but an idle one
+/// keeps the numbers of its last answer, from the old account, and writes them again whenever its
+/// status line redraws. The bridge names the signed-in account (a hash); its numbers are told apart by
+/// each account's weekly reset time. Older bridges name no account: then the weekly reset alone decides.
+/// One account's sessions are merged window by window.
 struct Accounts: Equatable, Codable {
     static let quiet: TimeInterval = 30 * 60   // the current account silent this long: the other one is back in use
     var week: Date?          // the current account's weekly reset
@@ -126,33 +131,73 @@ struct Accounts: Equatable, Codable {
     var switchedAt: Date?
     var seen: Date?          // the current account's newest reading
     var reading: Reading?    // its windows, merged
+    var id: String?          // the signed-in account, as the bridge names it
+    var weeks: [String: Date]? = nil   // each named account's weekly reset
+    var ids: [String]? = nil           // named accounts in the order first seen: A, B, ...
 
     /// nil = an old account's reading and nothing of the current one since the app started.
     mutating func take(_ r: Reading) -> Reading? {
+        if let t = r.account { return take(r, signedIn: t) }
         if let w = r.week?.resetsAt {
-            if let cur = week, !Self.same(w, cur), !(cur <= r.at && w > cur) {   // not this account's next week
+            if let cur = week, !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
                 if let p = previous, Self.same(w, p), let s = seen, r.at.timeIntervalSince(s) < Self.quiet { return reading }
                 previous = cur; switchedAt = r.at; reading = nil
             }
             week = w
         }
+        return add(r)
+    }
+
+    /// A reading from a bridge that names the signed-in account `t`.
+    private mutating func take(_ r: Reading, signedIn t: String) -> Reading? {
+        var known = weeks ?? [:]
+        if t != id {   // a /login (or the first named reading: the account is not new, only its name)
+            if id != nil { previous = week; switchedAt = r.at }
+            id = t; week = known[t]; reading = nil; seen = nil
+            if !(ids ?? []).contains(t) { ids = (ids ?? []) + [t] }
+        }
+        if let w = r.week?.resetsAt {
+            // another account's week: an idle session still holding that account's numbers
+            if known.contains(where: { $0.key != t && Self.same($0.value, w) }) { return reading }
+            if let cur = known[t], !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
+                // a week never seen for any account: numbers from before this app knew it, unless this one went quiet
+                if let s = seen, r.at.timeIntervalSince(s) < Self.quiet { return reading }
+                reading = nil
+            }
+            known[t] = w; weeks = known; week = w
+        }
+        return add(r)
+    }
+
+    private mutating func add(_ r: Reading) -> Reading? {
         reading = Self.merge(reading, r)
         seen = max(seen ?? r.at, r.at)
         return reading
     }
 
+    /// "A", "B", ... for a named account; nil for an unnamed one (an older bridge).
+    var letter: String? {
+        guard let id, let i = ids?.firstIndex(of: id) else { return nil }
+        return i < 26 ? String(UnicodeScalar(65 + i)!) : "#\(i + 1)"
+    }
+
     static func same(_ a: Date, _ b: Date) -> Bool { abs(a.timeIntervalSince(b)) <= 60 }
+    /// `w` is the week after `cur`: `cur` has passed (as of `at`) and `w` is later.
+    static func next(_ w: Date, after cur: Date, at: Date) -> Bool { cur <= at && w > cur }
 
     /// `n` is the newer reading. A window it lacks is kept while it has not reset; within one window the percent only grows.
+    /// A window that has reset and that `n` lacks stays as a new, empty one: Claude Code drops a window from the status
+    /// line once it resets, which does not make it an account without that window.
     static func merge(_ o: Reading?, _ n: Reading) -> Reading {
         guard let o else { return n }
         func window(_ a: Meter?, _ b: Meter?) -> Meter? {
-            guard let a, let ra = a.resetsAt, ra > n.at else { return b }
+            guard let a else { return b }
+            guard let ra = a.resetsAt, ra > n.at else { return b ?? Meter(pct: 0, resetsAt: nil) }
             guard let b else { return a }
             guard let rb = b.resetsAt, same(ra, rb) else { return b }
             return Meter(pct: max(a.pct, b.pct), resetsAt: rb)
         }
-        return Reading(five: window(o.five, n.five), week: window(o.week, n.week), at: max(o.at, n.at), month: n.month)
+        return Reading(five: window(o.five, n.five), week: window(o.week, n.week), at: max(o.at, n.at), month: n.month, account: n.account)
     }
 }
 

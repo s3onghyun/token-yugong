@@ -26,6 +26,14 @@ enum StatusLineSetup {
         return "\"statusLine\": {\n  \"type\": \"command\",\n  \"command\": \"\(c)\"\n}"
     }
 
+    /// A bridge installed earlier in `dir` that differs from this app's is replaced, so an update reaches
+    /// it (this version adds the hashed account). Nothing happens where none was installed; settings.json is not touched.
+    static func refreshInstalled(in dir: URL) {
+        let dest = dir.appendingPathComponent("statusline-bridge.sh")
+        guard let src = bundledBridge, let have = try? Data(contentsOf: dest), have != (try? Data(contentsOf: src)) else { return }
+        install(into: dir)
+    }
+
     /// Copies the bridge script into `dir` (made if missing). Returns false if there is no script to copy.
     @discardableResult static func install(into dir: URL) -> Bool {
         guard let src = bundledBridge else { return false }

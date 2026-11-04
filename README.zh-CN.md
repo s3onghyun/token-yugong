@@ -87,7 +87,7 @@ open build/TokenYugong.app     # or move it to /Applications first
 
 ## 连接 Claude Code
 
-Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.seven_day`：已用百分比、重置时间）传给它的状态栏命令。桥接脚本只把这个对象保存到 `~/.claude/token-pet/limits.json`；不含提示词、路径或会话 ID，也不联网。
+Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.seven_day`：已用百分比、重置时间）传给它的状态栏命令。桥接脚本只把这个对象（外加账号哈希）保存到 `~/.claude/token-pet/limits.json`；不含提示词、路径或会话 ID，也不联网。
 状态栏只报告成功的响应，所以额度用完时会停在 99%；应用还会读取 Claude Code 写进自己会话日志的拒绝记录（`usage_limit_reached`，带有窗口和重置时间），从而显示 100% 并让爷爷休息。
 
 使用说明里（或 设置 › 使用说明）的 **复制代码片段** 会把桥接脚本复制到 `~/.claude/token-pet/`，并把下面这段放进剪贴板。请自己把它粘贴到 `~/.claude/settings.json` 的最外层对象中；应用从不修改这个文件：
@@ -136,14 +136,14 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 
 | 读取的内容 | 用途 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | Claude Code 的官方额度，由状态栏桥接脚本写入（已用百分比、重置时间；不含提示词、路径或会话 ID） |
+| `~/.claude/token-pet/limits.json` | Claude Code 的官方额度，由状态栏桥接脚本写入（已用百分比、重置时间；不含提示词、路径或会话 ID）。为区分 Claude 账号，桥接脚本读取 `~/.claude.json` 中的 `oauthAccount.accountUuid`，只写入它的 12 位 SHA-256 哈希 |
 | Claude Code 会话日志（`~/.claude/projects`） | 用于爷爷挖土速度和大山的 token 数，以及 `usage_limit_reached` 拒绝记录，让用完的额度显示为 100% |
 | `~/.codex/sessions` | Codex 自己的额度和 token 数 |
 | `~/.gemini/tmp` | Gemini CLI 的 token 数 |
 
 - **网络：** 只有每天一次的更新检查（向 GitHub releases API 发一个 GET，可关闭），以及仅在你粘贴了密钥时，每 15 分钟查询一次 OpenAI 的费用 API 或 DeepSeek 的余额 API。
 - **密钥**只存在你的登录钥匙串里，别处没有。
-- **设置和历史**（大山、称号）保存在本机的 `TokenPet` UserDefaults 域中；`defaults delete TokenPet` 会清除它们。
+- **设置和历史**（大山、称号）保存在本机的 `TokenPet` UserDefaults 域中；`defaults delete TokenPet` 会清除它们。应用从桥接文件读到的内容（账号哈希、百分比、重置时间）记录在 `~/Library/Application Support/TokenPet/claude-readings.log`（最多两个 512 KB 文件），便于追查账号混淆；可随时删除。
 - 应用从不修改 `~/.claude/settings.json`；状态栏代码片段由你自己粘贴。
 
 ## 数字如何变成宠物

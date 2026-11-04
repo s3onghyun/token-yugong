@@ -6,7 +6,58 @@ import TokenPetAssets
 /// mountain and the settings carry over. `defaults delete TokenPet` clears everything.
 /// TOKENPET_PREFS names another domain (tests and demo recordings, so they leave yours alone).
 enum Prefs {
-    static let store = UserDefaults(suiteName: ProcessInfo.processInfo.environment["TOKENPET_PREFS"] ?? "TokenPet") ?? .standard
+    static let domain = ProcessInfo.processInfo.environment["TOKENPET_PREFS"] ?? "TokenPet"
+    static let store = UserDefaults(suiteName: domain) ?? .standard
+}
+
+/// What the app read from the bridge and made of it, one line per new reading, for telling later which
+/// account it showed and why. Hashed account ids, reset times and percentages only; on this Mac, in
+/// ~/Library/Application Support/<settings domain>/, at most two files of 512 KB (a few days).
+enum ReadingLog {
+    static let limit = 512 * 1024
+    static var url: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(Prefs.domain).appendingPathComponent("claude-readings.log")
+    }
+
+    static func append(_ line: String, to url: URL = url) {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let size = (try? fm.attributesOfItem(atPath: url.path))?[.size] as? Int, size > limit {
+            let old = url.appendingPathExtension("1")
+            try? fm.removeItem(at: old)
+            try? fm.moveItem(at: url, to: old)
+        }
+        guard let data = (line + "\n").data(using: .utf8) else { return }
+        if let h = try? FileHandle(forWritingTo: url) {
+            defer { try? h.close() }
+            _ = try? h.seekToEnd()
+            try? h.write(contentsOf: data)
+        } else {
+            try? data.write(to: url)
+        }
+    }
+
+    /// `5h=14%@11:40 week=33%@11-04 22:00` (local time; `-` = no window, `@?` = reset not known).
+    static func describe(_ r: Reading?) -> String {
+        func m(_ x: Meter?, _ f: String) -> String {
+            guard let x else { return "-" }
+            return "\(Int(x.pct.rounded()))%@" + (x.resetsAt.map { stamp($0, f) } ?? "?")
+        }
+        guard let r else { return "none" }
+        return "5h=\(m(r.five, "HH:mm")) week=\(m(r.week, "MM-dd HH:mm"))"
+    }
+
+    static func line(read r: Reading, decision: String, shown: Reading?, accounts a: Accounts) -> String {
+        "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) captured=\(stamp(r.at, "HH:mm:ss")) account=\(r.account ?? "-") "
+            + "\(describe(r)) -> \(decision) current=\(a.letter.map { "\($0):\(a.id ?? "")" } ?? "unnamed") shown: \(describe(shown))"
+    }
+
+    private static func stamp(_ d: Date, _ format: String) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = format
+        return f.string(from: d)
+    }
 }
 
 // MARK: - Codex CLI (local session logs; no network, no credentials)
@@ -118,7 +169,7 @@ struct MountainLedger {
 }
 
 /// Which Claude account is current and its numbers, saved so a restart still ignores the old account's
-/// sessions. Only reset times and percentages: Claude Code gives the status line no account name or id.
+/// sessions. Only reset times, percentages and the bridge's hashed account ids: no name, no raw id.
 extension Accounts {
     static func load(_ d: UserDefaults = Prefs.store) -> Accounts {
         d.data(forKey: "claude.account").flatMap { try? JSONDecoder().decode(Accounts.self, from: $0) } ?? Accounts()
@@ -177,6 +228,7 @@ final class UsageModel: ObservableObject {
     }
 
     func start() {
+        StatusLineSetup.refreshInstalled(in: bridgeURL.deletingLastPathComponent())
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in self?.refresh() }
         timer?.tolerance = 5
@@ -273,10 +325,19 @@ final class UsageModel: ObservableObject {
         let before = accounts.switchedAt
         claude = b.flatMap { accounts.take($0) }
         accounts.save()
+        if let b, b != lastLogged {
+            lastLogged = b
+            // taken: the shown reading is at least this new; else the numbers were another account's
+            let decision = accounts.switchedAt != before ? "switch" : (claude.map { $0.at >= b.at } ?? false) ? "taken" : "ignored"
+            ReadingLog.append(ReadingLog.line(read: b, decision: decision, shown: claude, accounts: accounts))
+        }
         guard accounts.switchedAt != before else { return }
         changedAt = Date()
         accountJustSwitched = true
     }
+    private var lastLogged: Reading?
+    /// The popover's last line: which Claude account (A, B, ... and its short hash) and when its numbers came.
+    var accountLine: (letter: String?, id: String?, seen: Date?) { (accounts.letter, accounts.id.map { String($0.prefix(6)) }, accounts.seen) }
     /// "Account change detected" in the popover, for as long as the wife asks about it.
     var accountNote: Bool { accounts.switchedAt.map { Date().timeIntervalSince($0) < Visitors.afterChange } ?? false }
 
