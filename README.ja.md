@@ -77,6 +77,10 @@ brew install --cask s3onghyun/tap/token-yugong
 
 `brew upgrade --cask token-yugong` で更新します。初回起動時の許可はこの場合も一度必要です（[初回起動](#初回起動)）。
 
+Homebrew 7 以降は、ほかの tap の cask を信頼（trust）するまで読み込みません。上のようにフルネームで
+インストールすると、この cask だけが自動で信頼されます。インストール前に `brew info --cask s3onghyun/tap/token-yugong`
+で確かめたいときは、先に `brew trust --cask s3onghyun/tap/token-yugong` を実行してください。
+
 ### アプリをダウンロード
 
 1. 最新の [GitHub Release](https://github.com/s3onghyun/token-yugong/releases/latest) から

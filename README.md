@@ -78,6 +78,10 @@ brew install --cask s3onghyun/tap/token-yugong
 
 `brew upgrade --cask token-yugong` updates it. The first launch still needs one approval ([First launch](#first-launch)).
 
+Homebrew 7 and later load casks from other taps only once you trust them. Installing by the full
+name, as above, trusts this one cask by itself. To look at it first with
+`brew info --cask s3onghyun/tap/token-yugong`, run `brew trust --cask s3onghyun/tap/token-yugong` before it.
+
 ### Download the app
 
 1. Download `TokenYugong-<version>-macos-universal.zip` and its `.sha256` file from the latest
