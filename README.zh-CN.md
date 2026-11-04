@@ -56,6 +56,8 @@ brew install --cask s3onghyun/tap/token-yugong
 
 用 `brew upgrade --cask token-yugong` 更新。首次启动时同样需要批准一次（见[首次启动](#首次启动)）。
 
+Homebrew 7 起，其他 tap 里的 cask 要先信任（trust）才会加载。像上面那样用完整名称安装，会自动信任这一个 cask。想在安装前用 `brew info --cask s3onghyun/tap/token-yugong` 查看，请先运行 `brew trust --cask s3onghyun/tap/token-yugong`。
+
 ### 下载应用
 
 1. 从最新的 [GitHub Release](https://github.com/s3onghyun/token-yugong/releases/latest) 下载 `TokenYugong-<version>-macos-universal.zip` 及对应的 `.sha256` 文件。
