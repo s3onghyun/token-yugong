@@ -7,7 +7,9 @@
 2. Unzip and move `TokenYugong.app` to Applications.
 3. First launch: the app is not notarized yet. macOS 15+: open it once, then System Settings → Privacy & Security → **Open Anyway**. macOS 13-14: Control-click → Open.
 
-Then connect Claude Code with one status-line snippet (the app's guide copies it; [details](https://github.com/s3onghyun/token-yugong#connect-claude-code)). Codex needs no setup.
+Or with Homebrew: `brew install --cask s3onghyun/tap/token-yugong` (`brew upgrade --cask token-yugong` later).
+
+Then connect Claude Code: **Connect** in the app's first-run guide does it in one click, after showing you the change ([details](https://github.com/s3onghyun/token-yugong#connect-claude-code)). Codex needs no setup.
 
 ## Privacy
 No account, no analytics, no telemetry. The app reads Claude Code, Codex and Gemini CLI files on your Mac. Its only network requests are a once-a-day check of this repository's latest release (can be turned off) and, only if you paste a key, the OpenAI costs or DeepSeek balance API. [Everything it reads](https://github.com/s3onghyun/token-yugong#privacy).
