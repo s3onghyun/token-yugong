@@ -257,7 +257,7 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
 `--stage`（録画用に、メニューバー項目とポップオーバーを1つのウィンドウに）、`--allow-capture`、`--open`、
 `--settings`、`--guide`、`--pretend-hidden`（ミニウィンドウへの切り替えを試す）、
 `--render <dir>`（PNG 静止画）、`--icon-set <dir>`、`--scan-report`（読み取った内容を表示）、`status`・`setup`（上のコマンドライン）、
-`--anim-stats`。`TOKENPET_PREFS=<domain>` を指定すると、テスト実行が自分の設定に影響しません。
+`--anim-stats`。`HOME=<dir>` を付けると使い捨てのホームで全部を動かせます。`TOKENPET_PREFS=<domain>` を指定すると、テスト実行が自分の設定に影響しません。
 
 キャラクターシート：`swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`。
 `--social` は `docs/social-preview.png` を描き、`--hero` は `docs/hero.gif` のフレームを描きます。そのあと：
