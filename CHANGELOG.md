@@ -3,6 +3,28 @@
 ## Unreleased
 
 ### Fixed
+- Overnight, once the 5-hour window had reset, Yugong took the Claude account for one with only a
+  weekly limit (*No 5-hour limit on this account*), the same note it had shown for the other account
+  the evening before, and the wife came to ask about a change of plan, at the reset and again when
+  the window came back. Claude Code drops a window from the status line once it resets; a window
+  that has reset now stays as a new, empty one (0%) until the next reading fills it.
+- Accounts are told apart by name, not only by guess. Correction to the fix below: the "weekly-only"
+  numbers seen after the `/login` were the *old* account's, from idle sessions (its 5-hour window had
+  reset and was dropped), and running sessions do follow the new login; they only keep the numbers of
+  their last answer until they answer again. The bridge now adds a 12-character SHA-256 hash of the
+  signed-in account's id (`oauthAccount.accountUuid` in `.claude.json`; the id itself is never
+  stored), so the account in use is known, and an idle session's numbers of another account are
+  ignored however long the current one has been quiet (the 30-minute rule let them take the app back
+  overnight). Bridges that name no account keep the weekly-reset rules. An installed bridge older
+  than the app is replaced at launch; `settings.json` is not touched.
+
+### Added
+- The popover's last line names the Claude account and when its numbers came:
+  *Claude 계정 A · 8edcde · 마지막 갱신 09:24* (accounts lettered in the order first seen, with the
+  first 6 characters of the hash).
+- `~/Library/Application Support/TokenPet/claude-readings.log`: every bridge reading the app took or
+  ignored, with the hashed account and what it showed (at most two files of 512 KB), so a mix-up can
+  be traced afterwards.
 - After switching the Claude account (`/login`), Yugong kept showing the old account. Claude Code
   sessions started before the switch keep the old account, keep writing its numbers into the one
   bridge file and keep logging its refused requests, so the old 5-hour window, its 99% and its rest

@@ -110,7 +110,7 @@ open build/TokenYugong.app     # 먼저 /Applications로 옮겨도 됩니다
 ## Claude Code 연결
 
 Claude Code는 상태줄 명령에 공식 한도(`rate_limits.five_hour`, `rate_limits.seven_day`: 사용
-%, 리셋 시각)를 넘겨 줍니다. 브리지 스크립트는 그 객체만 `~/.claude/token-pet/limits.json`에
+%, 리셋 시각)를 넘겨 줍니다. 브리지 스크립트는 그 객체와 계정 해시만 `~/.claude/token-pet/limits.json`에
 저장합니다. 프롬프트·경로·세션 ID는 남기지 않고 네트워크도 쓰지 않습니다.
 상태줄은 성공한 응답만 알려 주기 때문에 한도를 다 쓰면 99%에서 멈춥니다. 그래서 앱은 Claude
 Code가 자기 세션 기록에 남기는 거절(`usage_limit_reached`, 구간과 리셋 시각 포함)도 읽어서 100%로
@@ -188,7 +188,7 @@ Token Yugong은 이 Mac의 파일을 읽고, 모든 것을 이 Mac에만 둡니�
 
 | 읽는 것 | 이유 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | 상태줄 브리지가 적는 Claude Code 공식 한도(사용 %, 리셋 시각. 프롬프트·경로·세션 id 없음) |
+| `~/.claude/token-pet/limits.json` | 상태줄 브리지가 적는 Claude Code 공식 한도(사용 %, 리셋 시각. 프롬프트·경로·세션 id 없음). Claude 계정을 구분하려고 브리지가 `~/.claude.json`의 `oauthAccount.accountUuid`를 읽어 SHA-256 해시 12자만 적습니다 |
 | Claude Code 세션 로그(`~/.claude/projects`) | 할아버지의 속도와 산에 쓰는 토큰 수, 그리고 한도가 찼을 때 100%를 보여 주는 `usage_limit_reached` 거절 기록 |
 | `~/.codex/sessions` | Codex 자신의 한도와 토큰 수 |
 | `~/.gemini/tmp` | Gemini CLI 토큰 수 |
@@ -197,7 +197,9 @@ Token Yugong은 이 Mac의 파일을 읽고, 모든 것을 이 Mac에만 둡니�
   경우에만 15분마다 OpenAI 비용 API 또는 DeepSeek 잔액 API.
 - **키**는 로그인 키체인에만 저장합니다.
 - **설정과 기록**(산, 칭호)은 이 Mac의 UserDefaults 도메인 `TokenPet`에만 있고,
-  `defaults delete TokenPet`으로 지웁니다.
+  `defaults delete TokenPet`으로 지웁니다. 앱이 브리지에서 읽은 값(계정 해시, %, 리셋 시각)은
+  `~/Library/Application Support/TokenPet/claude-readings.log`(512 KB 파일 최대 두 개)에 남겨
+  계정이 엇갈렸을 때 따라가 볼 수 있습니다. 언제든 지워도 됩니다.
 - 앱은 `~/.claude/settings.json`을 고치지 않습니다. 상태줄 스니펫은 직접 붙여 넣습니다.
 
 ## 숫자가 할아버지가 되는 방법

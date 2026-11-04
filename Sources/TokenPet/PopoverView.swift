@@ -109,6 +109,16 @@ struct PopoverView: View {
                          "アカウントの切り替えを検出：新しい Claude アカウントのリミットを表示します。",
                          "检测到账号切换：显示新 Claude 账号的额度。"))
             }
+            if !s.demo && main == .claude, let seen = model.accountLine.seen {
+                // which account the numbers are from: A, B, ... and its short hash ("?" = a bridge that names none)
+                let a = model.accountLine, who = a.letter.map { "\($0) · \(a.id ?? "")" } ?? "?"
+                let when = Fmt.clock(seen, now: clockNow)
+                Text(L.t("Claude account \(who) · last update \(when)",
+                         "Claude 계정 \(who) · 마지막 갱신 \(when)",
+                         "Claude アカウント \(who) · 最終更新 \(when)",
+                         "Claude 账号 \(who) · 最后更新 \(when)"))
+                    .font(.caption2).foregroundColor(.secondary)
+            }
             if !s.demo {
                 Text(L.t("Shovel speed: \(Int(model.pace.smoothed.rounded())) output tokens/min (last 3 min, this Mac)",
                          "삽질 속도: 분당 출력 토큰 \(Int(model.pace.smoothed.rounded())) (최근 3분, 이 Mac)",
