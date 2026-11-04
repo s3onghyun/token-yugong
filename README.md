@@ -147,7 +147,9 @@ uses the network.
 
 ## The Yugong window
 
-Click Grandpa in the menu bar for the popover: the scene, the mountain, his title and every meter.
+Click Grandpa in the menu bar for the popover: the scene, the mountain and every meter. The ⌄ button
+next to Refresh shows the rest (his title, where the numbers come from, the Claude account, the
+shovel speed, screen sharing) and is remembered.
 The first launch points at him once ("Click Grandpa to see his mountain"). The popover's **Window**
 button opens the same scene in a window of its own that stays on the desktop:
 

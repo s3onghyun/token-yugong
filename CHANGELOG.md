@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed
+- The popover is compact again, close to the first releases (about 510 points tall instead of 650 with
+  the 5-hour and weekly meters and one more AI): the scene, the state and headline, the mountain,
+  every meter and the pace, any update or account-change notice, and one row of actions. The ⌄
+  button next to Refresh (*더 보기*) shows the rest: the title and its ladder (click for all titles),
+  where the numbers come from, the Claude account line, the shovel speed, the screen-sharing toggle,
+  the weekly-only explanation and the other AIs' source notes. It stays open or closed as you left it,
+  in the popover and the Yugong window alike. Without any Claude limits yet, the note on how to
+  connect the status line stays in view.
+
 ### Fixed
 - Overnight, once the 5-hour window had reset, Yugong took the Claude account for one with only a
   weekly limit (*No 5-hour limit on this account*), the same note it had shown for the other account
@@ -19,7 +29,7 @@
   than the app is replaced at launch; `settings.json` is not touched.
 
 ### Added
-- The popover's last line names the Claude account and when its numbers came:
+- The popover (behind ⌄ since the compact popover) names the Claude account and when its numbers came:
   *Claude 계정 A · 8edcde · 마지막 갱신 09:24* (accounts lettered in the order first seen, with the
   first 6 characters of the hash).
 - `~/Library/Application Support/TokenPet/claude-readings.log`: every bridge reading the app took or
