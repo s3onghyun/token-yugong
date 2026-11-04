@@ -157,6 +157,8 @@ final class SceneWindow: NSPanel, NSWindowDelegate, NSMenuDelegate {
         for (s, name) in zip(Self.sizes, [L.t("Small", "작게", "小", "小"), L.t("Medium", "보통", "中", "中"), L.t("Large", "크게", "大", "大")]) {
             item(name, on: abs(w - s) < 1) { [weak self] in self?.setWidth(s) }
         }
+        let compact = Prefs.store.bool(forKey: "sceneWindow.compact")
+        item(L.t("Compact: scene only", "간단히: 장면만", "コンパクト：場面だけ", "精简：只看场景"), on: compact) { Prefs.store.set(!compact, forKey: "sceneWindow.compact") }
         m.addItem(.separator())
         for (l, name) in [(SceneLevel.normal, L.t("Normal window", "보통 창", "通常のウィンドウ", "普通窗口")),
                           (.onTop, L.t("Always on top", "항상 위에", "常に手前に表示", "始终置顶")),

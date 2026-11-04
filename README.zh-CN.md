@@ -19,7 +19,7 @@
 <p align="center"><img src="docs/hero.gif" width="584" alt="愚公爷爷在挖土，背架快满时越挖越吃力，到了额度就打盹、智叟在一旁嘲笑，重置后重新开工，喜鹊送来新称号"><br>
 <sub>由应用自身的代码用演示数据绘制（<code>YugongSheet --hero</code>）。</sub></p>
 
-**安装**（macOS 13+，Apple 芯片或 Intel）：从 [Releases](https://github.com/s3onghyun/token-yugong/releases/latest) 下载 `TokenYugong-<version>-macos-universal.zip`，解压后把 `TokenYugong.app` 移到“应用程序”文件夹。
+**安装**（macOS 13+，Apple 芯片或 Intel）：从 [Releases](https://github.com/s3onghyun/token-yugong/releases/latest) 下载 `TokenYugong-<version>-macos-universal.zip`，解压后把 `TokenYugong.app` 移到“应用程序”文件夹。也可以用 Homebrew：`brew install --cask s3onghyun/tap/token-yugong`。
 应用还没有经过公证，首次启动需要手动允许一次：见[首次启动](#首次启动)。
 然后[连接 Claude Code](#连接-claude-code)（一段配置即可；Codex 无需设置）。
 
@@ -47,6 +47,14 @@
 ## 安装
 
 需要 macOS 13 或更高版本。
+
+### Homebrew
+
+```sh
+brew install --cask s3onghyun/tap/token-yugong
+```
+
+用 `brew upgrade --cask token-yugong` 更新。首次启动时同样需要批准一次（见[首次启动](#首次启动)）。
 
 ### 下载应用
 
@@ -81,7 +89,7 @@ git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 
-首次启动会显示一份简短的使用说明，最后一页有 **复制代码片段** 按钮，用于 Claude Code 状态栏（见下文）。要退出时，在弹出面板里退出。
+首次启动会显示一份简短的使用说明（三页，约 30 秒，随时可以**跳过**）：爷爷显示什么、用于 Claude Code 状态栏的**连接**按钮（见下文）、设置在哪里。设置 › *使用说明与 Claude Code 连接…* 可以再次打开。要退出时，在弹出面板里退出。
 
 也可以不打包直接运行：`swift run -c release TokenPet`（这样没有通知，也不能登录时打开）。
 
@@ -123,7 +131,7 @@ Codex 无需设置：它自己的日志（`~/.codex/sessions`）里就带有额�
 
 ![愚公窗口](docs/yugong-window.png)
 
-可以拖到任意位置（包括另一块显示器，竖屏也行），拖动角落可以调整大小：内容会等比缩放。标题栏里的 ⋯ 按钮（或右键）可以选择小、中、大，普通窗口、*始终置顶*或*放在桌面上*（在所有应用窗口之下，出现在每个空间），以及不透明度。按 Esc 或关闭按钮可隐藏。大小、位置、层级和不透明度都会被记住；如果原来的显示器不在了，它会回到主屏幕。设置 › *应用启动时同时打开愚公窗口*（默认关闭）会在启动时打开它；同时开了*登录时打开*的话，登录时也会打开。窗口关闭或被遮住时，场景停止绘制（不占 CPU）。
+可以拖到任意位置（包括另一块显示器，竖屏也行），拖动角落可以调整大小：内容会等比缩放。标题栏里的 ⋯ 按钮（或右键）可以选择小、中、大，*精简*（只显示场景和状态一行），普通窗口、*始终置顶*或*放在桌面上*（在所有应用窗口之下，出现在每个空间），以及不透明度。按 Esc 或关闭按钮可隐藏。大小、位置、层级和不透明度都会被记住；如果原来的显示器不在了，它会回到主屏幕。设置 › *应用启动时同时打开愚公窗口*（默认关闭）会在启动时打开它；同时开了*登录时打开*的话，登录时也会打开。窗口关闭或被遮住时，场景停止绘制（不占 CPU）。
 
 ## 菜单栏满时
 

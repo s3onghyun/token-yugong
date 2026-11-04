@@ -20,6 +20,7 @@ Claude Code와 Codex 사용 한도를 보여 주는 픽셀 아트 메뉴바 펫:
 
 **설치** (macOS 13 이상, Apple silicon·Intel): [Releases](https://github.com/s3onghyun/token-yugong/releases/latest)에서
 `TokenYugong-<version>-macos-universal.zip`을 내려받아 풀고 `TokenYugong.app`을 응용 프로그램 폴더로 옮깁니다.
+Homebrew로도 됩니다: `brew install --cask s3onghyun/tap/token-yugong`.
 아직 공증 전이라 처음 한 번은 승인이 필요합니다: [처음 실행](#처음-실행) 참고.
 그다음 [Claude Code를 연결](#claude-code-연결)합니다(스니펫 하나, Codex는 설정 없음).
 
@@ -65,6 +66,14 @@ Claude Code 사용량을 보여 줍니다.
 
 macOS 13 이상이 필요합니다.
 
+### Homebrew
+
+```sh
+brew install --cask s3onghyun/tap/token-yugong
+```
+
+`brew upgrade --cask token-yugong`으로 업데이트합니다. 처음 실행 때 승인은 똑같이 한 번 필요합니다([처음 실행](#처음-실행)).
+
 ### 앱 내려받기
 
 1. 최신 [GitHub Release](https://github.com/s3onghyun/token-yugong/releases/latest)에서
@@ -101,8 +110,9 @@ git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
 open build/TokenYugong.app     # 먼저 /Applications로 옮겨도 됩니다
 ```
 
-처음 실행하면 짧은 안내가 나옵니다. 마지막 장의 **스니펫 복사** 버튼으로 Claude Code
-상태줄을 연결합니다(아래). 종료는 팝오버에서 합니다.
+처음 실행하면 짧은 안내가 나옵니다(세 장, 30초쯤, 언제든 **건너뛰기**). 할아버지가 무엇을 보여 주는지,
+Claude Code 상태줄을 잇는 **연결하기**(아래), 설정이 어디 있는지 알려 줍니다. 설정 › *사용법과 Claude Code
+연결…*로 다시 엽니다. 종료는 팝오버에서 합니다.
 
 번들 없이 `swift run -c release TokenPet`으로도 돌릴 수 있습니다(이때는 알림과 로그인 시
 열기가 없습니다).
@@ -169,7 +179,7 @@ Gemini CLI도 설정할 것이 없습니다(`~/.gemini/tmp`에서 토큰을 읽�
 ![우공 창](docs/yugong-window.png)
 
 끌어서 어디든(세로 모니터 같은 다른 화면도) 옮기고, 모서리를 끌어 크기를 바꾸면 비율을 지키며
-커지고 작아집니다. 제목 막대의 ⋯ 단추(또는 오른쪽 클릭)로 작게·보통·크게, 보통 창·*항상 위에*·
+커지고 작아집니다. 제목 막대의 ⋯ 단추(또는 오른쪽 클릭)로 작게·보통·크게, *간단히*(장면과 상태 한 줄만), 보통 창·*항상 위에*·
 *바탕화면에 두기*(모든 앱 창 아래, 모든 Space에), 불투명도를 고릅니다. Esc나 닫기 단추로 닫습니다.
 크기, 위치, 위·아래 설정, 불투명도는 기억하고, 그 화면이 없어졌으면 주 화면에 다시 나타납니다. 설정 ›
 *앱이 열릴 때 우공 창도 열기*(기본 꺼짐)를 켜면 실행할 때, *로그인할 때 열기*와 함께면 로그인할 때

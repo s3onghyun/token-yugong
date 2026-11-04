@@ -22,6 +22,7 @@ Claude Code と Codex の使用リミットを見せる、ドット絵のメニ�
 
 **インストール**（macOS 13 以降、Apple silicon・Intel）：[Releases](https://github.com/s3onghyun/token-yugong/releases/latest) から
 `TokenYugong-<version>-macos-universal.zip` をダウンロードして展開し、`TokenYugong.app` をアプリケーションフォルダへ移動します。
+Homebrew でも入れられます：`brew install --cask s3onghyun/tap/token-yugong`。
 まだ公証を受けていないため、初回起動時に一度だけ許可が必要です。[初回起動](#初回起動) を参照してください。
 そのあと [Claude Code と接続](#claude-code-との接続) します（スニペット1つ。Codex は設定不要）。
 
@@ -68,6 +69,14 @@ Mac のメニューバーに住んで Claude Code の使用量を見せてくれ
 
 macOS 13 以降が必要です。
 
+### Homebrew
+
+```sh
+brew install --cask s3onghyun/tap/token-yugong
+```
+
+`brew upgrade --cask token-yugong` で更新します。初回起動時の許可はこの場合も一度必要です（[初回起動](#初回起動)）。
+
 ### アプリをダウンロード
 
 1. 最新の [GitHub Release](https://github.com/s3onghyun/token-yugong/releases/latest) から
@@ -104,8 +113,9 @@ git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 
-初回起動時には短いガイドが出ます。最後のページに Claude Code ステータスライン用の **スニペットをコピー**
-ボタンがあります（下記）。終了はポップオーバーから行います。
+初回起動時には短いガイドが出ます（3ページ、約30秒、いつでも **スキップ** できます）。おじいさんが何を見せるか、
+Claude Code ステータスラインをつなぐ **接続**（下記）、設定の場所を案内します。設定 › *使い方と Claude Code の接続…*
+でもう一度開けます。終了はポップオーバーから行います。
 
 バンドルを作らずに実行することもできます：`swift run -c release TokenPet`（この場合、通知とログイン時の起動は使えません）。
 
@@ -171,7 +181,7 @@ Codex は設定不要です。Codex 自身のログ（`~/.codex/sessions`）に�
 ![愚公ウィンドウ](docs/yugong-window.png)
 
 好きな場所へドラッグでき（縦置きを含む別のディスプレイにも）、角をドラッグしてサイズを変えられます。中身は
-縦横比を保ったまま拡大縮小されます。タイトルバーの ⋯ ボタン（または右クリック）で、小・中・大、
+縦横比を保ったまま拡大縮小されます。タイトルバーの ⋯ ボタン（または右クリック）で、小・中・大、*コンパクト*（場面と状態の1行だけ）、
 通常のウィンドウ、*常に手前に表示*、*デスクトップに置く*（すべてのアプリのウィンドウの下、すべての操作スペースに表示）、
 不透明度を選べます。Esc か閉じるボタンで隠れます。サイズ、位置、レベル、不透明度は記憶され、そのディスプレイが
 なくなった場合はメイン画面に戻ってきます。設定 › *アプリ起動時に愚公ウィンドウも開く*（既定はオフ）で起動時に開き、
