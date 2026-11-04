@@ -178,7 +178,7 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 `--stage`（把菜单栏图标和弹出面板放进同一个窗口，便于录屏）、`--allow-capture`、`--open`、
 `--settings`、`--guide`、`--pretend-hidden`（试用小窗口回退）、
 `--render <dir>`（PNG 静帧）、`--icon-set <dir>`、`--scan-report`（打印读到的内容）、`status`、`setup`（见上文命令行）、
-`--anim-stats`。`TOKENPET_PREFS=<domain>` 可以让测试运行不碰你的设置。
+`--anim-stats`。加上 `HOME=<dir>` 可以在一个用完即弃的主目录里运行全部功能。`TOKENPET_PREFS=<domain>` 可以让测试运行不碰你的设置。
 
 角色设定图：`swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`。
 `--social` 绘制 `docs/social-preview.png`；`--hero` 绘制 `docs/hero.gif` 的各帧，然后执行：

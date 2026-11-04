@@ -19,6 +19,10 @@
   `TokenPet setup --json`, with stable keys, plain-language errors on stderr and exit code 1.
 
 ### Changed
+- Japanese and Chinese wording: one word for each thing across the app (Japanese リミット, not
+  sometimes 上限; Chinese 额度, 背架 and token, not sometimes 限额, 背篓 or 令牌), full-width
+  punctuation in the titles window, and a few stiff lines rewritten (*limit has reset* is リセット, not
+  戻った).
 - The first-run guide takes about 30 seconds: what Grandpa shows (the carrier, his pace, the mountain)
   on one page, **Connect** for Claude Code, then where Settings and the Yugong window's ⋯ menu are.
   **Skip** on every page; it still shows once by itself and Settings › *How it works and Claude Code
