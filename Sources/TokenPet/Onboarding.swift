@@ -27,7 +27,8 @@ enum StatusLineSetup {
     }
 
     /// A bridge installed earlier in `dir` that differs from this app's is replaced, so an update reaches
-    /// it (this version adds the hashed account). Nothing happens where none was installed; settings.json is not touched.
+    /// it (this version pins hashed account ids to status-line sessions). Nothing happens where none was installed;
+    /// settings.json is not touched.
     static func refreshInstalled(in dir: URL) {
         let dest = dir.appendingPathComponent("statusline-bridge.sh")
         guard let src = bundledBridge, let have = try? Data(contentsOf: dest), have != (try? Data(contentsOf: src)) else { return }

@@ -181,6 +181,10 @@ struct Accounts: Equatable, Codable {
         return i < 26 ? String(UnicodeScalar(65 + i)!) : "#\(i + 1)"
     }
 
+    /// A `/login` was seen, but its first status-line redraw belonged to an already-known account.
+    /// Wait for a reply from the newly signed-in account instead of showing that old payload as new.
+    var awaitingReading: Bool { id != nil && reading == nil }
+
     static func same(_ a: Date, _ b: Date) -> Bool { abs(a.timeIntervalSince(b)) <= 60 }
     /// `w` is the week after `cur`: `cur` has passed (as of `at`) and `w` is later.
     static func next(_ w: Date, after cur: Date, at: Date) -> Bool { cur <= at && w > cur }
