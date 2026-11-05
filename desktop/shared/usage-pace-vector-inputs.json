@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "logic": [
+    { "name": "weekly_only_day_share", "source": "Rules.dailyShareExactlyAtThreshold", "now": 1793750400, "week": { "pct": 42.85714285714286, "resets_at": 1794164400 } },
+    { "name": "weekly_only_unused_days_carry", "source": "Rules.unusedDaysCarryOver", "now": 1793653200, "week": { "pct": 19, "resets_at": 1794164400 } },
+    { "name": "five_hour_wins_and_disables_daily", "source": "Rules.fiveHourPresentMeansNoDaily", "now": 1793570400, "five": { "pct": 10, "resets_at": 1793574000 }, "week": { "pct": 30, "resets_at": 1794164400 } },
+    { "name": "weekly_limit_rests", "source": "Rules.weeklyOnlyRestsOnlyAtTheWeeklyLimit", "now": 1793822400, "week": { "pct": 100, "resets_at": 1794164400 } },
+    { "name": "five_hour_steady_threshold", "source": "Rules.paceThresholds", "now": 1793595600, "five": { "pct": 37.5, "resets_at": 1793604600 } },
+    { "name": "five_hour_straining_threshold", "source": "Rules.paceThresholds", "now": 1793595600, "five": { "pct": 55, "resets_at": 1793604600 } },
+    { "name": "rolled_window_is_morning", "source": "Rules.resetInThePast", "now": 1794164460, "week": { "pct": 90, "resets_at": 1794164400 } }
+  ],
+  "pace": [
+    { "name": "three_minute_open_window", "source": "PaceTests.rateCountsTheLastThreeMinutes", "now": 1793595600, "events": [{ "at": 1793595420, "output_tokens": 999 }, { "at": 1793595421, "output_tokens": 300 }, { "at": 1793595540, "output_tokens": 300 }, { "at": 1793595600, "output_tokens": 300 }, { "at": 1793595605, "output_tokens": 999 }] },
+    { "name": "high_boundary", "source": "PaceTests.levelsExactlyAtBounds", "now": 1793595600, "events": [{ "at": 1793595599, "output_tokens": 6000 }] },
+    { "name": "very_high_boundary", "source": "PaceTests.levelsExactlyAtBounds", "now": 1793595600, "events": [{ "at": 1793595599, "output_tokens": 24000 }] }
+  ]
+}
