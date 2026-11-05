@@ -80,6 +80,7 @@ import Testing
         #expect(Update.route(app: app, writable: true, brewed: true) == .brew)        // brew keeps its own record
         #expect(Update.route(app: app, writable: false, brewed: false) == .manual)
         #expect(Update.route(app: URL(fileURLWithPath: "/tmp/.build/debug"), writable: true, brewed: false) == .manual)   // swift run
+        #expect(!Update.brewed(URL(fileURLWithPath: "/tmp/try/TokenYugong.app")))   // a copy outside (~)/Applications is never Homebrew's
     }
 
     @Test func acceptsOnlyThisAppAtTheOfferedVersion() {

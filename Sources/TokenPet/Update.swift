@@ -92,8 +92,11 @@ enum Update {
         guard app.pathExtension == "app" else { return .manual }
         return brewed ? .brew : writable ? .replace : .manual
     }
-    static var brewed: Bool {
-        ["/opt/homebrew", "/usr/local"].contains { FileManager.default.fileExists(atPath: "\($0)/Caskroom/token-yugong") }
+    /// Homebrew's copy: the cask is installed and this is the app it put in (~)/Applications. Another copy is ours to replace.
+    static func brewed(_ app: URL) -> Bool {
+        let path = app.resolvingSymlinksInPath().path
+        return ["/Applications", NSHomeDirectory() + "/Applications"].contains { path == "\($0)/TokenYugong.app" }
+            && ["/opt/homebrew", "/usr/local"].contains { FileManager.default.fileExists(atPath: "\($0)/Caskroom/token-yugong") }
     }
 
     enum Install: Equatable { case working, failed(String) }
@@ -161,7 +164,7 @@ extension UsageModel {
     var updateRoute: Update.Route {
         let app = Bundle.main.bundleURL, fm = FileManager.default
         return Update.route(app: app, writable: fm.isWritableFile(atPath: app.path) && fm.isWritableFile(atPath: app.deletingLastPathComponent().path),
-                            brewed: Update.brewed)
+                            brewed: Update.brewed(app))
     }
 
     /// Update: download, check and swap the app, then quit and open the new one at the same path.
