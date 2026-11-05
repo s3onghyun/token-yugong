@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.3 (2026-11-05)
 
 ### Added
 - **Update** in the new-version row: downloads that release's ZIP, checks it (size, same bundle id,
