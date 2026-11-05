@@ -67,9 +67,25 @@ struct PopoverView: View {
             VStack(alignment: .leading, spacing: 10) { scene(model.snap); headline(model.snap) }
                 .padding(14)
                 .frame(width: 320)
-        } else {
+        } else if inWindow {
             full
+        } else {
+            // taller than the screen (settings and more open, under the mini window): scroll instead of being cut
+            let measured = full.background(GeometryReader { g in Color.clear.preference(key: FullHeight.self, value: g.size.height) })
+            Group {
+                if let h = fullHeight, h > model.popoverMaxHeight {
+                    ScrollView(.vertical) { measured }.frame(height: model.popoverMaxHeight)
+                } else {
+                    measured
+                }
+            }
+            .onPreferenceChange(FullHeight.self) { fullHeight = $0 }
         }
+    }
+    @State private var fullHeight: CGFloat?
+    private struct FullHeight: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
     }
 
     private func headline(_ s: Snapshot) -> some View {
@@ -288,16 +304,54 @@ struct PopoverView: View {
 
     /// The update notice: shown until the user updates or skips this version.
     private func updateRow(_ v: SemVer) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "arrow.down.circle.fill").foregroundColor(Color(red: 0.75, green: 0.28, blue: 0.23))
-            Text(L.t("Version \(v) is out", "새 버전 \(v)", "新バージョン \(v)", "新版本 \(v)")).font(.caption.weight(.semibold))
-            Spacer()
-            Button(L.t("Release page", "릴리스 페이지", "リリースページ", "发布页面")) { NSWorkspace.shared.open(Update.page(v)) }
-                .buttonStyle(.link)
-            Button(L.t("Skip this version", "이 버전 건너뛰기", "このバージョンをスキップ", "跳过此版本")) { model.skippedVersion = v.description }
-                .buttonStyle(.link).foregroundColor(.secondary)
+        let route = model.updateRoute, step = model.installStep
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle.fill").foregroundColor(Color(red: 0.75, green: 0.28, blue: 0.23))
+                Text(L.t("Version \(v) is out", "새 버전 \(v)", "新バージョン \(v)", "新版本 \(v)")).font(.caption.weight(.semibold))
+                Spacer()
+                if step == .working {
+                    ProgressView().controlSize(.small)
+                    Text(L.t("Updating…", "업데이트하는 중…", "アップデート中…", "正在更新…")).foregroundColor(.secondary)
+                } else if route == .replace {
+                    Button(L.t("Update", "업데이트", "アップデート", "更新")) { model.installUpdate(v) }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                }
+            }
+            if case .failed = step {
+                Text(L.t("Couldn't update; the current app is unchanged. Try again or use the release page.",
+                         "업데이트하지 못했어요. 지금 앱은 그대로예요. 다시 시도하거나 릴리스 페이지를 이용해 주세요.",
+                         "アップデートできませんでした。今のアプリはそのままです。もう一度試すか、リリースページを使ってください。",
+                         "未能更新，当前应用保持不变。请重试或使用发布页面。")).foregroundColor(.secondary)
+            }
+            if route == .brew {
+                Text(L.t("Installed with Homebrew. Update it in Terminal:", "Homebrew로 설치했어요. 터미널에서 업데이트하세요:",
+                         "Homebrew でインストールされています。ターミナルでアップデートしてください：", "通过 Homebrew 安装。请在终端中更新："))
+                    .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    Text(Update.brewCommand).font(.caption.monospaced()).textSelection(.enabled).lineLimit(1).minimumScaleFactor(0.8)
+                    Spacer()
+                    Button(L.t("Copy", "복사", "コピー", "复制")) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(Update.brewCommand, forType: .string)
+                    }.buttonStyle(.link)
+                }
+            } else if route == .manual {
+                Text(L.t("This copy can't be replaced in place. Download it from the release page.",
+                         "이 위치의 앱은 바로 바꿀 수 없어요. 릴리스 페이지에서 받아 주세요.",
+                         "この場所のアプリはその場で置き換えられません。リリースページからダウンロードしてください。",
+                         "此位置的应用无法直接替换。请从发布页面下载。")).foregroundColor(.secondary)
+            }
+            HStack(spacing: 10) {
+                Spacer()
+                Button(L.t("Release page", "릴리스 페이지", "リリースページ", "发布页面")) { NSWorkspace.shared.open(Update.page(v)) }
+                    .buttonStyle(.link)
+                Button(L.t("Skip this version", "이 버전 건너뛰기", "このバージョンをスキップ", "跳过此版本")) { model.skippedVersion = v.description }
+                    .buttonStyle(.link).foregroundColor(.secondary)
+            }
         }
         .font(.caption)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     /// Settings: this version and what the last check found.

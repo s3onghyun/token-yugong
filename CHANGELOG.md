@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.3 (2026-11-05)
+
+### Added
+- **Update** in the new-version row: downloads that release's ZIP, checks it (size, same bundle id,
+  exactly that version, `codesign --verify`), swaps it in for the running app and restarts. On any
+  failure the current app is left as it was. Installed with Homebrew, the row shows
+  `brew upgrade --cask s3onghyun/tap/token-yugong` with a Copy button instead; where the app cannot be
+  replaced, it points to the release page.
+
+### Fixed
+- The popover opened from the mini window could be cut off at the bottom of a shorter screen (with
+  Settings or More open it grew past the screen). It now stays within the screen and scrolls.
+
 ## 0.2.2 (2026-11-04)
 
 ### Added

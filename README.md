@@ -175,7 +175,7 @@ either (its tokens are read from `~/.gemini/tmp`).
 budget in USD and paste an **Admin key** (OpenAI reports costs only to Admin keys). The meter is
 this month's spend ÷ the budget, asked every 15 minutes. For DeepSeek, paste an API key to see the
 balance; DeepSeek does not report spend, so its meter says "don't know". Keys go into the login
-Keychain only. These two and the once-a-day update check (below) are the only times the app
+Keychain only. These two and the update check and download (below) are the only times the app
 uses the network.
 
 ## The Yugong window
@@ -221,10 +221,16 @@ one `L.t(en, ko, ja, zh)` call, and `./test.sh` fails on a missing or wrong-scri
 Once a day the app asks GitHub for the latest release: one HTTPS GET to
 `api.github.com/repos/s3onghyun/token-yugong/releases/latest`, with only `User-Agent: TokenYugong/<version>`,
 `Accept` and a fixed `Accept-Language: en`, no cookies and no cache. Nothing about you or your usage is
-sent, and there is no telemetry. When a newer version is out, the popover shows a row with **Release
-page** and **Skip this version**, and you get one notification for that version. The app never
-downloads or installs anything itself: download the new ZIP, check its `.sha256` and replace the app
-as in [Install](#install). Settings › *Check for updates (once a day)* turns it off; *Check now* asks
+sent, and there is no telemetry. When a newer version is out, the popover shows a row with **Update**,
+**Release page** and **Skip this version**, and you get one notification for that version. Nothing is
+downloaded until you click **Update**: then the app fetches that release's ZIP from
+`github.com/s3onghyun/token-yugong/releases/download/v<version>/`, unzips it to a temporary folder,
+checks it is Token Yugong (same bundle id) at exactly that version with a valid signature
+(`codesign --verify`), swaps it in for the app where it runs and restarts. If anything fails, the
+current app stays as it was. Installed with Homebrew, the row shows
+`brew upgrade --cask s3onghyun/tap/token-yugong` with a Copy button instead, so Homebrew's record stays
+right; where the app cannot be replaced (a folder you cannot write to), use the release page and
+replace it as in [Install](#install). Settings › *Check for updates (once a day)* turns it off; *Check now* asks
 at once.
 
 ## Privacy
@@ -239,7 +245,7 @@ Token Yugong reads files on your Mac and keeps everything there. No account, no 
 | `~/.gemini/tmp` | Gemini CLI token counts |
 
 - **Network:** only the once-a-day update check (one GET to the GitHub releases API, can be turned
-  off), and, only if you paste a key, OpenAI's costs API or DeepSeek's balance API every 15 minutes.
+  off), the release ZIP when you click **Update**, and, only if you paste a key, OpenAI's costs API or DeepSeek's balance API every 15 minutes.
 - **Keys** live in your login Keychain, nowhere else.
 - **Settings and history** (the mountain, titles) stay in the `TokenPet` UserDefaults domain on this
   Mac; `defaults delete TokenPet` erases them. What the app read from the bridge (hashed account,
