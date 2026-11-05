@@ -66,19 +66,21 @@ default). A used-up **weekly** limit is a long rest: a full moon instead of the 
 
 ### Another account
 
-Claude Code tells the status line no account, and every session writes the same `limits.json`.
+Claude Code tells the status line a `session_id`, and every session writes the same `limits.json`.
 After `/login` the running sessions use the new account, but each one keeps the numbers of its last
 answer until it answers again, and redraws them (an idle session writes the old account's numbers
 for hours). Claude Code also drops a window from the status line once it resets, so an idle
 session's numbers often lack the 5-hour window.
 
-The bridge names the signed-in account: a 12-character SHA-256 hash of `oauthAccount.accountUuid`
-in `.claude.json` (under `CLAUDE_CONFIG_DIR` when set). The id itself is never stored. Which numbers
-belong to which account is told by the **weekly reset time** (each account's week resets at its
-own time). Older bridges name no account; then the weekly reset alone decides. The app keeps which
-account is current, each named account's weekly reset and the merged numbers in the settings
-(`claude.account`: hashes, reset times and percentages only). An installed bridge older than the
-app is replaced at launch (settings.json is not touched).
+The bridge names the signed-in account with a 12-character SHA-256 hash of `oauthAccount.accountUuid`
+in `.claude.json` (under `CLAUDE_CONFIG_DIR` when set). It pins that hash to the session's own
+SHA-256 hash on its first reply, so a session which redraws after `/login` stays attributed to its
+old account instead of receiving the new global login's hash. The raw account and session ids are
+never stored. Which numbers belong to which account is otherwise told by the **weekly reset time**
+(each account's week resets at its own time). Older bridges name no account; then the weekly reset
+alone decides. The app keeps which account is current, each named account's weekly reset and the
+merged numbers in the settings (`claude.account`: hashes, reset times and percentages only). An
+installed bridge older than the app is replaced at launch (settings.json is not touched).
 
 | When | Then |
 |---|---|

@@ -111,16 +111,16 @@ struct PopoverView: View {
             if !s.known {
                 meterRow(L.t("Limit", "한도", "リミット", "额度"), nil)
             } else if let d = s.daily {
-                // no 5-hour window on this account: the weekly limit is the carrier, today's share only sets the pace
+                // Claude Code did not report a 5-hour window: the weekly limit is the carrier, today's share only sets the pace
                 meterRow(L.t("Weekly (the carrier)", "주간 (지게)", "週間（背負子）", "每周（背架）"), s.week)
                 meterRow(L.t("Today's share: pace (1/7 of the week)",
                              "오늘 몫: 속도 (주간의 1/7)",
                              "今日の取り分：ペース（週の1/7）",
                              "今日份额：节奏（每周的 1/7）"), Meter(pct: d.fill * 100, resetsAt: d.dayEnd), pace: true)
-                if showMore { Text(L.t("No 5-hour limit on this account, only weekly. Grandpa naps only when the weekly limit runs out\(weeklyReset(s)); going past today's share just makes him sweat.",
-                         "이 계정은 5시간 한도 없이 주간 한도만 있어요. 할아버지는 주간 한도를 다 쓸 때만 쉬어요\(weeklyReset(s)). 오늘 몫을 넘으면 땀만 흘려요.",
-                         "このアカウントには5時間リミットがなく、週間リミットだけです。おじいさんが休むのは週間リミットを使い切ったときだけです\(weeklyReset(s))。今日の取り分を超えても汗をかくだけです。",
-                         "这个账号没有 5 小时额度，只有每周额度。只有每周额度用完时爷爷才会打盹\(weeklyReset(s))；超过今日份额只会让他流汗。"))
+                if showMore { Text(L.t("Claude Code is not reporting a 5-hour window right now, so Yugong is showing the weekly limit. Grandpa naps only when that weekly limit runs out\(weeklyReset(s)); going past today's share just makes him sweat.",
+                         "Claude Code가 지금은 5시간 구간을 알려주지 않아 주간 한도를 보여요. 할아버지는 주간 한도를 다 쓸 때만 쉬어요\(weeklyReset(s)). 오늘 몫을 넘으면 땀만 흘려요.",
+                         "Claude Code が今は5時間リミットを報告していないため、愚公は週間リミットを表示しています。おじいさんが休むのはその週間リミットを使い切ったときだけです\(weeklyReset(s))。今日の取り分を超えても汗をかくだけです。",
+                         "Claude Code 目前没有报告 5 小时额度，因此愚公显示每周额度。只有该每周额度用完时爷爷才会打盹\(weeklyReset(s))；超过今日份额只会让他流汗。"))
                     .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true) }
             } else {
                 windowRows(Reading(five: s.five, week: s.week, at: s.captured ?? clockNow, month: s.month))
@@ -134,10 +134,15 @@ struct PopoverView: View {
             }
             if !s.demo && !s.known { note(source(main, nil)) }   // how to connect: never folded away
             if !s.demo && main == .claude && model.accountNote {
-                note(L.t("Account change detected: showing the new Claude account's limits.",
-                         "계정 바뀜 감지: 새 Claude 계정의 한도를 보여 줘요.",
-                         "アカウントの切り替えを検出：新しい Claude アカウントのリミットを表示します。",
-                         "检测到账号切换：显示新 Claude 账号的额度。"))
+                note(model.accountAwaitingReading
+                     ? L.t("Account change detected — waiting for a reply from the new Claude account.",
+                           "계정 바뀜 감지: 새 Claude 계정의 다음 응답을 기다려요.",
+                           "アカウントの切り替えを検出：新しい Claude アカウントからの応答を待っています。",
+                           "检测到账号切换：正在等待新 Claude 账号的回复。")
+                     : L.t("Account change detected: showing the new Claude account's limits.",
+                           "계정 바뀜 감지: 새 Claude 계정의 한도를 보여 줘요.",
+                           "アカウントの切り替えを検出：新しい Claude アカウントのリミットを表示します。",
+                           "检测到账号切换：显示新 Claude 账号的额度。"))
             }
             ForEach([Role.son, .grandson, .boy].filter { model.family.roles[$0] != nil }) { role in
                 // one row each: his headline window (5-hour, else weekly, else the month's budget)

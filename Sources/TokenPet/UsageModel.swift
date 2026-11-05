@@ -340,6 +340,8 @@ final class UsageModel: ObservableObject {
     var accountLine: (letter: String?, id: String?, seen: Date?) { (accounts.letter, accounts.id.map { String($0.prefix(6)) }, accounts.seen) }
     /// "Account change detected" in the popover, for as long as the wife asks about it.
     var accountNote: Bool { accounts.switchedAt.map { Date().timeIntervalSince($0) < Visitors.afterChange } ?? false }
+    /// An old session redrew first after `/login`; its payload is deliberately ignored until the new account replies.
+    var accountAwaitingReading: Bool { accounts.awaitingReading }
 
     static func readBridge(_ url: URL) -> Reading? {
         guard let data = try? Data(contentsOf: url) else { return nil }

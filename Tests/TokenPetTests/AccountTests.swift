@@ -160,10 +160,10 @@ import Testing
         var a = Accounts()
         _ = a.take(max(login - hour, tag: M))                                                   // signed in to M
         #expect(a.take(max(login + 30, tag: T)) == nil)                                        // /login: M's numbers, now named T
-        #expect(a.switchedAt == login + 30 && a.letter == "B")
+        #expect(a.switchedAt == login + 30 && a.letter == "B" && a.awaitingReading)
         let fresh = team(login + 76 * 60, five: Meter(pct: 26, resetsAt: tFive), tag: T)
         #expect(a.take(fresh) == fresh)
-        #expect(a.take(max(login + 9 * hour, tag: T)) == fresh)                                // 04:27, after hours of quiet
+        #expect(!a.awaitingReading && a.take(max(login + 9 * hour, tag: T)) == fresh)           // 04:27, after hours of quiet
         #expect(a.switchedAt == login + 30 && a.id == T)
     }
 

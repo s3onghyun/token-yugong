@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.4 (2026-11-05)
+
+### Fixed
+- After a Claude Code `/login`, an already-running session could redraw its old account's limits.
+  The bridge had been reading the *current* global login for every redraw and consequently relabelled
+  that old payload as the new account. It now pins each status-line session to the first account hash
+  it sees, so alternating old/new sessions stay separated and Yugong can ignore the old reading. Both
+  the account and session identifiers are SHA-256 hashes kept only on this Mac; no raw identifier,
+  prompt, path or telemetry is saved.
+- When an old session is the first to redraw after the switch, the popover now says **계정 바뀜 감지**
+  and waits for a reply from the new account instead of calling the old payload the new account's usage.
+- If Claude Code omits `five_hour`, Yugong now says it is showing the weekly limit because the 5-hour
+  window is not being reported *right now*, rather than claiming the account has no 5-hour limit.
+
 ## 0.2.3 (2026-11-05)
 
 ### Added

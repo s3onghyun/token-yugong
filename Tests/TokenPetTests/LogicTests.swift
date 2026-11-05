@@ -415,4 +415,31 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         _ = try run(#"{"session_id":"s"}"#)                     // before the first response: no rate_limits
         #expect(try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8) == saved)   // kept, not wiped
     }
+
+    @Test func bridgePinsAStatusLineSessionToItsFirstAccount() throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let config = dir.appendingPathComponent("config")
+        try FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)
+        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../bridge/statusline-bridge.sh").standardized
+        func run(_ input: String, accountID: String) throws -> Reading {
+            try #"{"oauthAccount":{"accountUuid":"\#(accountID)"}}"#.write(to: config.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
+            p.environment = ["TOKENPET_DIR": dir.path, "CLAUDE_CONFIG_DIR": config.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
+            let i = Pipe(); p.standardInput = i
+            try p.run(); i.fileHandleForWriting.write(Data(input.utf8)); try i.fileHandleForWriting.close(); p.waitUntilExit()
+            return try #require(Limits.bridge(Data(contentsOf: dir.appendingPathComponent("limits.json")), fileDate: Date()))
+        }
+        let oldID = "old-account-id", newID = "new-account-id"
+        let old = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":37,"resets_at":1794164400}}}"#, accountID: oldID)
+        // `/login` changes the global config. An old session redraw must retain its first account hash.
+        let oldRedraw = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":38,"resets_at":1794164400}}}"#, accountID: newID)
+        let fresh = try run(#"{"session_id":"new-session","rate_limits":{"seven_day":{"used_percentage":57,"resets_at":1794164400}}}"#, accountID: newID)
+        #expect(old.account != nil && oldRedraw.account == old.account && fresh.account != old.account)
+        let stored = try FileManager.default.contentsOfDirectory(at: dir.appendingPathComponent("sessions"), includingPropertiesForKeys: nil)
+        #expect(stored.count == 2)
+        for u in stored {
+            let text = try String(contentsOf: u, encoding: .utf8)
+            #expect(!u.lastPathComponent.contains("session") && !text.contains(oldID) && !text.contains(newID))
+        }
+    }
 }
