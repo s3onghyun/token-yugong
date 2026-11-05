@@ -22,6 +22,7 @@ Claude Code と Codex の使用リミットを見せる、ドット絵のメニ�
 
 **インストール**（macOS 13 以降、Apple silicon・Intel）：[Releases](https://github.com/s3onghyun/token-yugong/releases/latest) から
 `TokenYugong-<version>-macos-universal.zip` をダウンロードして展開し、`TokenYugong.app` をアプリケーションフォルダへ移動します。
+Homebrew でも入れられます：`brew install --cask s3onghyun/tap/token-yugong`。
 まだ公証を受けていないため、初回起動時に一度だけ許可が必要です。[初回起動](#初回起動) を参照してください。
 そのあと [Claude Code と接続](#claude-code-との接続) します（スニペット1つ。Codex は設定不要）。
 
@@ -68,6 +69,18 @@ Mac のメニューバーに住んで Claude Code の使用量を見せてくれ
 
 macOS 13 以降が必要です。
 
+### Homebrew
+
+```sh
+brew install --cask s3onghyun/tap/token-yugong
+```
+
+`brew upgrade --cask token-yugong` で更新します。初回起動時の許可はこの場合も一度必要です（[初回起動](#初回起動)）。
+
+Homebrew 7 以降は、ほかの tap の cask を信頼（trust）するまで読み込みません。上のようにフルネームで
+インストールすると、この cask だけが自動で信頼されます。インストール前に `brew info --cask s3onghyun/tap/token-yugong`
+で確かめたいときは、先に `brew trust --cask s3onghyun/tap/token-yugong` を実行してください。
+
 ### アプリをダウンロード
 
 1. 最新の [GitHub Release](https://github.com/s3onghyun/token-yugong/releases/latest) から
@@ -104,8 +117,9 @@ git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 
-初回起動時には短いガイドが出ます。最後のページに Claude Code ステータスライン用の **スニペットをコピー**
-ボタンがあります（下記）。終了はポップオーバーから行います。
+初回起動時には短いガイドが出ます（3ページ、約30秒、いつでも **スキップ** できます）。おじいさんが何を見せるか、
+Claude Code ステータスラインをつなぐ **接続**（下記）、設定の場所を案内します。設定 › *使い方と Claude Code の接続…*
+でもう一度開けます。終了はポップオーバーから行います。
 
 バンドルを作らずに実行することもできます：`swift run -c release TokenPet`（この場合、通知とログイン時の起動は使えません）。
 
@@ -113,14 +127,28 @@ open build/TokenYugong.app     # or move it to /Applications first
 
 Claude Code は、ステータスラインのコマンドに公式のリミット（`rate_limits.five_hour` と
 `rate_limits.seven_day`：使用率 %、リセット時刻）を渡します。ブリッジスクリプトはそのオブジェクトだけを
-`~/.claude/token-pet/limits.json` に保存します。プロンプト、パス、セッション ID は保存せず、ネットワークも使いません。
+`~/.claude/token-pet/limits.json` に保存します（ほかはアカウントのハッシュだけ）。プロンプト、パス、セッション ID は保存せず、ネットワークも使いません。
 ステータスラインは成功した応答しか報告しないため、リミットを使い切ると 99% で止まります。そこでアプリは、
 Claude Code が自分のセッションログに書く拒否（`usage_limit_reached`、ウィンドウとリセット時刻つき）も読み取り、
 100% を表示しておじいさんを休ませます。
 
-ガイド（または設定 › *使い方と Claude Code の接続…*）の **スニペットをコピー** は、ブリッジを
-`~/.claude/token-pet/` にコピーし、次の内容をクリップボードに入れます。これを `~/.claude/settings.json` の
-一番外側のオブジェクトに自分で貼り付けてください。アプリがこのファイルを書き換えることはありません：
+**ワンクリック：** ガイド（または設定 › *使い方と Claude Code の接続…*）で **接続** を押します。変更前と変更後の
+`statusLine` を見せ、了承したときだけ書き込みます。**コマンド 1 行**（エージェントもこれを使います）：
+
+```sh
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup            # --dry-run を付けると見るだけ
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # 元に戻す
+```
+
+どちらもブリッジを `~/.claude/token-pet/` にコピーし、`~/.claude/settings.json` の `statusLine` キーだけを
+変えます。ほかのバイトはそのまま、バックアップは `~/.claude/token-pet/settings.json.<時刻>.bak`、もう一度
+実行しても何も変わらず、シンボリックリンクはリンクのまま残ります。すでにあるステータスラインは残します：
+`sh ~/.claude/token-pet/statusline-bridge.sh --chain '<元のコマンド>'` になり、同じ入力を受け取って、表示は
+元の出力のままです。`--undo` で元のコマンドに戻ります。この Mac に Claude Code がない（`~/.claude` がない）
+ときは、そう伝えて何も書きません。
+
+手で設定したい場合は **スニペットをコピー** で、ブリッジと次の内容をクリップボードに入れ、
+`~/.claude/settings.json` の一番外側のオブジェクトに貼り付けてください：
 
 ```json
 "statusLine": {
@@ -129,9 +157,13 @@ Claude Code が自分のセッションログに書く拒否（`usage_limit_reac
 }
 ```
 
-すでにステータスラインを使っている場合は、それを残したまま 1 行目を
-`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null` にし、
-JSON は `$input` から読んでください。
+（手で設定し、ステータスラインがすでにある場合：`"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<元のコマンド>'"`）
+
+**コマンドライン。** `TokenPet status [--json]` は Claude Code との接続と最後に届いたリミットを表示し、
+`TokenPet setup [--undo] [--dry-run] [--json]` は上の接続です。`--json` ではキーが固定された JSON オブジェクトを
+1 つ出力します（`result`、`before`、`after`、`backup`、`claude.connection`、`claude.reading.five_hour.used_percentage` など）。
+エラーは stderr にわかりやすい言葉で出し、終了コード 1、
+`{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}` を返します。
 
 ブリッジは `jq` があればそれを使い（macOS 15 以降は標準搭載）、なければ `plutil` を使います。
 Codex は設定不要です。Codex 自身のログ（`~/.codex/sessions`）にリミットが記録されています。Gemini CLI も
@@ -140,19 +172,20 @@ Codex は設定不要です。Codex 自身のログ（`~/.codex/sessions`）に�
 **API の予算。** OpenAI API の場合は、設定 › 家族 で家族の誰かに OpenAI を受け持たせ、月の予算を USD で入力し、
 **Admin key** を貼り付けます（OpenAI はコストを Admin key にしか報告しません）。メーターは今月の支出 ÷ 予算で、
 15 分ごとに問い合わせます。DeepSeek の場合は API キーを貼り付けると残高が見えます。DeepSeek は支出を報告しないため、
-メーターは「わからない」と表示します。キーはログインキーチェーンにだけ保存されます。この二つと、1日1回の
-アップデート確認（下記）だけが、アプリがネットワークを使う場面です。
+メーターは「わからない」と表示します。キーはログインキーチェーンにだけ保存されます。この二つと、アップデートの
+確認とダウンロード（下記）だけが、アプリがネットワークを使う場面です。
 
 ## 愚公ウィンドウ
 
-メニューバーのおじいさんをクリックするとポップオーバーが開き、場面、山、称号、すべてのメーターが見られます。
+メニューバーのおじいさんをクリックするとポップオーバーが開き、場面、山、すべてのメーターが見られます。「更新」の横の ⌄
+ボタン（もっと見る）で称号、数字の出どころ、Claude アカウント、掘る速さ、画面共有の設定が開き、開いた状態は記憶されます。
 初回起動時には一度だけおじいさんを指し示します（「おじいさんをクリックしてみてください」）。ポップオーバーの
 **ウィンドウ** ボタンを押すと、同じ場面がデスクトップに置いておける専用のウィンドウで開きます：
 
 ![愚公ウィンドウ](docs/yugong-window.png)
 
 好きな場所へドラッグでき（縦置きを含む別のディスプレイにも）、角をドラッグしてサイズを変えられます。中身は
-縦横比を保ったまま拡大縮小されます。タイトルバーの ⋯ ボタン（または右クリック）で、小・中・大、
+縦横比を保ったまま拡大縮小されます。タイトルバーの ⋯ ボタン（または右クリック）で、小・中・大、*コンパクト*（場面と状態の1行だけ）、
 通常のウィンドウ、*常に手前に表示*、*デスクトップに置く*（すべてのアプリのウィンドウの下、すべての操作スペースに表示）、
 不透明度を選べます。Esc か閉じるボタンで隠れます。サイズ、位置、レベル、不透明度は記憶され、そのディスプレイが
 なくなった場合はメイン画面に戻ってきます。設定 › *アプリ起動時に愚公ウィンドウも開く*（既定はオフ）で起動時に開き、
@@ -183,9 +216,14 @@ macOS は、入りきらないメニューバーアイコンを黙って隠し�
 1日1回、アプリが GitHub に最新リリースを問い合わせます。`api.github.com/repos/s3onghyun/token-yugong/releases/latest`
 への HTTPS GET 1回で、送るのは `User-Agent: TokenYugong/<version>`、`Accept`、固定の `Accept-Language: en` だけ。
 Cookie もキャッシュも使いません。あなたや使用状況についての情報は何も送らず、テレメトリもありません。新しいバージョンが
-出ると、ポップオーバーに **リリースページ** と **このバージョンをスキップ** の行が表示され、そのバージョンについて
-通知が一度届きます。アプリが自分で何かをダウンロードしたりインストールしたりすることはありません。新しい ZIP を
-ダウンロードし、`.sha256` を確認して、[インストール](#インストール) と同じ手順でアプリを置き換えてください。
+出ると、ポップオーバーに **アップデート**、**リリースページ**、**このバージョンをスキップ** の行が表示され、そのバージョン
+について通知が一度届きます。**アップデート** を押すまでは何もダウンロードしません。押すと
+`github.com/s3onghyun/token-yugong/releases/download/v<version>/` からそのリリースの ZIP を取得して一時フォルダに展開し、
+同じバンドル ID の Token Yugong であること、ちょうどそのバージョンであること、署名が有効であること（`codesign --verify`）を
+確かめてから、今動いている場所のアプリと入れ替えて再起動します。途中で失敗しても今のアプリはそのまま残ります。
+Homebrew でインストールした場合は、代わりに `brew upgrade --cask s3onghyun/tap/token-yugong` とコピーボタンを表示します
+（Homebrew の記録がずれないように）。アプリを置き換えられない場所（書き込みできないフォルダ）では、リリースページから
+ダウンロードし、[インストール](#インストール) と同じ手順で置き換えてください。
 設定 › *アップデートを確認（1日1回）* でオフにでき、*今すぐ確認* ですぐに問い合わせます。
 
 ## プライバシー
@@ -194,17 +232,20 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
 
 | 読むもの | 理由 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | ステータスラインのブリッジが書き込む Claude Code の公式リミット（使用率 %、リセット時刻。プロンプト、パス、セッション ID は含まない） |
+| `~/.claude/token-pet/limits.json` | ステータスラインのブリッジが書き込む Claude Code の公式リミット（使用率 %、リセット時刻。プロンプト、パス、セッション ID は含まない）。Claude アカウントを見分けるため、ブリッジは `~/.claude.json` の `oauthAccount.accountUuid` を読み、その SHA-256 ハッシュ 12 文字だけを書きます |
 | Claude Code のセッションログ（`~/.claude/projects`） | おじいさんのペースと山のためのトークン数、そしてリミットいっぱいを 100% と表示するための `usage_limit_reached` 拒否 |
 | `~/.codex/sessions` | Codex 自身のリミットとトークン数 |
 | `~/.gemini/tmp` | Gemini CLI のトークン数 |
 
-- **ネットワーク：** 1日1回のアップデート確認（GitHub releases API への GET 1回、オフにできます）と、
+- **ネットワーク：** 1日1回のアップデート確認（GitHub releases API への GET 1回、オフにできます）、**アップデート** を押したときのリリース ZIP、
   キーを貼り付けた場合に限り、15 分ごとの OpenAI の costs API または DeepSeek の残高 API だけです。
 - **キー** はログインキーチェーンにだけ保存され、ほかには置きません。
 - **設定と履歴**（山、称号）は、この Mac の UserDefaults ドメイン `TokenPet` に残ります。
-  `defaults delete TokenPet` で消去できます。
-- アプリは `~/.claude/settings.json` を書き換えません。ステータスラインのスニペットは自分で貼り付けてください。
+  `defaults delete TokenPet` で消去できます。アプリがブリッジから読んだ値（アカウントのハッシュ、%、リセット時刻）は
+  `~/Library/Application Support/TokenPet/claude-readings.log`（512 KB のファイル最大 2 つ）に記録され、
+  アカウントの取り違えを後から追えます。いつ削除しても構いません。
+- アプリが `~/.claude/settings.json` を書き換えるのは、**接続** を押したとき（変更内容を見せたあと）か
+  `TokenPet setup` を実行したときだけで、そのときも `statusLine` だけをバックアップ付きで変えます。`TokenPet setup --undo` で戻せます。
 
 ## 数字がペットになるまで
 
@@ -220,8 +261,8 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
 （`pseudo`：すべての文字列を約 40% 長くしてアクセント記号を付け、`--render` で文字の切れを見つける）、
 `--stage`（録画用に、メニューバー項目とポップオーバーを1つのウィンドウに）、`--allow-capture`、`--open`、
 `--settings`、`--guide`、`--pretend-hidden`（ミニウィンドウへの切り替えを試す）、
-`--render <dir>`（PNG 静止画）、`--icon-set <dir>`、`--scan-report`（読み取った内容を表示）、
-`--anim-stats`。`TOKENPET_PREFS=<domain>` を指定すると、テスト実行が自分の設定に影響しません。
+`--render <dir>`（PNG 静止画）、`--icon-set <dir>`、`--scan-report`（読み取った内容を表示）、`status`・`setup`（上のコマンドライン）、
+`--anim-stats`。`HOME=<dir>` を付けると使い捨てのホームで全部を動かせます。`TOKENPET_PREFS=<domain>` を指定すると、テスト実行が自分の設定に影響しません。
 
 キャラクターシート：`swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`。
 `--social` は `docs/social-preview.png` を描き、`--hero` は `docs/hero.gif` のフレームを描きます。そのあと：

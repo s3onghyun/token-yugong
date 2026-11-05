@@ -56,23 +56,56 @@ struct PopoverView: View {
 
     static let sceneSize = CGSize(width: 292, height: 176)
     @State var showSettings = args.contains("--settings")   // demo: open with settings shown
+    /// Off: the compact popover (scene, meters, pace, actions). On: title, sources, account, speed, capture. Remembered.
+    @AppStorage("popover.more", store: Prefs.store) var showMore = args.contains("--more")
+
+    /// The Yugong window's ⋯ › Compact: only the scene and its headline. Remembered.
+    @AppStorage("sceneWindow.compact", store: Prefs.store) var compactWindow = false
 
     var body: some View {
-        let s = model.snap
-        VStack(alignment: .leading, spacing: 10) {
-            scene(s)
-            HStack(alignment: .firstTextBaseline) {
-                Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!", "山が動いていく！", "山在移动！")
-                     : model.finaleDue ? L.t("The mountains are moving!", "두 산이 옮겨져요!", "二つの山が動いていく！", "两座山在移动！") : stateTitle(s.state))
-                    .font(.system(.headline, design: .rounded))
-                Spacer()
-                if let d = BarText.detail(s, now: clockNow) {
-                    Text(d).font(.subheadline.monospacedDigit().weight(.semibold)).foregroundColor(.secondary)
+        if inWindow && compactWindow {
+            VStack(alignment: .leading, spacing: 10) { scene(model.snap); headline(model.snap) }
+                .padding(14)
+                .frame(width: 320)
+        } else if inWindow {
+            full
+        } else {
+            // taller than the screen (settings and more open, under the mini window): scroll instead of being cut
+            let measured = full.background(GeometryReader { g in Color.clear.preference(key: FullHeight.self, value: g.size.height) })
+            Group {
+                if let h = fullHeight, h > model.popoverMaxHeight {
+                    ScrollView(.vertical) { measured }.frame(height: model.popoverMaxHeight)
+                } else {
+                    measured
                 }
             }
+            .onPreferenceChange(FullHeight.self) { fullHeight = $0 }
+        }
+    }
+    @State private var fullHeight: CGFloat?
+    private struct FullHeight: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+    }
+
+    private func headline(_ s: Snapshot) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(model.cutsceneDue ? L.t("The mountain is moving!", "산이 옮겨져요!", "山が動いていく！", "山在移动！")
+                 : model.finaleDue ? L.t("The mountains are moving!", "두 산이 옮겨져요!", "二つの山が動いていく！", "两座山在移动！") : stateTitle(s.state))
+                .font(.system(.headline, design: .rounded))
+            Spacer()
+            if let d = BarText.detail(s, now: clockNow) {
+                Text(d).font(.subheadline.monospacedDigit().weight(.semibold)).foregroundColor(.secondary)
+            }
+        }
+    }
+
+    private var full: some View {
+        let s = model.snap
+        return VStack(alignment: .leading, spacing: 10) {
+            scene(s)
+            headline(s)
             mountainRow
-            Button { model.openTitles?() } label: { TitleProgress(lifetime: model.lifetime).contentShape(Rectangle()) }
-                .buttonStyle(.plain).help(L.t("All titles and achievements…", "칭호와 업적 모두 보기…", "称号と実績をすべて見る…", "查看全部称号与成就…"))
             let main = model.family.roles[.grandpa] ?? .claude
             Text("\(main.name) · \(Role.grandpa.name) \(Role.grandpa.meter)").font(.caption.weight(.bold)).foregroundColor(.secondary)
             if !s.known {
@@ -84,11 +117,11 @@ struct PopoverView: View {
                              "오늘 몫: 속도 (주간의 1/7)",
                              "今日の取り分：ペース（週の1/7）",
                              "今日份额：节奏（每周的 1/7）"), Meter(pct: d.fill * 100, resetsAt: d.dayEnd), pace: true)
-                Text(L.t("No 5-hour limit on this account, only weekly. Grandpa naps only when the weekly limit runs out\(weeklyReset(s)); going past today's share just makes him sweat.",
+                if showMore { Text(L.t("No 5-hour limit on this account, only weekly. Grandpa naps only when the weekly limit runs out\(weeklyReset(s)); going past today's share just makes him sweat.",
                          "이 계정은 5시간 한도 없이 주간 한도만 있어요. 할아버지는 주간 한도를 다 쓸 때만 쉬어요\(weeklyReset(s)). 오늘 몫을 넘으면 땀만 흘려요.",
                          "このアカウントには5時間リミットがなく、週間リミットだけです。おじいさんが休むのは週間リミットを使い切ったときだけです\(weeklyReset(s))。今日の取り分を超えても汗をかくだけです。",
                          "这个账号没有 5 小时额度，只有每周额度。只有每周额度用完时爷爷才会打盹\(weeklyReset(s))；超过今日份额只会让他流汗。"))
-                    .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true) }
             } else {
                 windowRows(Reading(five: s.five, week: s.week, at: s.captured ?? clockNow, month: s.month))
             }
@@ -99,70 +132,100 @@ struct PopoverView: View {
                          "按这个速度，重置时约为 \(Int(p.rounded()))%"))
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
-            note(s.demo ? L.t("Simulated state for preview.",
-                              "미리보기용 가상 상태입니다.",
-                              "プレビュー用の仮の状態です。",
-                              "预览用的模拟状态。") : source(main, s.known ? s.captured : nil))
+            if !s.demo && !s.known { note(source(main, nil)) }   // how to connect: never folded away
             if !s.demo && main == .claude && model.accountNote {
                 note(L.t("Account change detected: showing the new Claude account's limits.",
                          "계정 바뀜 감지: 새 Claude 계정의 한도를 보여 줘요.",
                          "アカウントの切り替えを検出：新しい Claude アカウントのリミットを表示します。",
                          "检测到账号切换：显示新 Claude 账号的额度。"))
             }
-            if !s.demo {
-                Text(L.t("Shovel speed: \(Int(model.pace.smoothed.rounded())) output tokens/min (last 3 min, this Mac)",
-                         "삽질 속도: 분당 출력 토큰 \(Int(model.pace.smoothed.rounded())) (최근 3분, 이 Mac)",
-                         "掘る速さ：毎分 \(Int(model.pace.smoothed.rounded())) 出力トークン（直近3分、この Mac）",
-                         "挖土速度：每分钟 \(Int(model.pace.smoothed.rounded())) 个输出 token（最近 3 分钟，本机）"))
-                    .font(.caption).foregroundColor(.secondary)
-            }
             ForEach([Role.son, .grandson, .boy].filter { model.family.roles[$0] != nil }) { role in
                 // one row each: his headline window (5-hour, else weekly, else the month's budget)
                 let p = model.family.roles[role]!, r = s.members[role]?.reading
                 Divider()
                 meterRow("\(p.name) · \(role.name) \(role.meter)", r.flatMap { $0.five ?? $0.week ?? $0.month })
-                if r == nil || s.demo == false && p.billed { note(source(p, r?.at)) }
+                if showMore && (r == nil || s.demo == false && p.billed) { note(source(p, r?.at)) }
             }
             if let v = model.updateOffer { updateRow(v) }
-            Button { model.hideFromCapture.toggle() } label: {
-                HStack(spacing: 6) {
-                    let hidden = model.hideFromCapture && !model.captureAllowedForDemo
-                    Image(systemName: hidden ? "eye.slash.fill" : "eye")
-                    Text(model.captureAllowedForDemo ? L.t("Capture allowed for this demo recording",
-                                                           "데모 녹화를 위해 잠시 캡처 허용",
-                                                           "デモ録画のため一時的にキャプチャを許可",
-                                                           "为录制演示暂时允许截屏")
-                         : hidden ? L.t("Hidden from screen sharing", "화면 공유·녹화에서 숨김", "画面共有・録画で非表示", "在屏幕共享和录制中隐藏")
-                                  : L.t("Visible in screen sharing", "화면 공유·녹화에 보임", "画面共有・録画で表示", "在屏幕共享和录制中可见"))
-                }
-                .font(.caption)
-            }
-            .buttonStyle(.plain).foregroundColor(.secondary)
+            if showMore { more(s, main) }
             if showSettings { settings }
-            HStack {
-                Button { showSettings.toggle() } label: { Image(systemName: showSettings ? "gearshape.fill" : "gearshape") }
-                    .buttonStyle(.plain).foregroundColor(.secondary).help(L.t("Settings", "설정", "設定", "设置"))
-                if !inWindow {
-                    Button { model.openWindow?() } label: { Label(L.t("Window", "창으로 보기", "ウィンドウ", "窗口"), systemImage: "macwindow") }
-                        .buttonStyle(.plain).foregroundColor(.accentColor).fixedSize()
-                        .help(L.t("Show Grandpa in a window of his own: resize it, keep it on top or on the desktop",
-                                  "할아버지를 따로 창으로 띄워요. 크기를 바꾸고, 항상 위나 바탕화면에 둘 수 있어요",
-                                  "おじいさんを別のウィンドウで表示します。大きさを変えたり、常に手前やデスクトップに置けます",
-                                  "在单独的窗口中显示爷爷：可以调整大小、置顶或放在桌面上"))
-                }
-                if model.demo != nil || model.demoCycle || model.demoCutscene {
-                    Text(L.t("Demo data", "데모 데이터", "デモデータ", "演示数据")).font(.caption.weight(.semibold))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Capsule().fill(Color.orange.opacity(0.25)))
-                }
-                Spacer()
-                Button(L.t("Refresh", "새로고침", "更新", "刷新")) { model.refresh() }.disabled(model.scanning)
-                Button(L.t("Quit", "종료", "終了", "退出")) { NSApp.terminate(nil) }
-            }
-            .font(.callout)
+            actions
         }
         .padding(14)
         .frame(width: 320)
+    }
+
+    /// Behind "More": the title ladder, where the numbers come from, the account, the shovel speed, capture.
+    @ViewBuilder private func more(_ s: Snapshot, _ main: Provider) -> some View {
+        Divider()
+        Button { model.openTitles?() } label: { TitleProgress(lifetime: model.lifetime).contentShape(Rectangle()) }
+            .buttonStyle(.plain).help(L.t("All titles and achievements…", "칭호와 업적 모두 보기…", "称号と実績をすべて見る…", "查看全部称号与成就…"))
+        if s.demo || s.known {
+            note(s.demo ? L.t("Simulated state for preview.",
+                              "미리보기용 가상 상태입니다.",
+                              "プレビュー用の仮の状態です。",
+                              "预览用的模拟状态。") : source(main, s.captured))
+        }
+        if !s.demo && main == .claude, let seen = model.accountLine.seen {
+            // which account the numbers are from: A, B, ... and its short hash ("?" = a bridge that names none)
+            let a = model.accountLine, who = a.letter.map { "\($0) · \(a.id ?? "")" } ?? "?"
+            let when = Fmt.clock(seen, now: clockNow)
+            Text(L.t("Claude account \(who) · last update \(when)",
+                     "Claude 계정 \(who) · 마지막 갱신 \(when)",
+                     "Claude アカウント \(who) · 最終更新 \(when)",
+                     "Claude 账号 \(who) · 最后更新 \(when)"))
+                .font(.caption2).foregroundColor(.secondary)
+        }
+        if !s.demo {
+            Text(L.t("Shovel speed: \(Int(model.pace.smoothed.rounded())) output tokens/min (last 3 min, this Mac)",
+                     "삽질 속도: 분당 출력 토큰 \(Int(model.pace.smoothed.rounded())) (최근 3분, 이 Mac)",
+                     "掘る速さ：毎分 \(Int(model.pace.smoothed.rounded())) 出力トークン（直近3分、この Mac）",
+                     "挖土速度：每分钟 \(Int(model.pace.smoothed.rounded())) 个输出 token（最近 3 分钟，本机）"))
+                .font(.caption).foregroundColor(.secondary)
+        }
+        Button { model.hideFromCapture.toggle() } label: {
+            HStack(spacing: 6) {
+                let hidden = model.hideFromCapture && !model.captureAllowedForDemo
+                Image(systemName: hidden ? "eye.slash.fill" : "eye")
+                Text(model.captureAllowedForDemo ? L.t("Capture allowed for this demo recording",
+                                                       "데모 녹화를 위해 잠시 캡처 허용",
+                                                       "デモ録画のため一時的にキャプチャを許可",
+                                                       "为录制演示暂时允许截屏")
+                     : hidden ? L.t("Hidden from screen sharing", "화면 공유·녹화에서 숨김", "画面共有・録画で非表示", "在屏幕共享和录制中隐藏")
+                              : L.t("Visible in screen sharing", "화면 공유·녹화에 보임", "画面共有・録画で表示", "在屏幕共享和录制中可见"))
+            }
+            .font(.caption)
+        }
+        .buttonStyle(.plain).foregroundColor(.secondary)
+    }
+
+    private var actions: some View {
+        HStack {
+            Button { showSettings.toggle() } label: { Image(systemName: showSettings ? "gearshape.fill" : "gearshape") }
+                .buttonStyle(.plain).foregroundColor(.secondary).help(L.t("Settings", "설정", "設定", "设置"))
+            if !inWindow {
+                Button { model.openWindow?() } label: { Label(L.t("Window", "창으로 보기", "ウィンドウ", "窗口"), systemImage: "macwindow") }
+                    .buttonStyle(.plain).foregroundColor(.accentColor).fixedSize()
+                    .help(L.t("Show Grandpa in a window of his own: resize it, keep it on top or on the desktop",
+                              "할아버지를 따로 창으로 띄워요. 크기를 바꾸고, 항상 위나 바탕화면에 둘 수 있어요",
+                              "おじいさんを別のウィンドウで表示します。大きさを変えたり、常に手前やデスクトップに置けます",
+                              "在单独的窗口中显示爷爷：可以调整大小、置顶或放在桌面上"))
+            }
+            if model.demo != nil || model.demoCycle || model.demoCutscene {
+                Text(L.t("Demo data", "데모 데이터", "デモデータ", "演示数据")).font(.caption.weight(.semibold))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill(Color.orange.opacity(0.25)))
+            }
+            Spacer()
+            Button { showMore.toggle() } label: { Image(systemName: showMore ? "chevron.up.circle.fill" : "chevron.down.circle") }
+                .buttonStyle(.plain).foregroundColor(.secondary)
+                .accessibilityLabel(showMore ? L.t("Less", "접기", "閉じる", "收起") : L.t("More", "더 보기", "もっと見る", "更多"))
+                .help(showMore ? L.t("Less", "접기", "閉じる", "收起")
+                               : L.t("More: title, sources, account, speed", "더 보기: 칭호·출처·계정·속도", "もっと見る：称号・出どころ・アカウント・速さ", "更多：称号、来源、账号、速度"))
+            Button(L.t("Refresh", "새로고침", "更新", "刷新")) { model.refresh() }.disabled(model.scanning)
+            Button(L.t("Quit", "종료", "終了", "退出")) { NSApp.terminate(nil) }
+        }
+        .font(.callout)
     }
 
     private var clockNow: Date { now ?? Date() }
@@ -193,7 +256,7 @@ struct PopoverView: View {
             familySettings
             Toggle(L.t("Notify when the limit is used up and when it resets",
                        "한도가 다 찼을 때와 다시 풀릴 때 알림",
-                       "リミットに達したときと戻ったときに通知",
+                       "リミットに達したときとリセットされたときに通知",
                        "额度用完和重置时通知"), isOn: $model.notifyLimits)
             let login = model.launchAtLogin
             Toggle(L.t("Open at login",
@@ -241,16 +304,54 @@ struct PopoverView: View {
 
     /// The update notice: shown until the user updates or skips this version.
     private func updateRow(_ v: SemVer) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "arrow.down.circle.fill").foregroundColor(Color(red: 0.75, green: 0.28, blue: 0.23))
-            Text(L.t("Version \(v) is out", "새 버전 \(v)", "新バージョン \(v)", "新版本 \(v)")).font(.caption.weight(.semibold))
-            Spacer()
-            Button(L.t("Release page", "릴리스 페이지", "リリースページ", "发布页面")) { NSWorkspace.shared.open(Update.page(v)) }
-                .buttonStyle(.link)
-            Button(L.t("Skip this version", "이 버전 건너뛰기", "このバージョンをスキップ", "跳过此版本")) { model.skippedVersion = v.description }
-                .buttonStyle(.link).foregroundColor(.secondary)
+        let route = model.updateRoute, step = model.installStep
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle.fill").foregroundColor(Color(red: 0.75, green: 0.28, blue: 0.23))
+                Text(L.t("Version \(v) is out", "새 버전 \(v)", "新バージョン \(v)", "新版本 \(v)")).font(.caption.weight(.semibold))
+                Spacer()
+                if step == .working {
+                    ProgressView().controlSize(.small)
+                    Text(L.t("Updating…", "업데이트하는 중…", "アップデート中…", "正在更新…")).foregroundColor(.secondary)
+                } else if route == .replace {
+                    Button(L.t("Update", "업데이트", "アップデート", "更新")) { model.installUpdate(v) }
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                }
+            }
+            if case .failed = step {
+                Text(L.t("Couldn't update; the current app is unchanged. Try again or use the release page.",
+                         "업데이트하지 못했어요. 지금 앱은 그대로예요. 다시 시도하거나 릴리스 페이지를 이용해 주세요.",
+                         "アップデートできませんでした。今のアプリはそのままです。もう一度試すか、リリースページを使ってください。",
+                         "未能更新，当前应用保持不变。请重试或使用发布页面。")).foregroundColor(.secondary)
+            }
+            if route == .brew {
+                Text(L.t("Installed with Homebrew. Update it in Terminal:", "Homebrew로 설치했어요. 터미널에서 업데이트하세요:",
+                         "Homebrew でインストールされています。ターミナルでアップデートしてください：", "通过 Homebrew 安装。请在终端中更新："))
+                    .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    Text(Update.brewCommand).font(.caption.monospaced()).textSelection(.enabled).lineLimit(1).minimumScaleFactor(0.8)
+                    Spacer()
+                    Button(L.t("Copy", "복사", "コピー", "复制")) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(Update.brewCommand, forType: .string)
+                    }.buttonStyle(.link)
+                }
+            } else if route == .manual {
+                Text(L.t("This copy can't be replaced in place. Download it from the release page.",
+                         "이 위치의 앱은 바로 바꿀 수 없어요. 릴리스 페이지에서 받아 주세요.",
+                         "この場所のアプリはその場で置き換えられません。リリースページからダウンロードしてください。",
+                         "此位置的应用无法直接替换。请从发布页面下载。")).foregroundColor(.secondary)
+            }
+            HStack(spacing: 10) {
+                Spacer()
+                Button(L.t("Release page", "릴리스 페이지", "リリースページ", "发布页面")) { NSWorkspace.shared.open(Update.page(v)) }
+                    .buttonStyle(.link)
+                Button(L.t("Skip this version", "이 버전 건너뛰기", "このバージョンをスキップ", "跳过此版本")) { model.skippedVersion = v.description }
+                    .buttonStyle(.link).foregroundColor(.secondary)
+            }
         }
         .font(.caption)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     /// Settings: this version and what the last check found.
@@ -534,7 +635,7 @@ struct PopoverView: View {
         case .claude:
             return at != nil ? L.t("Limits from Claude Code's status line, as of \(when) (they can only have grown since).",
                                    "Claude Code 상태줄의 공식 한도 · \(when) 기준 (그 뒤로는 늘었을 수만 있어요)",
-                                   "Claude Code のステータスラインの公式リミット・\(when)時点（その後は増えたかもしれません）",
+                                   "Claude Code のステータスラインの公式リミット・\(when)時点（その後は増えることはあっても減りません）",
                                    "来自 Claude Code 状态栏的官方额度，截至 \(when)（之后只可能增加）。")
                              : L.t("No limits from Claude Code yet. Connect its status line (Settings › How it works); until then he says he doesn't know.",
                                    "아직 Claude Code 한도 정보가 없어요. 상태줄을 연결하면 보여요(설정 › 사용법과 Claude Code 연결). 그 전에는 모른다고 말해요.",
@@ -552,7 +653,7 @@ struct PopoverView: View {
         case .gemini:
             return L.t("Gemini CLI keeps no limits on this Mac, so he can't say how full it is. Its tokens still move the mountain.",
                        "Gemini CLI는 이 Mac에 한도를 남기지 않아서 얼마나 찼는지 몰라요. 토큰은 산 옮기기에 들어가요.",
-                       "Gemini CLI はこの Mac にリミットを残さないので、どれだけ詰まったかはわかりません。トークンは山を移すのに数えます。",
+                       "Gemini CLI はこの Mac にリミットを残さないので、どれだけ使ったかはわかりません。それでもトークンは山を動かします。",
                        "Gemini CLI 不在这台 Mac 上记录额度，所以不知道用了多少。它的 token 仍会用来搬山。")
         case .openai:
             if let pr = budget?.problem { return "OpenAI: \(pr.text)" }
@@ -576,7 +677,7 @@ struct PopoverView: View {
             if let b = budget?.balance {
                 return L.t("DeepSeek reports only the balance (\(b)), not what was spent, so he can't say how full it is.",
                            "DeepSeek은 잔액(\(b))만 알려 주고 쓴 돈은 알려 주지 않아서 얼마나 찼는지 몰라요.",
-                           "DeepSeek は残高（\(b)）だけを伝え、使った金額は教えてくれないので、どれだけ詰まったかはわかりません。",
+                           "DeepSeek は残高（\(b)）だけを伝え、使った金額は教えてくれないので、どれだけ使ったかはわかりません。",
                            "DeepSeek 只报告余额（\(b)），不报告花了多少，所以不知道用了多少。")
             }
             return L.t("DeepSeek reports only a balance, never the spend. Add a key to see the balance (Settings › Family).",

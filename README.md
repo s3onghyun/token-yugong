@@ -20,6 +20,7 @@ his carrier fills with your 5-hour limit, he naps when it runs out, and the moun
 
 **Install** (macOS 13+, Apple silicon or Intel): download `TokenYugong-<version>-macos-universal.zip` from
 [Releases](https://github.com/s3onghyun/token-yugong/releases/latest), unzip, move `TokenYugong.app` to Applications.
+Or with Homebrew: `brew install --cask s3onghyun/tap/token-yugong`.
 It is not notarized yet, so the first launch needs one approval: see [First launch](#first-launch).
 Then [connect Claude Code](#connect-claude-code) (one snippet; Codex needs nothing).
 
@@ -69,6 +70,36 @@ All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
 Needs macOS 13 or later.
 
+### Linux/Windows (beta)
+
+**Experimental.** A separate Tauri 2 desktop shell for Linux and Windows lives in
+[`desktop/`](desktop/). It reads local Claude Code and Codex JSONL data, shows an animated tray
+pet and a small usage window, and keeps its settings in the platform app-config directory.
+
+Linux builds target AppImage and `.deb`; Windows builds target unsigned MSI and NSIS installers.
+They are CI artifacts only for now: there is no release, auto-update, winget, or Flathub package.
+On Linux, open the window from the tray menu (some StatusNotifierItem implementations do not send
+tray-click events). On Windows, SmartScreen may warn until the project can obtain OSS signing.
+
+Build the beta on a Linux or Windows machine with Rust and Node.js installed:
+
+```sh
+npm ci --prefix desktop
+npm run tauri --prefix desktop -- build
+```
+
+### Homebrew
+
+```sh
+brew install --cask s3onghyun/tap/token-yugong
+```
+
+`brew upgrade --cask token-yugong` updates it. The first launch still needs one approval ([First launch](#first-launch)).
+
+Homebrew 7 and later load casks from other taps only once you trust them. Installing by the full
+name, as above, trusts this one cask by itself. To look at it first with
+`brew info --cask s3onghyun/tap/token-yugong`, run `brew trust --cask s3onghyun/tap/token-yugong` before it.
+
 ### Download the app
 
 1. Download `TokenYugong-<version>-macos-universal.zip` and its `.sha256` file from the latest
@@ -105,23 +136,39 @@ git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 
-The first launch shows a short guide. Its last page has a **Copy snippet** button for the
-Claude Code status line (below). Quit from the popover.
+The first launch shows a short guide (three pages, about 30 seconds, **Skip** any time): what Grandpa
+shows, **Connect** for the Claude Code status line (below), and where Settings are. Settings ›
+*How it works and Claude Code setup…* opens it again. Quit from the popover.
 
 Or run without a bundle: `swift run -c release TokenPet` (no notifications or open-at-login there).
 
 ## Connect Claude Code
 
 Claude Code hands its status-line command your official limits (`rate_limits.five_hour` and
-`rate_limits.seven_day`: used %, reset time). The bridge script saves only that object to
+`rate_limits.seven_day`: used %, reset time). The bridge script saves only that object (and a hash of the account) to
 `~/.claude/token-pet/limits.json`; no prompts, paths or session ids, no network.
 The status line only reports successful responses, so it stops at 99% when a limit runs out; the
 app also reads the refusal Claude Code writes to its own session log (`usage_limit_reached`, with
 the window and reset time) to show 100% and let Grandpa rest.
 
-**Copy snippet** in the guide (or Settings › How it works) copies the bridge into
-`~/.claude/token-pet/` and this onto the clipboard. Paste it into the top-level object of
-`~/.claude/settings.json` yourself; the app never edits that file:
+**One click:** press **Connect** in the guide (or Settings › How it works). The app shows the
+`statusLine` before and after, and only writes when you say so. **One command** (also for agents):
+
+```sh
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup            # add --dry-run to only look
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # put it back
+```
+
+Either way it copies the bridge into `~/.claude/token-pet/` and changes only the `statusLine` key of
+`~/.claude/settings.json`: every other byte stays, a backup goes to
+`~/.claude/token-pet/settings.json.<time>.bak`, running it again changes nothing, and a symlinked
+file stays a symlink. A status line you already have is kept: it becomes
+`sh ~/.claude/token-pet/statusline-bridge.sh --chain '<your command>'`, so it gets the same input and
+what it prints is still what you see; `--undo` gives your command back. No Claude Code on this Mac
+(no `~/.claude`)? It says so and writes nothing.
+
+Prefer to do it by hand? **Copy snippet** copies the bridge and this onto the clipboard, for the
+top-level object of `~/.claude/settings.json`:
 
 ```json
 "statusLine": {
@@ -130,9 +177,13 @@ the window and reset time) to show 100% and let Grandpa rest.
 }
 ```
 
-Already have a status line? Keep it and make its first line
-`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null`,
-then read the JSON from `$input`.
+(by hand, with a status line already there: `"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<your command>'"`).
+
+**Command line.** `TokenPet status [--json]` says whether Claude Code is connected and prints the last
+limits it reported; `TokenPet setup [--undo] [--dry-run] [--json]` is the setup above. With `--json`
+the output is one JSON object with stable keys (`result`, `before`, `after`, `backup`; `claude.connection`,
+`claude.reading.five_hour.used_percentage`, ...); errors go to stderr in plain words, exit 1, and as
+`{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`.
 
 The bridge uses `jq` when present (built into macOS 15+) and `plutil` otherwise.
 Codex needs no setup: its own logs (`~/.codex/sessions`) carry its limits. Gemini CLI needs none
@@ -142,12 +193,14 @@ either (its tokens are read from `~/.gemini/tmp`).
 budget in USD and paste an **Admin key** (OpenAI reports costs only to Admin keys). The meter is
 this month's spend ÷ the budget, asked every 15 minutes. For DeepSeek, paste an API key to see the
 balance; DeepSeek does not report spend, so its meter says "don't know". Keys go into the login
-Keychain only. These two and the once-a-day update check (below) are the only times the app
+Keychain only. These two and the update check and download (below) are the only times the app
 uses the network.
 
 ## The Yugong window
 
-Click Grandpa in the menu bar for the popover: the scene, the mountain, his title and every meter.
+Click Grandpa in the menu bar for the popover: the scene, the mountain and every meter. The ⌄ button
+next to Refresh shows the rest (his title, where the numbers come from, the Claude account, the
+shovel speed, screen sharing) and is remembered.
 The first launch points at him once ("Click Grandpa to see his mountain"). The popover's **Window**
 button opens the same scene in a window of its own that stays on the desktop:
 
@@ -155,7 +208,7 @@ button opens the same scene in a window of its own that stays on the desktop:
 
 Drag it anywhere (another display too, a vertical one included) and drag its corner to resize: the
 content scales and keeps its proportions. The ⋯ button in its title bar (or a right-click) picks
-small, medium or large, a normal window, *always on top* or *on the desktop* (under every app
+small, medium or large, *compact* (the scene and its headline only), a normal window, *always on top* or *on the desktop* (under every app
 window, on every Space), and the opacity. Esc or the close button hides it. Size, place, level
 and opacity are remembered; if its display is gone, it comes back on the main screen. Settings ›
 *Open the Yugong window when the app starts* (off by default) opens it at launch, and with *Open at
@@ -186,10 +239,16 @@ one `L.t(en, ko, ja, zh)` call, and `./test.sh` fails on a missing or wrong-scri
 Once a day the app asks GitHub for the latest release: one HTTPS GET to
 `api.github.com/repos/s3onghyun/token-yugong/releases/latest`, with only `User-Agent: TokenYugong/<version>`,
 `Accept` and a fixed `Accept-Language: en`, no cookies and no cache. Nothing about you or your usage is
-sent, and there is no telemetry. When a newer version is out, the popover shows a row with **Release
-page** and **Skip this version**, and you get one notification for that version. The app never
-downloads or installs anything itself: download the new ZIP, check its `.sha256` and replace the app
-as in [Install](#install). Settings › *Check for updates (once a day)* turns it off; *Check now* asks
+sent, and there is no telemetry. When a newer version is out, the popover shows a row with **Update**,
+**Release page** and **Skip this version**, and you get one notification for that version. Nothing is
+downloaded until you click **Update**: then the app fetches that release's ZIP from
+`github.com/s3onghyun/token-yugong/releases/download/v<version>/`, unzips it to a temporary folder,
+checks it is Token Yugong (same bundle id) at exactly that version with a valid signature
+(`codesign --verify`), swaps it in for the app where it runs and restarts. If anything fails, the
+current app stays as it was. Installed with Homebrew, the row shows
+`brew upgrade --cask s3onghyun/tap/token-yugong` with a Copy button instead, so Homebrew's record stays
+right; where the app cannot be replaced (a folder you cannot write to), use the release page and
+replace it as in [Install](#install). Settings › *Check for updates (once a day)* turns it off; *Check now* asks
 at once.
 
 ## Privacy
@@ -198,17 +257,20 @@ Token Yugong reads files on your Mac and keeps everything there. No account, no 
 
 | What it reads | Why |
 |---|---|
-| `~/.claude/token-pet/limits.json` | Claude Code's official limits, written by the status-line bridge (used %, reset time; no prompts, paths or session ids) |
+| `~/.claude/token-pet/limits.json` | Claude Code's official limits, written by the status-line bridge (used %, reset time; no prompts, paths or session ids). To tell Claude accounts apart, the bridge reads `oauthAccount.accountUuid` from `~/.claude.json` and writes only a 12-character SHA-256 hash of it |
 | Claude Code session logs (`~/.claude/projects`) | token counts for Grandpa's pace and the mountain, and the `usage_limit_reached` refusal so a full limit shows 100% |
 | `~/.codex/sessions` | Codex's own limits and token counts |
 | `~/.gemini/tmp` | Gemini CLI token counts |
 
 - **Network:** only the once-a-day update check (one GET to the GitHub releases API, can be turned
-  off), and, only if you paste a key, OpenAI's costs API or DeepSeek's balance API every 15 minutes.
+  off), the release ZIP when you click **Update**, and, only if you paste a key, OpenAI's costs API or DeepSeek's balance API every 15 minutes.
 - **Keys** live in your login Keychain, nowhere else.
 - **Settings and history** (the mountain, titles) stay in the `TokenPet` UserDefaults domain on this
-  Mac; `defaults delete TokenPet` erases them.
-- The app never edits `~/.claude/settings.json`; you paste the status-line snippet yourself.
+  Mac; `defaults delete TokenPet` erases them. What the app read from the bridge (hashed account,
+  percentages, reset times) is logged to `~/Library/Application Support/TokenPet/claude-readings.log`
+  (at most two files of 512 KB), so a wrong account can be traced; delete it any time.
+- The app edits `~/.claude/settings.json` only when you press **Connect** (after showing the change) or run
+  `TokenPet setup`, and then only its `statusLine`, with a backup; `TokenPet setup --undo` reverses it.
 
 ## How the numbers become a pet
 
@@ -225,7 +287,7 @@ weekly-only share needs no saved state, so restarts and several Macs give the sa
 `--stage` (bar item and popover in one window, for recording), `--allow-capture`, `--open`,
 `--settings`, `--guide`, `--pretend-hidden` (try the mini-window fallback),
 `--render <dir>` (PNG stills), `--icon-set <dir>`, `--scan-report` (prints what it read),
-`--anim-stats`. `TOKENPET_PREFS=<domain>` keeps a test run out of your settings.
+`--anim-stats`; `status` and `setup` (Command line, above). `HOME=<dir>` runs it all against a throwaway home. `TOKENPET_PREFS=<domain>` keeps a test run out of your settings.
 
 Character sheets: `swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`.
 `--social` draws `docs/social-preview.png`; `--hero` draws the frames of `docs/hero.gif`, then:

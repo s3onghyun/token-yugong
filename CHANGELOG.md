@@ -1,8 +1,77 @@
 # Changelog
 
-## Unreleased
+## 0.2.3 (2026-11-05)
+
+### Added
+- **Update** in the new-version row: downloads that release's ZIP, checks it (size, same bundle id,
+  exactly that version, `codesign --verify`), swaps it in for the running app and restarts. On any
+  failure the current app is left as it was. Installed with Homebrew, the row shows
+  `brew upgrade --cask s3onghyun/tap/token-yugong` with a Copy button instead; where the app cannot be
+  replaced, it points to the release page.
 
 ### Fixed
+- The popover opened from the mini window could be cut off at the bottom of a shorter screen (with
+  Settings or More open it grew past the screen). It now stays within the screen and scrolls.
+
+## 0.2.2 (2026-11-04)
+
+### Added
+- Homebrew: `brew install --cask s3onghyun/tap/token-yugong` (from the
+  [s3onghyun/homebrew-tap](https://github.com/s3onghyun/homebrew-tap) tap, bumped to each new release).
+- *Compact* in the Yugong window's ⋯ menu (and right-click): only the scene and its headline, for a
+  small window on the desktop. Remembered; unticking it brings the meters and actions back.
+- One-click and one-command Claude Code setup. **Connect** in the guide shows the `statusLine`
+  before and after and writes it into `~/.claude/settings.json` only when you agree;
+  `TokenPet setup` (in `TokenYugong.app/Contents/MacOS/`) does the same from a terminal or an agent,
+  `--dry-run` only shows it, `--undo` (or **Undo** in the guide) puts it back. Only the `statusLine`
+  member changes, every other byte of the file stays, a backup goes next to `limits.json`, running it
+  twice changes nothing, and a symlinked settings file stays a link. A status line you already have is
+  kept: the bridge's new `--chain '<command>'` passes it the same input and shows its output. Without
+  Claude Code (no `~/.claude`) it says so and writes nothing.
+- A command line for agents: `TokenPet status --json` (connected or not, the last limits) and
+  `TokenPet setup --json`, with stable keys, plain-language errors on stderr and exit code 1.
+
+### Changed
+- Japanese and Chinese wording: one word for each thing across the app (Japanese リミット, not
+  sometimes 上限; Chinese 额度, 背架 and token, not sometimes 限额, 背篓 or 令牌), full-width
+  punctuation in the titles window, and a few stiff lines rewritten (*limit has reset* is リセット, not
+  戻った).
+- The first-run guide takes about 30 seconds: what Grandpa shows (the carrier, his pace, the mountain)
+  on one page, **Connect** for Claude Code, then where Settings and the Yugong window's ⋯ menu are.
+  **Skip** on every page; it still shows once by itself and Settings › *How it works and Claude Code
+  setup…* opens it again.
+- The popover is compact again, close to the first releases (about 510 points tall instead of 650 with
+  the 5-hour and weekly meters and one more AI): the scene, the state and headline, the mountain,
+  every meter and the pace, any update or account-change notice, and one row of actions. The ⌄
+  button next to Refresh (*더 보기*) shows the rest: the title and its ladder (click for all titles),
+  where the numbers come from, the Claude account line, the shovel speed, the screen-sharing toggle,
+  the weekly-only explanation and the other AIs' source notes. It stays open or closed as you left it,
+  in the popover and the Yugong window alike. Without any Claude limits yet, the note on how to
+  connect the status line stays in view.
+
+### Fixed
+- Overnight, once the 5-hour window had reset, Yugong took the Claude account for one with only a
+  weekly limit (*No 5-hour limit on this account*), the same note it had shown for the other account
+  the evening before, and the wife came to ask about a change of plan, at the reset and again when
+  the window came back. Claude Code drops a window from the status line once it resets; a window
+  that has reset now stays as a new, empty one (0%) until the next reading fills it.
+- Accounts are told apart by name, not only by guess. Correction to the fix below: the "weekly-only"
+  numbers seen after the `/login` were the *old* account's, from idle sessions (its 5-hour window had
+  reset and was dropped), and running sessions do follow the new login; they only keep the numbers of
+  their last answer until they answer again. The bridge now adds a 12-character SHA-256 hash of the
+  signed-in account's id (`oauthAccount.accountUuid` in `.claude.json`; the id itself is never
+  stored), so the account in use is known, and an idle session's numbers of another account are
+  ignored however long the current one has been quiet (the 30-minute rule let them take the app back
+  overnight). Bridges that name no account keep the weekly-reset rules. An installed bridge older
+  than the app is replaced at launch; `settings.json` is not touched.
+
+### Added
+- The popover (behind ⌄ since the compact popover) names the Claude account and when its numbers came:
+  *Claude 계정 A · 8edcde · 마지막 갱신 09:24* (accounts lettered in the order first seen, with the
+  first 6 characters of the hash).
+- `~/Library/Application Support/TokenPet/claude-readings.log`: every bridge reading the app took or
+  ignored, with the hashed account and what it showed (at most two files of 512 KB), so a mix-up can
+  be traced afterwards.
 - After switching the Claude account (`/login`), Yugong kept showing the old account. Claude Code
   sessions started before the switch keep the old account, keep writing its numbers into the one
   bridge file and keep logging its refused requests, so the old 5-hour window, its 99% and its rest

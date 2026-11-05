@@ -68,4 +68,62 @@ import Testing
         #expect(Update.headers(v("0.2.0")) == ["User-Agent": "TokenYugong/0.2.0", "Accept": "application/vnd.github+json", "Accept-Language": "en"])
         #expect(Update.latestAPI.absoluteString == "https://api.github.com/repos/s3onghyun/token-yugong/releases/latest")
     }
+
+    @Test func archiveIsBuiltFromTheVersion() {
+        #expect(Update.archive(v("0.2.3")).absoluteString
+                == "https://github.com/s3onghyun/token-yugong/releases/download/v0.2.3/TokenYugong-0.2.3-macos-universal.zip")
+    }
+
+    @Test func routeForThisCopy() {
+        let app = URL(fileURLWithPath: "/Applications/TokenYugong.app")
+        #expect(Update.route(app: app, writable: true, brewed: false) == .replace)
+        #expect(Update.route(app: app, writable: true, brewed: true) == .brew)        // brew keeps its own record
+        #expect(Update.route(app: app, writable: false, brewed: false) == .manual)
+        #expect(Update.route(app: URL(fileURLWithPath: "/tmp/.build/debug"), writable: true, brewed: false) == .manual)   // swift run
+        #expect(!Update.brewed(URL(fileURLWithPath: "/tmp/try/TokenYugong.app")))   // a copy outside (~)/Applications is never Homebrew's
+    }
+
+    @Test func acceptsOnlyThisAppAtTheOfferedVersion() {
+        let id = "dev.yugongpet.app"
+        func info(_ i: String, _ ver: String) -> [String: Any] { ["CFBundleIdentifier": i, "CFBundleShortVersionString": ver] }
+        #expect(Update.acceptable(info: info(id, "0.2.3"), id: id, version: v("0.2.3")))
+        #expect(!Update.acceptable(info: info(id, "0.2.2"), id: id, version: v("0.2.3")))         // not what was offered
+        #expect(!Update.acceptable(info: info("evil.app", "0.2.3"), id: id, version: v("0.2.3")))
+        #expect(!Update.acceptable(info: nil, id: id, version: v("0.2.3")))
+        #expect(!Update.acceptable(info: info(id, "0.2.3"), id: nil, version: v("0.2.3")))          // swift run has no id
+    }
+
+    /// The real swap on a fake app: a matching signed zip replaces it; anything else leaves it alone.
+    @Test func installReplacesOnlyWithAVerifiedApp() throws {
+        let fm = FileManager.default, id = "dev.yugongpet.test"
+        let root = fm.temporaryDirectory.appendingPathComponent("update-\(UUID())")
+        defer { try? fm.removeItem(at: root) }
+        func makeApp(_ dir: String, version: String, sign: Bool) throws -> URL {
+            let app = root.appendingPathComponent(dir).appendingPathComponent("TokenYugong.app")
+            try fm.createDirectory(at: app.appendingPathComponent("Contents/MacOS"), withIntermediateDirectories: true)
+            try fm.copyItem(atPath: "/usr/bin/true", toPath: app.appendingPathComponent("Contents/MacOS/TokenPet").path)
+            (["CFBundleIdentifier": id, "CFBundleShortVersionString": version, "CFBundleExecutable": "TokenPet"] as NSDictionary)
+                .write(to: app.appendingPathComponent("Contents/Info.plist"), atomically: true)
+            if sign { #expect(Update.run("/usr/bin/codesign", "--force", "--sign", "-", app.path)) }
+            return app
+        }
+        func zip(_ app: URL) -> URL {
+            let z = app.deletingLastPathComponent().appendingPathComponent("a.zip")
+            #expect(Update.run("/usr/bin/ditto", "-c", "-k", "--keepParent", app.path, z.path))
+            return z
+        }
+        func installed(_ app: URL) -> String? {
+            NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String
+        }
+        let current = try makeApp("installed", version: "0.2.2", sign: true)
+
+        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("old", version: "0.2.1", sign: true)), version: v("0.2.3"), id: id, over: current) }
+        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("unsigned", version: "0.2.3", sign: false)), version: v("0.2.3"), id: id, over: current) }
+        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("other", version: "0.2.3", sign: true)), version: v("0.2.3"), id: "dev.other", over: current) }
+        #expect(installed(current) == "0.2.2")
+
+        try Update.install(zip: zip(try makeApp("new", version: "0.2.3", sign: true)), version: v("0.2.3"), id: id, over: current)
+        #expect(installed(current) == "0.2.3")
+        #expect(Update.run("/usr/bin/codesign", "--verify", "--deep", "--strict", current.path))
+    }
 }

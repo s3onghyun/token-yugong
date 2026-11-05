@@ -20,6 +20,7 @@ Claude Code와 Codex 사용 한도를 보여 주는 픽셀 아트 메뉴바 펫:
 
 **설치** (macOS 13 이상, Apple silicon·Intel): [Releases](https://github.com/s3onghyun/token-yugong/releases/latest)에서
 `TokenYugong-<version>-macos-universal.zip`을 내려받아 풀고 `TokenYugong.app`을 응용 프로그램 폴더로 옮깁니다.
+Homebrew로도 됩니다: `brew install --cask s3onghyun/tap/token-yugong`.
 아직 공증 전이라 처음 한 번은 승인이 필요합니다: [처음 실행](#처음-실행) 참고.
 그다음 [Claude Code를 연결](#claude-code-연결)합니다(스니펫 하나, Codex는 설정 없음).
 
@@ -65,6 +66,18 @@ Claude Code 사용량을 보여 줍니다.
 
 macOS 13 이상이 필요합니다.
 
+### Homebrew
+
+```sh
+brew install --cask s3onghyun/tap/token-yugong
+```
+
+`brew upgrade --cask token-yugong`으로 업데이트합니다. 처음 실행 때 승인은 똑같이 한 번 필요합니다([처음 실행](#처음-실행)).
+
+Homebrew 7부터는 다른 tap의 cask를 신뢰(trust)해야 읽습니다. 위처럼 전체 이름으로 설치하면 이 cask 하나를
+저절로 신뢰합니다. 설치 전에 `brew info --cask s3onghyun/tap/token-yugong`으로 먼저 보려면
+`brew trust --cask s3onghyun/tap/token-yugong`을 먼저 실행하세요.
+
 ### 앱 내려받기
 
 1. 최신 [GitHub Release](https://github.com/s3onghyun/token-yugong/releases/latest)에서
@@ -101,8 +114,9 @@ git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
 open build/TokenYugong.app     # 먼저 /Applications로 옮겨도 됩니다
 ```
 
-처음 실행하면 짧은 안내가 나옵니다. 마지막 장의 **스니펫 복사** 버튼으로 Claude Code
-상태줄을 연결합니다(아래). 종료는 팝오버에서 합니다.
+처음 실행하면 짧은 안내가 나옵니다(세 장, 30초쯤, 언제든 **건너뛰기**). 할아버지가 무엇을 보여 주는지,
+Claude Code 상태줄을 잇는 **연결하기**(아래), 설정이 어디 있는지 알려 줍니다. 설정 › *사용법과 Claude Code
+연결…*로 다시 엽니다. 종료는 팝오버에서 합니다.
 
 번들 없이 `swift run -c release TokenPet`으로도 돌릴 수 있습니다(이때는 알림과 로그인 시
 열기가 없습니다).
@@ -110,15 +124,29 @@ open build/TokenYugong.app     # 먼저 /Applications로 옮겨도 됩니다
 ## Claude Code 연결
 
 Claude Code는 상태줄 명령에 공식 한도(`rate_limits.five_hour`, `rate_limits.seven_day`: 사용
-%, 리셋 시각)를 넘겨 줍니다. 브리지 스크립트는 그 객체만 `~/.claude/token-pet/limits.json`에
+%, 리셋 시각)를 넘겨 줍니다. 브리지 스크립트는 그 객체와 계정 해시만 `~/.claude/token-pet/limits.json`에
 저장합니다. 프롬프트·경로·세션 ID는 남기지 않고 네트워크도 쓰지 않습니다.
 상태줄은 성공한 응답만 알려 주기 때문에 한도를 다 쓰면 99%에서 멈춥니다. 그래서 앱은 Claude
 Code가 자기 세션 기록에 남기는 거절(`usage_limit_reached`, 구간과 리셋 시각 포함)도 읽어서 100%로
 보여 주고 할아버지를 쉬게 합니다.
 
-안내(또는 설정 › 사용법과 Claude Code 연결)의 **스니펫 복사**를 누르면 브리지를
-`~/.claude/token-pet/`에 넣고 아래 내용을 클립보드에 복사합니다. `~/.claude/settings.json`의
-맨 바깥 객체에 직접 붙여 넣으세요. 앱은 이 파일을 고치지 않습니다.
+**클릭 한 번:** 안내(또는 설정 › 사용법과 Claude Code 연결)에서 **연결하기**를 누르세요. 바뀔
+`statusLine`을 먼저 보여 주고, 확인해야 씁니다. **명령 한 줄**(에이전트도 이걸 씁니다):
+
+```sh
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup            # --dry-run 을 붙이면 보기만
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # 되돌리기
+```
+
+어느 쪽이든 브리지를 `~/.claude/token-pet/`에 넣고 `~/.claude/settings.json`의 `statusLine` 키만
+바꿉니다. 나머지 바이트는 그대로이고, 백업은 `~/.claude/token-pet/settings.json.<시각>.bak`에 남고,
+다시 실행해도 바뀌는 게 없고, 심볼릭 링크는 링크로 남습니다. 이미 쓰던 상태줄은 살려 둡니다:
+`sh ~/.claude/token-pet/statusline-bridge.sh --chain '<원래 명령>'`이 되어 같은 입력을 받고, 화면에는
+원래 출력이 그대로 나옵니다. `--undo`는 원래 명령을 돌려놓습니다. 이 Mac에 Claude Code가
+없으면(`~/.claude` 없음) 그렇다고 알려 주고 아무것도 쓰지 않습니다.
+
+직접 하고 싶다면 **스니펫 복사**로 브리지와 아래 내용을 클립보드에 받아 `~/.claude/settings.json`
+맨 바깥 객체에 붙여 넣으세요.
 
 ```json
 "statusLine": {
@@ -127,9 +155,13 @@ Code가 자기 세션 기록에 남기는 거절(`usage_limit_reached`, 구간�
 }
 ```
 
-이미 상태줄을 쓰고 있다면 그대로 두고 그 스크립트 첫 줄을
-`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null`
-로 바꾼 뒤 JSON은 `$input`에서 읽으세요.
+(직접 하면서 상태줄이 이미 있다면: `"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<원래 명령>'"`)
+
+**명령줄.** `TokenPet status [--json]`은 Claude Code 연결 여부와 마지막으로 받은 한도를 보여 주고,
+`TokenPet setup [--undo] [--dry-run] [--json]`은 위의 연결입니다. `--json`이면 키가 고정된 JSON 객체
+하나를 출력합니다(`result`, `before`, `after`, `backup`; `claude.connection`,
+`claude.reading.five_hour.used_percentage` 등). 오류는 stderr에 쉬운 말로, 종료 코드 1, 그리고
+`{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`로 나옵니다.
 
 브리지는 `jq`가 있으면 쓰고(macOS 15부터 기본 포함), 없으면 `plutil`을 씁니다.
 Codex는 설정할 것이 없습니다. Codex 기록(`~/.codex/sessions`)에 한도가 들어 있습니다.
@@ -139,18 +171,19 @@ Gemini CLI도 설정할 것이 없습니다(`~/.gemini/tmp`에서 토큰을 읽�
 **관리자(Admin) 키**를 붙여 넣습니다(OpenAI는 비용을 관리자 키에만 알려 줍니다). 미터는 이번 달
 쓴 돈 ÷ 예산이고 15분마다 묻습니다. DeepSeek은 API 키를 넣으면 잔액이 보입니다. DeepSeek은 쓴
 돈을 알려 주지 않아서 미터는 "모름"입니다. 키는 로그인 키체인에만 저장됩니다. 앱이 네트워크를
-쓰는 건 이 두 경우와 하루 한 번의 새 버전 확인(아래)뿐입니다.
+쓰는 건 이 두 경우와 새 버전 확인과 업데이트 내려받기(아래)뿐입니다.
 
 ## 우공 창
 
-메뉴바의 할아버지를 누르면 팝오버가 열립니다. 장면, 산, 칭호, 모든 미터가 여기 있습니다.
+메뉴바의 할아버지를 누르면 팝오버가 열립니다. 장면, 산, 모든 미터가 여기 있습니다. 새로고침 옆 ⌄ 버튼(더 보기)을
+누르면 칭호, 숫자의 출처, Claude 계정, 삽질 속도, 화면 공유 설정이 나오고, 펼친 상태는 기억됩니다.
 처음 실행하면 한 번 "우공을 눌러 보세요"라고 알려 줍니다. 팝오버의 **창으로 보기**를 누르면 같은
 장면이 따로 창으로 떠서 바탕화면에 계속 둘 수 있습니다.
 
 ![우공 창](docs/yugong-window.png)
 
 끌어서 어디든(세로 모니터 같은 다른 화면도) 옮기고, 모서리를 끌어 크기를 바꾸면 비율을 지키며
-커지고 작아집니다. 제목 막대의 ⋯ 단추(또는 오른쪽 클릭)로 작게·보통·크게, 보통 창·*항상 위에*·
+커지고 작아집니다. 제목 막대의 ⋯ 단추(또는 오른쪽 클릭)로 작게·보통·크게, *간단히*(장면과 상태 한 줄만), 보통 창·*항상 위에*·
 *바탕화면에 두기*(모든 앱 창 아래, 모든 Space에), 불투명도를 고릅니다. Esc나 닫기 단추로 닫습니다.
 크기, 위치, 위·아래 설정, 불투명도는 기억하고, 그 화면이 없어졌으면 주 화면에 다시 나타납니다. 설정 ›
 *앱이 열릴 때 우공 창도 열기*(기본 꺼짐)를 켜면 실행할 때, *로그인할 때 열기*와 함께면 로그인할 때
@@ -178,9 +211,13 @@ macOS는 메뉴바에 자리가 없는 아이콘을 말없이 숨기거나 카�
 앱은 하루 한 번 GitHub에 최신 릴리스를 묻습니다. `api.github.com/repos/s3onghyun/token-yugong/releases/latest`
 에 HTTPS GET 하나를 보내고, 머리글은 `User-Agent: TokenYugong/<버전>`, `Accept`, 고정값 `Accept-Language: en`
 뿐이며 쿠키·캐시를 쓰지 않습니다. 사용자나 사용량에 관한 정보는 보내지 않고 텔레메트리도 없습니다.
-새 버전이 나오면 팝오버에 **릴리스 페이지**와 **이 버전 건너뛰기**가 있는 줄이 보이고, 그 버전마다
-알림이 한 번 옵니다. 앱이 스스로 내려받거나 설치하지는 않습니다. 새 ZIP을 받아 `.sha256`을 확인하고
-[설치](#설치)처럼 앱을 바꿔 주세요. 설정 › *새 버전 확인 (하루 한 번)*으로 끄고, *지금 확인*으로 바로 묻습니다.
+새 버전이 나오면 팝오버에 **업데이트**, **릴리스 페이지**, **이 버전 건너뛰기**가 있는 줄이 보이고,
+그 버전마다 알림이 한 번 옵니다. **업데이트**를 누르기 전에는 아무것도 내려받지 않습니다. 누르면
+`github.com/s3onghyun/token-yugong/releases/download/v<버전>/`에서 그 릴리스의 ZIP을 받아 임시 폴더에 풀고,
+같은 번들 ID의 Token Yugong인지, 정확히 그 버전인지, 서명이 유효한지(`codesign --verify`) 확인한 뒤 지금
+실행 중인 자리의 앱과 바꾸고 다시 엽니다. 중간에 실패하면 지금 앱은 그대로 남습니다. Homebrew로 설치했다면
+대신 `brew upgrade --cask s3onghyun/tap/token-yugong`과 복사 버튼을 보여 줍니다(Homebrew 기록이 어긋나지
+않게). 앱을 바꿀 수 없는 위치(쓰기 권한이 없는 폴더)라면 릴리스 페이지에서 받아 [설치](#설치)처럼 바꿔 주세요. 설정 › *새 버전 확인 (하루 한 번)*으로 끄고, *지금 확인*으로 바로 묻습니다.
 
 ## 개인정보
 
@@ -188,17 +225,20 @@ Token Yugong은 이 Mac의 파일을 읽고, 모든 것을 이 Mac에만 둡니�
 
 | 읽는 것 | 이유 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | 상태줄 브리지가 적는 Claude Code 공식 한도(사용 %, 리셋 시각. 프롬프트·경로·세션 id 없음) |
+| `~/.claude/token-pet/limits.json` | 상태줄 브리지가 적는 Claude Code 공식 한도(사용 %, 리셋 시각. 프롬프트·경로·세션 id 없음). Claude 계정을 구분하려고 브리지가 `~/.claude.json`의 `oauthAccount.accountUuid`를 읽어 SHA-256 해시 12자만 적습니다 |
 | Claude Code 세션 로그(`~/.claude/projects`) | 할아버지의 속도와 산에 쓰는 토큰 수, 그리고 한도가 찼을 때 100%를 보여 주는 `usage_limit_reached` 거절 기록 |
 | `~/.codex/sessions` | Codex 자신의 한도와 토큰 수 |
 | `~/.gemini/tmp` | Gemini CLI 토큰 수 |
 
-- **네트워크:** 하루 한 번 새 버전 확인(GitHub releases API에 GET 하나, 끌 수 있음)과, 키를 넣은
+- **네트워크:** 하루 한 번 새 버전 확인(GitHub releases API에 GET 하나, 끌 수 있음), **업데이트**를 누를 때의 릴리스 ZIP, 키를 넣은
   경우에만 15분마다 OpenAI 비용 API 또는 DeepSeek 잔액 API.
 - **키**는 로그인 키체인에만 저장합니다.
 - **설정과 기록**(산, 칭호)은 이 Mac의 UserDefaults 도메인 `TokenPet`에만 있고,
-  `defaults delete TokenPet`으로 지웁니다.
-- 앱은 `~/.claude/settings.json`을 고치지 않습니다. 상태줄 스니펫은 직접 붙여 넣습니다.
+  `defaults delete TokenPet`으로 지웁니다. 앱이 브리지에서 읽은 값(계정 해시, %, 리셋 시각)은
+  `~/Library/Application Support/TokenPet/claude-readings.log`(512 KB 파일 최대 두 개)에 남겨
+  계정이 엇갈렸을 때 따라가 볼 수 있습니다. 언제든 지워도 됩니다.
+- 앱은 **연결하기**를 눌렀을 때(바뀔 내용을 보여 준 뒤)나 `TokenPet setup`을 실행했을 때만
+  `~/.claude/settings.json`을 고치고, 그때도 `statusLine`만 백업과 함께 바꿉니다. `TokenPet setup --undo`로 되돌립니다.
 
 ## 숫자가 할아버지가 되는 방법
 

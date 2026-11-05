@@ -10,6 +10,7 @@ import UserNotifications
 //            [--lifetime <tokens>] [--award rank:<0-9>|feat:<name>] [--titles] [--window]
 //   TokenPet --render <dir>     write popover + sprite-sheet PNGs for every state, then exit
 //   TokenPet --scan-report      scan local logs once, print what the pet would show, then exit
+//   TokenPet status|setup ...   the command line for people and agents (CLI.swift), then exit
 
 setvbuf(stdout, nil, _IOLBF, 0)   // line-buffered, so scripts see "stage window N" at once
 let args = CommandLine.arguments
@@ -21,11 +22,17 @@ if let lang = arg("--lang") {   // this run only; the saved setting stays. "pseu
     if lang == "pseudo" { L.pseudo = true } else { L.lang = L.resolve(lang) }
 }
 
-let home = FileManager.default.homeDirectoryForCurrentUser
+// $HOME first (Foundation ignores it), so a test can run the app against a throwaway home
+let home = ProcessInfo.processInfo.environment["HOME"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.homeDirectoryForCurrentUser
 let bridgeURL = URL(fileURLWithPath: arg("--bridge")
     ?? (ProcessInfo.processInfo.environment["TOKENPET_DIR"].map { $0 + "/limits.json" }
         ?? home.appendingPathComponent(".claude/token-pet/limits.json").path))
 let logsRoot = URL(fileURLWithPath: arg("--logs") ?? home.appendingPathComponent(".claude/projects").path)
+if let r = CLI.run(Array(args.dropFirst()), home: home, bridge: bridgeURL) {
+    FileHandle.standardOutput.write(Data(r.out.utf8))
+    FileHandle.standardError.write(Data(r.err.utf8))
+    exit(r.code)
+}
 let model = UsageModel(bridgeURL: bridgeURL, logsRoot: logsRoot)
 
 if args.contains("--scan-report") {
@@ -218,7 +225,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         model.onLimit = { s in
             guard s.resting else {
                 return Notify.post(id: "limit-reset", title: L.t("Grandpa picked up his shovel again", "할아버지가 다시 삽을 들었어요", "おじいさんがまたシャベルを手に取りました", "爷爷又拿起了铁锹"),
-                                   body: L.t("The limit has reset. Back to digging!", "한도가 풀렸어요. 다시 파 볼까요!", "リミットが戻りました。また掘りましょう！", "额度已重置，接着挖吧！"))
+                                   body: L.t("The limit has reset. Back to digging!", "한도가 풀렸어요. 다시 파 볼까요!", "リミットがリセットされました。また掘りましょう！", "额度已重置，接着挖吧！"))
             }
             let week = (s.week?.pct ?? 0) >= 100
             let when = s.wakeAt.map { Fmt.clock($0) } ?? "?"
@@ -599,6 +606,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         hint?.performClose(nil); hint = nil
         Prefs.store.set(true, forKey: "barHintShown")   // found him: no hint needed
         NSApp.activate(ignoringOtherApps: true)
+        if let screen = anchor.window?.screen ?? NSScreen.main { model.popoverMaxHeight = UsageModel.popoverMaxHeight(screen: screen.visibleFrame.height) }
         popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
         print("popover opened at \(popover.contentViewController?.view.window?.frame ?? .zero)")   // scripts check where it went
         applySharing()

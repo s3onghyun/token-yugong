@@ -19,7 +19,7 @@
 <p align="center"><img src="docs/hero.gif" width="584" alt="愚公爷爷在挖土，背架快满时越挖越吃力，到了额度就打盹、智叟在一旁嘲笑，重置后重新开工，喜鹊送来新称号"><br>
 <sub>由应用自身的代码用演示数据绘制（<code>YugongSheet --hero</code>）。</sub></p>
 
-**安装**（macOS 13+，Apple 芯片或 Intel）：从 [Releases](https://github.com/s3onghyun/token-yugong/releases/latest) 下载 `TokenYugong-<version>-macos-universal.zip`，解压后把 `TokenYugong.app` 移到“应用程序”文件夹。
+**安装**（macOS 13+，Apple 芯片或 Intel）：从 [Releases](https://github.com/s3onghyun/token-yugong/releases/latest) 下载 `TokenYugong-<version>-macos-universal.zip`，解压后把 `TokenYugong.app` 移到“应用程序”文件夹。也可以用 Homebrew：`brew install --cask s3onghyun/tap/token-yugong`。
 应用还没有经过公证，首次启动需要手动允许一次：见[首次启动](#首次启动)。
 然后[连接 Claude Code](#连接-claude-code)（一段配置即可；Codex 无需设置）。
 
@@ -47,6 +47,16 @@
 ## 安装
 
 需要 macOS 13 或更高版本。
+
+### Homebrew
+
+```sh
+brew install --cask s3onghyun/tap/token-yugong
+```
+
+用 `brew upgrade --cask token-yugong` 更新。首次启动时同样需要批准一次（见[首次启动](#首次启动)）。
+
+Homebrew 7 起，其他 tap 里的 cask 要先信任（trust）才会加载。像上面那样用完整名称安装，会自动信任这一个 cask。想在安装前用 `brew info --cask s3onghyun/tap/token-yugong` 查看，请先运行 `brew trust --cask s3onghyun/tap/token-yugong`。
 
 ### 下载应用
 
@@ -81,16 +91,25 @@ git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 
-首次启动会显示一份简短的使用说明，最后一页有 **复制代码片段** 按钮，用于 Claude Code 状态栏（见下文）。要退出时，在弹出面板里退出。
+首次启动会显示一份简短的使用说明（三页，约 30 秒，随时可以**跳过**）：爷爷显示什么、用于 Claude Code 状态栏的**连接**按钮（见下文）、设置在哪里。设置 › *使用说明与 Claude Code 连接…* 可以再次打开。要退出时，在弹出面板里退出。
 
 也可以不打包直接运行：`swift run -c release TokenPet`（这样没有通知，也不能登录时打开）。
 
 ## 连接 Claude Code
 
-Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.seven_day`：已用百分比、重置时间）传给它的状态栏命令。桥接脚本只把这个对象保存到 `~/.claude/token-pet/limits.json`；不含提示词、路径或会话 ID，也不联网。
+Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.seven_day`：已用百分比、重置时间）传给它的状态栏命令。桥接脚本只把这个对象（外加账号哈希）保存到 `~/.claude/token-pet/limits.json`；不含提示词、路径或会话 ID，也不联网。
 状态栏只报告成功的响应，所以额度用完时会停在 99%；应用还会读取 Claude Code 写进自己会话日志的拒绝记录（`usage_limit_reached`，带有窗口和重置时间），从而显示 100% 并让爷爷休息。
 
-使用说明里（或 设置 › 使用说明）的 **复制代码片段** 会把桥接脚本复制到 `~/.claude/token-pet/`，并把下面这段放进剪贴板。请自己把它粘贴到 `~/.claude/settings.json` 的最外层对象中；应用从不修改这个文件：
+**一键：** 在使用说明（或 设置 › 使用说明）里点 **连接**。应用会先展示修改前后的 `statusLine`，你同意后才写入。**一条命令**（智能体也用它）：
+
+```sh
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup            # --dry-run 只看不改
+/Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # 撤销
+```
+
+两种方式都会把桥接脚本复制到 `~/.claude/token-pet/`，并且只改 `~/.claude/settings.json` 里的 `statusLine` 键：其余字节保持不变，备份放在 `~/.claude/token-pet/settings.json.<时间>.bak`，再运行一次不会有任何改动，符号链接仍是符号链接。已有的状态栏会保留：它变成 `sh ~/.claude/token-pet/statusline-bridge.sh --chain '<原来的命令>'`，收到同样的输入，显示的仍是它原来的输出；`--undo` 会还原原来的命令。这台 Mac 上没有 Claude Code（没有 `~/.claude`）时，它会直接告诉你，什么也不写。
+
+想手动设置？**复制代码片段** 会复制桥接脚本，并把下面这段放进剪贴板，粘贴到 `~/.claude/settings.json` 的最外层对象中：
 
 ```json
 "statusLine": {
@@ -99,22 +118,22 @@ Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.
 }
 ```
 
-已经有状态栏了？保留它，把它的第一行改成
-`input=$(cat); printf '%s' "$input" | sh ~/.claude/token-pet/statusline-bridge.sh >/dev/null`，
-然后从 `$input` 读取 JSON。
+（手动设置且已有状态栏时：`"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<原来的命令>'"`）
+
+**命令行。** `TokenPet status [--json]` 显示 Claude Code 是否已连接以及最近一次收到的额度；`TokenPet setup [--undo] [--dry-run] [--json]` 就是上面的连接。加 `--json` 时输出一个键名固定的 JSON 对象（`result`、`before`、`after`、`backup`；`claude.connection`、`claude.reading.five_hour.used_percentage` 等）；错误用平实的话写到 stderr，退出码 1，并输出 `{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`。
 
 桥接脚本有 `jq` 时用 `jq`（macOS 15+ 自带），否则用 `plutil`。
 Codex 无需设置：它自己的日志（`~/.codex/sessions`）里就带有额度。Gemini CLI 也不需要（从 `~/.gemini/tmp` 读取它的 token）。
 
-**API 预算。** OpenAI API：在 设置 › 家人 中给某个成员选 OpenAI，填入以美元计的月度预算，并粘贴一个 **管理员密钥**（Admin key；OpenAI 只向管理员密钥报告费用）。额度表就是本月花费 ÷ 预算，每 15 分钟查询一次。DeepSeek：粘贴 API 密钥即可看到余额；DeepSeek 不报告花费，所以它的额度表显示“不知道”。密钥只存进登录钥匙串。这两项加上每天一次的更新检查（见下文），是应用仅有的联网场景。
+**API 预算。** OpenAI API：在 设置 › 家人 中给某个成员选 OpenAI，填入以美元计的月度预算，并粘贴一个 **管理员密钥**（Admin key；OpenAI 只向管理员密钥报告费用）。额度表就是本月花费 ÷ 预算，每 15 分钟查询一次。DeepSeek：粘贴 API 密钥即可看到余额；DeepSeek 不报告花费，所以它的额度表显示“不知道”。密钥只存进登录钥匙串。这两项加上更新检查与下载（见下文），是应用仅有的联网场景。
 
 ## 愚公窗口
 
-点击菜单栏里的爷爷会打开弹出面板：场景、大山、他的称号和所有额度表。首次启动时会提示一次（“点一下爷爷看看”）。弹出面板里的 **窗口** 按钮会在独立窗口中打开同一个场景，一直留在桌面上：
+点击菜单栏里的爷爷会打开弹出面板：场景、大山和所有额度表。“刷新”旁边的 ⌄ 按钮（更多）会展开称号、数字来源、Claude 账号、挖土速度和屏幕共享设置，展开状态会被记住。首次启动时会提示一次（“点一下爷爷看看”）。弹出面板里的 **窗口** 按钮会在独立窗口中打开同一个场景，一直留在桌面上：
 
 ![愚公窗口](docs/yugong-window.png)
 
-可以拖到任意位置（包括另一块显示器，竖屏也行），拖动角落可以调整大小：内容会等比缩放。标题栏里的 ⋯ 按钮（或右键）可以选择小、中、大，普通窗口、*始终置顶*或*放在桌面上*（在所有应用窗口之下，出现在每个空间），以及不透明度。按 Esc 或关闭按钮可隐藏。大小、位置、层级和不透明度都会被记住；如果原来的显示器不在了，它会回到主屏幕。设置 › *应用启动时同时打开愚公窗口*（默认关闭）会在启动时打开它；同时开了*登录时打开*的话，登录时也会打开。窗口关闭或被遮住时，场景停止绘制（不占 CPU）。
+可以拖到任意位置（包括另一块显示器，竖屏也行），拖动角落可以调整大小：内容会等比缩放。标题栏里的 ⋯ 按钮（或右键）可以选择小、中、大，*精简*（只显示场景和状态一行），普通窗口、*始终置顶*或*放在桌面上*（在所有应用窗口之下，出现在每个空间），以及不透明度。按 Esc 或关闭按钮可隐藏。大小、位置、层级和不透明度都会被记住；如果原来的显示器不在了，它会回到主屏幕。设置 › *应用启动时同时打开愚公窗口*（默认关闭）会在启动时打开它；同时开了*登录时打开*的话，登录时也会打开。窗口关闭或被遮住时，场景停止绘制（不占 CPU）。
 
 ## 菜单栏满时
 
@@ -128,7 +147,7 @@ macOS 会悄悄隐藏放不下的菜单栏图标，或把它们藏到摄像头�
 
 ## 更新
 
-应用每天向 GitHub 查询一次最新版本：向 `api.github.com/repos/s3onghyun/token-yugong/releases/latest` 发一个 HTTPS GET，只带 `User-Agent: TokenYugong/<version>`、`Accept` 和固定的 `Accept-Language: en`，不带 cookie，也不使用缓存。不会发送任何关于你或你的用量的信息，也没有遥测。有新版本时，弹出面板会显示一行，带有 **发布页面** 和 **跳过此版本**，同一个版本只通知你一次。应用自己从不下载或安装任何东西：请下载新的 ZIP，校验它的 `.sha256`，再按[安装](#安装)一节替换应用。设置 › *检查更新（每天一次）* 可以关闭此功能；*立即检查* 会马上查询。
+应用每天向 GitHub 查询一次最新版本：向 `api.github.com/repos/s3onghyun/token-yugong/releases/latest` 发一个 HTTPS GET，只带 `User-Agent: TokenYugong/<version>`、`Accept` 和固定的 `Accept-Language: en`，不带 cookie，也不使用缓存。不会发送任何关于你或你的用量的信息，也没有遥测。有新版本时，弹出面板会显示一行，带有 **更新**、**发布页面** 和 **跳过此版本**，同一个版本只通知你一次。在你点击 **更新** 之前不会下载任何东西；点击后，应用从 `github.com/s3onghyun/token-yugong/releases/download/v<version>/` 获取该版本的 ZIP，解压到临时文件夹，确认它是同一 bundle ID 的 Token Yugong、正好是该版本且签名有效（`codesign --verify`），然后替换当前运行位置的应用并重新打开。任何一步失败，当前应用都保持不变。如果是用 Homebrew 安装的，则改为显示 `brew upgrade --cask s3onghyun/tap/token-yugong` 和复制按钮，让 Homebrew 的记录保持一致；如果应用所在位置无法替换（没有写入权限的文件夹），请从发布页面下载，再按[安装](#安装)一节替换应用。设置 › *检查更新（每天一次）* 可以关闭此功能；*立即检查* 会马上查询。
 
 ## 隐私
 
@@ -136,15 +155,15 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 
 | 读取的内容 | 用途 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | Claude Code 的官方额度，由状态栏桥接脚本写入（已用百分比、重置时间；不含提示词、路径或会话 ID） |
+| `~/.claude/token-pet/limits.json` | Claude Code 的官方额度，由状态栏桥接脚本写入（已用百分比、重置时间；不含提示词、路径或会话 ID）。为区分 Claude 账号，桥接脚本读取 `~/.claude.json` 中的 `oauthAccount.accountUuid`，只写入它的 12 位 SHA-256 哈希 |
 | Claude Code 会话日志（`~/.claude/projects`） | 用于爷爷挖土速度和大山的 token 数，以及 `usage_limit_reached` 拒绝记录，让用完的额度显示为 100% |
 | `~/.codex/sessions` | Codex 自己的额度和 token 数 |
 | `~/.gemini/tmp` | Gemini CLI 的 token 数 |
 
-- **网络：** 只有每天一次的更新检查（向 GitHub releases API 发一个 GET，可关闭），以及仅在你粘贴了密钥时，每 15 分钟查询一次 OpenAI 的费用 API 或 DeepSeek 的余额 API。
+- **网络：** 只有每天一次的更新检查（向 GitHub releases API 发一个 GET，可关闭）、点击 **更新** 时下载的发布 ZIP，以及仅在你粘贴了密钥时，每 15 分钟查询一次 OpenAI 的费用 API 或 DeepSeek 的余额 API。
 - **密钥**只存在你的登录钥匙串里，别处没有。
-- **设置和历史**（大山、称号）保存在本机的 `TokenPet` UserDefaults 域中；`defaults delete TokenPet` 会清除它们。
-- 应用从不修改 `~/.claude/settings.json`；状态栏代码片段由你自己粘贴。
+- **设置和历史**（大山、称号）保存在本机的 `TokenPet` UserDefaults 域中；`defaults delete TokenPet` 会清除它们。应用从桥接文件读到的内容（账号哈希、百分比、重置时间）记录在 `~/Library/Application Support/TokenPet/claude-readings.log`（最多两个 512 KB 文件），便于追查账号混淆；可随时删除。
+- 只有在你点 **连接**（先展示改动）或运行 `TokenPet setup` 时，应用才会修改 `~/.claude/settings.json`，而且只改 `statusLine` 并留有备份；`TokenPet setup --undo` 可撤销。
 
 ## 数字如何变成宠物
 
@@ -158,8 +177,8 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 （`pseudo`：每条字符串加长约 40% 并带上变音符号，配合 `--render` 查找文字被截断的地方）、
 `--stage`（把菜单栏图标和弹出面板放进同一个窗口，便于录屏）、`--allow-capture`、`--open`、
 `--settings`、`--guide`、`--pretend-hidden`（试用小窗口回退）、
-`--render <dir>`（PNG 静帧）、`--icon-set <dir>`、`--scan-report`（打印读到的内容）、
-`--anim-stats`。`TOKENPET_PREFS=<domain>` 可以让测试运行不碰你的设置。
+`--render <dir>`（PNG 静帧）、`--icon-set <dir>`、`--scan-report`（打印读到的内容）、`status`、`setup`（见上文命令行）、
+`--anim-stats`。加上 `HOME=<dir>` 可以在一个用完即弃的主目录里运行全部功能。`TOKENPET_PREFS=<domain>` 可以让测试运行不碰你的设置。
 
 角色设定图：`swift run -c release YugongSheet <dir> [--scenes] [--family] [--visitors] [--rewards]`。
 `--social` 绘制 `docs/social-preview.png`；`--hero` 绘制 `docs/hero.gif` 的各帧，然后执行：

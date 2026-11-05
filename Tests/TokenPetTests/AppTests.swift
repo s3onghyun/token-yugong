@@ -253,3 +253,9 @@ import Testing
         #expect(BarFit.clickAnchor(mouse: CGPoint(x: 9000, y: 9000), item: itemOnTheLG, screens: screens) == nil) // nowhere
     }
 }
+
+/// The popover under the mini window (or the bar) never grows past its screen; past that it scrolls.
+@Test func popoverFitsItsScreen() {
+    #expect(UsageModel.popoverMaxHeight(screen: 1050) == 1010)   // the 1920 x 1080 monitor the cut was seen on
+    #expect(UsageModel.popoverMaxHeight(screen: 100) == 200)     // never too small to show the headline
+}

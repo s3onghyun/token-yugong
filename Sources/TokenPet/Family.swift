@@ -190,7 +190,7 @@ final class BudgetClient {
         case noKey, rejected, noAnswer(Int)
         var text: String {
             switch self {
-            case .noKey: return L.t("no API key yet", "API 키 없음", "APIキー未設定", "尚无 API 密钥")
+            case .noKey: return L.t("no API key yet", "API 키 없음", "API キー未設定", "尚无 API 密钥")
             case .rejected: return L.t("key not accepted", "키가 거부됨", "キーが拒否されました", "密钥被拒绝")
             case .noAnswer(let code): return L.t("no answer (\(code))", "응답 없음 (\(code))", "応答なし (\(code))", "无响应 (\(code))")
             }

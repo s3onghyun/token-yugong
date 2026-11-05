@@ -22,7 +22,7 @@ enum Titles {
     /// 3B in ~10 months. See LOGIC.md for the table.
     static let ladder: [Rank] = [
         Rank(tokens: 100_000) { L.t("Grandson with a Shovel", "삽 든 손주", "シャベルを持った孫", "拿铲的孙子") },
-        Rank(tokens: 1_000_000) { L.t("Carrier Bearer", "지게꾼", "背負子かつぎ", "背篓工") },
+        Rank(tokens: 1_000_000) { L.t("Carrier Bearer", "지게꾼", "背負子かつぎ", "背架工") },
         Rank(tokens: 10_000_000) { L.t("Stone Breaker", "돌 깨는 일꾼", "石割り職人", "碎石工") },
         Rank(tokens: 40_000_000) { L.t("Basket Master", "삼태기 장인", "もっこの名人", "箕畚匠人") },
         Rank(tokens: 100_000_000) { L.t("Hauler to the Bohai Sea", "발해까지 나르는 자", "渤海まで運ぶ者", "运土到渤海的人") },
@@ -46,9 +46,9 @@ enum Titles {
 
     static func name(_ f: Feat) -> String {
         switch f {
-        case .fullCarrier: return L.t("Full Carrier", "지게 가득", "背負子いっぱい", "背篓装满")
+        case .fullCarrier: return L.t("Full Carrier", "지게 가득", "背負子いっぱい", "背架装满")
         case .streak7: return L.t("Seven Days of Digging", "이레 연속 삽질", "七日続けて掘る", "连挖七天")
-        case .weekKept: return L.t("Kept to the Week", "주간 한도 지킴이", "週の上限を守った", "守住周限额")
+        case .weekKept: return L.t("Kept to the Week", "주간 한도 지킴이", "週間リミットを守った", "守住每周额度")
         case .twoAIs: return L.t("Two Shovels", "두 삽으로", "二本のシャベル", "两把铲子")
         case .dawnReset: return L.t("Up for the Dawn Reset", "새벽 리셋을 지켜본 자", "夜明けのリセットを見届けた", "守到黎明重置")
         }
@@ -57,15 +57,15 @@ enum Titles {
     static func detail(_ f: Feat) -> String {
         switch f {
         case .fullCarrier: return L.t("A limit ran out and Grandpa had to rest.", "한도를 다 써서 할아버지가 쉬었어요.",
-                                        "上限を使い切って、おじいさんが休みました。", "用完了限额，爷爷只好歇一歇。")
+                                        "リミットを使い切って、おじいさんが休みました。", "额度用完了，爷爷只好歇一歇。")
         case .streak7: return L.t("Tokens moved on seven days in a row.", "7일 연속으로 토큰을 옮겼어요.",
-                                    "7日続けてトークンを運びました。", "连续七天搬运了令牌。")
+                                    "7日続けてトークンを運びました。", "连续七天都在搬 token。")
         case .weekKept: return L.t("A whole week ended without running out of the weekly limit.", "주간 한도를 다 쓰지 않고 한 주를 마쳤어요.",
-                                     "週の上限を使い切らずに一週間を終えました。", "一整周都没有用完周限额。")
+                                     "週間リミットを使い切らずに一週間を終えました。", "一整周都没有用完每周额度。")
         case .twoAIs: return L.t("Two AIs (Claude Code, Codex, Gemini CLI) worked on the same day.", "두 AI(Claude Code·Codex·Gemini CLI)가 같은 날 일했어요.",
-                                   "二つのAI(Claude Code・Codex・Gemini CLI)が同じ日に働きました。", "两个AI(Claude Code、Codex、Gemini CLI)在同一天干活。")
+                                   "二つの AI（Claude Code・Codex・Gemini CLI）が同じ日に働きました。", "两个 AI（Claude Code、Codex、Gemini CLI）在同一天干活。")
         case .dawnReset: return L.t("Still at it when a limit reset before 6 a.m.", "새벽 6시 전에 한도가 리셋될 때 깨어 있었어요.",
-                                      "朝6時前に上限がリセットされたとき、まだ起きていました。", "清晨6点前限额重置时还在干活。")
+                                      "朝6時前にリミットがリセットされたとき、まだ起きていました。", "清晨 6 点前额度重置时还在干活。")
         }
     }
 
