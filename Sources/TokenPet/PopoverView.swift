@@ -67,9 +67,25 @@ struct PopoverView: View {
             VStack(alignment: .leading, spacing: 10) { scene(model.snap); headline(model.snap) }
                 .padding(14)
                 .frame(width: 320)
-        } else {
+        } else if inWindow {
             full
+        } else {
+            // taller than the screen (settings and more open, under the mini window): scroll instead of being cut
+            let measured = full.background(GeometryReader { g in Color.clear.preference(key: FullHeight.self, value: g.size.height) })
+            Group {
+                if let h = fullHeight, h > model.popoverMaxHeight {
+                    ScrollView(.vertical) { measured }.frame(height: model.popoverMaxHeight)
+                } else {
+                    measured
+                }
+            }
+            .onPreferenceChange(FullHeight.self) { fullHeight = $0 }
         }
+    }
+    @State private var fullHeight: CGFloat?
+    private struct FullHeight: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
     }
 
     private func headline(_ s: Snapshot) -> some View {

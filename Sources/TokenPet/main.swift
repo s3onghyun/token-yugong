@@ -606,6 +606,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         hint?.performClose(nil); hint = nil
         Prefs.store.set(true, forKey: "barHintShown")   // found him: no hint needed
         NSApp.activate(ignoringOtherApps: true)
+        if let screen = anchor.window?.screen ?? NSScreen.main { model.popoverMaxHeight = UsageModel.popoverMaxHeight(screen: screen.visibleFrame.height) }
         popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
         print("popover opened at \(popover.contentViewController?.view.window?.frame ?? .zero)")   // scripts check where it went
         applySharing()

@@ -522,6 +522,9 @@ final class UsageModel: ObservableObject {
     @Published var updateStatus: Update.Status?
     /// Update clicked: working, or why it stopped (the old app is untouched).
     @Published var installStep: Update.Install?
+    /// The popover never grows past the screen it opens on (set on each open, main.swift `show`).
+    @Published var popoverMaxHeight: CGFloat = .infinity
+    static func popoverMaxHeight(screen visible: CGFloat) -> CGFloat { max(200, visible - 40) }   // room for the arrow and margins
 
     /// Keep the pet and the numbers out of screen shares and recordings (default on).
     @Published var hideFromCapture: Bool = Prefs.store.object(forKey: "hideFromCapture") as? Bool ?? true {
