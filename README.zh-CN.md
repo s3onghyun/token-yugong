@@ -125,7 +125,7 @@ Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.
 桥接脚本有 `jq` 时用 `jq`（macOS 15+ 自带），否则用 `plutil`。
 Codex 无需设置：它自己的日志（`~/.codex/sessions`）里就带有额度。Gemini CLI 也不需要（从 `~/.gemini/tmp` 读取它的 token）。
 
-**API 预算。** OpenAI API：在 设置 › 家人 中给某个成员选 OpenAI，填入以美元计的月度预算，并粘贴一个 **管理员密钥**（Admin key；OpenAI 只向管理员密钥报告费用）。额度表就是本月花费 ÷ 预算，每 15 分钟查询一次。DeepSeek：粘贴 API 密钥即可看到余额；DeepSeek 不报告花费，所以它的额度表显示“不知道”。密钥只存进登录钥匙串。这两项加上每天一次的更新检查（见下文），是应用仅有的联网场景。
+**API 预算。** OpenAI API：在 设置 › 家人 中给某个成员选 OpenAI，填入以美元计的月度预算，并粘贴一个 **管理员密钥**（Admin key；OpenAI 只向管理员密钥报告费用）。额度表就是本月花费 ÷ 预算，每 15 分钟查询一次。DeepSeek：粘贴 API 密钥即可看到余额；DeepSeek 不报告花费，所以它的额度表显示“不知道”。密钥只存进登录钥匙串。这两项加上更新检查与下载（见下文），是应用仅有的联网场景。
 
 ## 愚公窗口
 
@@ -147,7 +147,7 @@ macOS 会悄悄隐藏放不下的菜单栏图标，或把它们藏到摄像头�
 
 ## 更新
 
-应用每天向 GitHub 查询一次最新版本：向 `api.github.com/repos/s3onghyun/token-yugong/releases/latest` 发一个 HTTPS GET，只带 `User-Agent: TokenYugong/<version>`、`Accept` 和固定的 `Accept-Language: en`，不带 cookie，也不使用缓存。不会发送任何关于你或你的用量的信息，也没有遥测。有新版本时，弹出面板会显示一行，带有 **发布页面** 和 **跳过此版本**，同一个版本只通知你一次。应用自己从不下载或安装任何东西：请下载新的 ZIP，校验它的 `.sha256`，再按[安装](#安装)一节替换应用。设置 › *检查更新（每天一次）* 可以关闭此功能；*立即检查* 会马上查询。
+应用每天向 GitHub 查询一次最新版本：向 `api.github.com/repos/s3onghyun/token-yugong/releases/latest` 发一个 HTTPS GET，只带 `User-Agent: TokenYugong/<version>`、`Accept` 和固定的 `Accept-Language: en`，不带 cookie，也不使用缓存。不会发送任何关于你或你的用量的信息，也没有遥测。有新版本时，弹出面板会显示一行，带有 **更新**、**发布页面** 和 **跳过此版本**，同一个版本只通知你一次。在你点击 **更新** 之前不会下载任何东西；点击后，应用从 `github.com/s3onghyun/token-yugong/releases/download/v<version>/` 获取该版本的 ZIP，解压到临时文件夹，确认它是同一 bundle ID 的 Token Yugong、正好是该版本且签名有效（`codesign --verify`），然后替换当前运行位置的应用并重新打开。任何一步失败，当前应用都保持不变。如果是用 Homebrew 安装的，则改为显示 `brew upgrade --cask s3onghyun/tap/token-yugong` 和复制按钮，让 Homebrew 的记录保持一致；如果应用所在位置无法替换（没有写入权限的文件夹），请从发布页面下载，再按[安装](#安装)一节替换应用。设置 › *检查更新（每天一次）* 可以关闭此功能；*立即检查* 会马上查询。
 
 ## 隐私
 
@@ -160,7 +160,7 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 | `~/.codex/sessions` | Codex 自己的额度和 token 数 |
 | `~/.gemini/tmp` | Gemini CLI 的 token 数 |
 
-- **网络：** 只有每天一次的更新检查（向 GitHub releases API 发一个 GET，可关闭），以及仅在你粘贴了密钥时，每 15 分钟查询一次 OpenAI 的费用 API 或 DeepSeek 的余额 API。
+- **网络：** 只有每天一次的更新检查（向 GitHub releases API 发一个 GET，可关闭）、点击 **更新** 时下载的发布 ZIP，以及仅在你粘贴了密钥时，每 15 分钟查询一次 OpenAI 的费用 API 或 DeepSeek 的余额 API。
 - **密钥**只存在你的登录钥匙串里，别处没有。
 - **设置和历史**（大山、称号）保存在本机的 `TokenPet` UserDefaults 域中；`defaults delete TokenPet` 会清除它们。应用从桥接文件读到的内容（账号哈希、百分比、重置时间）记录在 `~/Library/Application Support/TokenPet/claude-readings.log`（最多两个 512 KB 文件），便于追查账号混淆；可随时删除。
 - 只有在你点 **连接**（先展示改动）或运行 `TokenPet setup` 时，应用才会修改 `~/.claude/settings.json`，而且只改 `statusLine` 并留有备份；`TokenPet setup --undo` 可撤销。

@@ -520,6 +520,8 @@ final class UsageModel: ObservableObject {
         didSet { Prefs.store.set(skippedVersion, forKey: "update.skipped") }
     }
     @Published var updateStatus: Update.Status?
+    /// Update clicked: working, or why it stopped (the old app is untouched).
+    @Published var installStep: Update.Install?
 
     /// Keep the pet and the numbers out of screen shares and recordings (default on).
     @Published var hideFromCapture: Bool = Prefs.store.object(forKey: "hideFromCapture") as? Bool ?? true {

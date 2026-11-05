@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Update** in the new-version row: downloads that release's ZIP, checks it (size, same bundle id,
+  exactly that version, `codesign --verify`), swaps it in for the running app and restarts. On any
+  failure the current app is left as it was. Installed with Homebrew, the row shows
+  `brew upgrade --cask s3onghyun/tap/token-yugong` with a Copy button instead; where the app cannot be
+  replaced, it points to the release page.
+
 ## 0.2.2 (2026-11-04)
 
 ### Added
