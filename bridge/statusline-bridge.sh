@@ -33,7 +33,9 @@ else
   rl=$(/bin/cat "$limits_file")
   plutil -extract five_hour.used_percentage raw -o "$pct_file" "$limits_file" 2>/dev/null
   pct=$(/bin/cat "$pct_file")
-  plutil -extract session_id raw -o "$sid_file" "$input_file" 2>/dev/null
+  # `plutil -extract` can print its missing-key diagnostic to stdout on older macOS releases;
+  # do not let an optional session_id leak into a chained status line.
+  case "$input" in *'"session_id"'*) plutil -extract session_id raw -o "$sid_file" "$input_file" 2>/dev/null ;; esac
   sid=$(/bin/cat "$sid_file")
   uuid=$(plutil -extract oauthAccount.accountUuid raw -o - "$cfg" 2>/dev/null)
   /bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file"
