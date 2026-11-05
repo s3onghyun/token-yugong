@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Token Yugong",
+  "version": "0.1.0",
+  "identifier": "io.github.s3onghyun.token-yugong.desktop",
+  "build": { "frontendDist": "../ui" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{ "label": "main", "title": "Token Yugong (Beta)", "width": 390, "height": 460, "resizable": false, "visible": false }],
+    "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:" }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "A local-only pixel pet for Claude Code and Codex usage",
+    "longDescription": "Experimental Linux and Windows desktop shell for Token Yugong. It reads local Claude Code and Codex data only."
+  }
+}

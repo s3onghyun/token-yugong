@@ -70,6 +70,24 @@ All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
 Needs macOS 13 or later.
 
+### Linux/Windows (beta)
+
+**Experimental.** A separate Tauri 2 desktop shell for Linux and Windows lives in
+[`desktop/`](desktop/). It reads local Claude Code and Codex JSONL data, shows an animated tray
+pet and a small usage window, and keeps its settings in the platform app-config directory.
+
+Linux builds target AppImage and `.deb`; Windows builds target unsigned MSI and NSIS installers.
+They are CI artifacts only for now: there is no release, auto-update, winget, or Flathub package.
+On Linux, open the window from the tray menu (some StatusNotifierItem implementations do not send
+tray-click events). On Windows, SmartScreen may warn until the project can obtain OSS signing.
+
+Build the beta on a Linux or Windows machine with Rust and Node.js installed:
+
+```sh
+npm ci --prefix desktop
+npm run tauri --prefix desktop -- build
+```
+
 ### Homebrew
 
 ```sh

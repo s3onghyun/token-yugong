@@ -1,0 +1,7 @@
+{
+  "name": "token-yugong-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": { "build": "node scripts/copy-assets.mjs", "tauri": "tauri" },
+  "devDependencies": { "@tauri-apps/cli": "^2.12.0" }
+}
