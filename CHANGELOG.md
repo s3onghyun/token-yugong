@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.7 (2026-11-07)
+
+### Fixed
+- Local usage scans now wake after a watched bridge or usage directory changes, coalesced and throttled to one scan per 30 seconds. The old 20-second polling loop is a five-minute recovery check instead, so an otherwise static menu-bar pet does not spend CPU scanning unchanged files.
+
 ## 0.2.6 (2026-11-07)
 
 ### Changed

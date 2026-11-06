@@ -125,6 +125,12 @@ import Testing
         #expect(!MenuAnimationPolicy.shouldUpdateText(previous: " 24%", next: " 24%"))
         #expect(MenuAnimationPolicy.shouldUpdateText(previous: " 24%", next: " 25%"))
     }
+
+    @Test func usageRefreshUsesFileChangesWithASlowFallback() {
+        #expect(UsageRefreshPolicy.fallbackInterval == 5 * 60)
+        #expect(UsageRefreshPolicy.notificationDebounce == 1)
+        #expect(UsageRefreshPolicy.minimumNotificationInterval == 30)
+    }
 }
 
 @Suite struct SettingsAndSetup {
