@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- Menu-bar animation now holds a static pose in Low Power Mode and avoids preparing sprite frames at all when the pet image is off. Static percentage labels refresh at most every five minutes; countdown labels refresh once a minute. The existing one-shot, tolerant timer continues to stop for an asleep display, locked/inactive session, or an occluded/hidden status item.
+- AppKit gives one `NSStatusItem` one shared image, replicated by the system on every menu bar; it does not expose a per-display image or the display a copied item is being viewed on. Yugong therefore cannot animate only the active copy. It uses one cached image and skips all redraws when its item is not visible instead.
+
 ## 0.2.5
 
 ### Added

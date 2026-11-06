@@ -340,6 +340,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var lastImage: NSImage?, lastTitle = "", barShowsImage = true
 
     private var screensAsleep = false, sessionAway = false
+    // `--low-power` is a measurement hook; regular launches follow the system setting.
+    private var lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled || args.contains("--low-power")
 
     func watchVisibility() {
         let ws = NSWorkspace.shared.notificationCenter
@@ -347,6 +349,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         ws.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.screensAsleep = false; self?.updatePaused() }
         ws.addObserver(forName: NSWorkspace.sessionDidResignActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.sessionAway = true; self?.updatePaused() }
         ws.addObserver(forName: NSWorkspace.sessionDidBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.sessionAway = false; self?.updatePaused() }
+        NotificationCenter.default.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: ProcessInfo.processInfo, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled || args.contains("--low-power")
+            self.scheduleAnim()
+        }
         NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: nil, queue: .main) { [weak self] _ in self?.updatePaused() }
         // the bar reshuffles when other apps add items or screens change: look again a moment later
         let recheck: (Notification) -> Void = { [weak self] _ in
@@ -360,7 +367,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func updatePaused() {
         let itemSeen = !barHidden && (item.button?.window?.occlusionState.contains(.visible) ?? true)
         let miniSeen = mini.map { $0.isVisible && $0.occlusionState.contains(.visible) } ?? false
-        let hidden = screensAsleep || sessionAway || !(itemSeen || miniSeen || args.contains("--anim-stats"))
+        let hidden = MenuAnimationPolicy.isPaused(screensAsleep: screensAsleep, sessionAway: sessionAway,
+                                                   statusItemVisible: itemSeen, miniWindowVisible: miniSeen,
+                                                   measuring: args.contains("--anim-stats"))
         if hidden != paused { paused = hidden; scheduleAnim() }
     }
 
@@ -548,20 +557,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func tick() {
         wakeCount += 1
         let s = model.snap
-        let l = loop(s.state, model.tempo, night: model.night, carrier: s.carrier, titles: model.rewards)
-        let now = Date.timeIntervalSinceReferenceDate
-        let p = l.period.isFinite ? model.phase(at: now).truncatingRemainder(dividingBy: l.period) : 0
-        let run = l.runs.first { p < $0.end } ?? l.runs[l.runs.count - 1]
         let (showImage, title) = BarText.item(model.barText.text(s, cutscene: model.cutsceneDue || model.finaleDue, now: Date()), grandpa: model.barGrandpa)
-        if run.img !== lastImage || showImage != barShowsImage {
+        let miniVisible = mini?.isVisible == true
+        let animate = MenuAnimationPolicy.shouldAnimate(lowPowerMode: lowPowerMode, showsImage: showImage,
+                                                         miniWindowVisible: miniVisible, staging: args.contains("--stage"),
+                                                         measuring: args.contains("--anim-stats"))
+        let needsImage = showImage || miniVisible
+        var runImage = lastImage
+        var nextFrameWait: TimeInterval?
+        if needsImage {
+            let l = loop(s.state, model.tempo, night: model.night, carrier: s.carrier, titles: model.rewards)
+            let now = Date.timeIntervalSinceReferenceDate
+            let p = animate && l.period.isFinite ? model.phase(at: now).truncatingRemainder(dividingBy: l.period) : 0
+            let run = l.runs.first { p < $0.end } ?? l.runs[l.runs.count - 1]
+            runImage = run.img
+            if animate { nextFrameWait = min(30, max(1.0 / 30, (run.end - p) / max(0.3, model.animSpeed))) }
+        }
+        if runImage !== lastImage || showImage != barShowsImage {
             if showImage || showImage != barShowsImage {   // % only: the item has no picture to change
                 // a hidden bar item still costs a redraw per frame (measured 3% CPU at "high"): skip it
-                if !barHidden || args.contains("--anim-stats") { item.button?.image = showImage ? run.img : nil }
-                bar.image = showImage ? run.img : NSImage()
+                if !barHidden || args.contains("--anim-stats") { item.button?.image = showImage ? runImage : nil }
+                bar.image = showImage ? (runImage ?? NSImage()) : NSImage()
             }
             barShowsImage = showImage
-            lastImage = run.img
-            if mini?.isVisible == true { mini?.pet.image = run.img }
+            lastImage = runImage
+            if miniVisible, let runImage { mini?.pet.image = runImage }
             drawCount += 1
         }
         if title != lastTitle {
@@ -570,12 +590,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             item.button?.attributedTitle = NSAttributedString(string: title, attributes: [
                 .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
             ])
-            mini?.update(image: run.img, title: title)
+            mini?.update(image: runImage, title: title)
         }
-        // wake again when this picture ends, at the current speed (at least 1/30 s, at most 30 s)
-        // nothing animated on show (number only, no mini window): wake twice a minute for the time styles; a new snapshot ticks anyway
-        let animating = showImage || mini?.isVisible == true || args.contains("--stage") || args.contains("--anim-stats")
-        let wait = l.period.isFinite && animating ? min(30, max(1.0 / 30, (run.end - p) / max(0.3, model.animSpeed))) : 30
+        // Wake at a distinct pose only.  With no animation (notably Low Power Mode), the
+        // only time-sensitive work is the menu-bar clock; percentage-only labels need no
+        // more than a five-minute check and snapshots schedule an immediate refresh.
+        let showsClock = model.barText == .timeLeft || (s.resting && model.barText != .none)
+        let wait = nextFrameWait ?? MenuAnimationPolicy.staticRefreshInterval(showsClock: showsClock)
         animTimer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { [weak self] _ in self?.tick() }
         animTimer?.tolerance = wait * 0.1
     }
