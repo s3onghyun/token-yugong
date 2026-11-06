@@ -112,6 +112,7 @@ struct PopoverView: View {
                 meterRow(L.t("Limit", "한도", "リミット", "额度"), nil)
             } else if let d = s.daily {
                 // Claude Code did not report a 5-hour window: the weekly limit is the carrier, today's share only sets the pace
+                meterRow(L.t("5-hour", "5시간", "5時間", "5 小时"), nil, missingReset: true)
                 meterRow(L.t("Weekly (the carrier)", "주간 (지게)", "週間（背負子）", "每周（背架）"), s.week)
                 meterRow(L.t("Today's share: pace (1/7 of the week)",
                              "오늘 몫: 속도 (주간의 1/7)",
@@ -590,7 +591,7 @@ struct PopoverView: View {
     }
 
     /// `pace`: a pace guide, not a limit, so 100% and over is not drawn as "full, resting".
-    @ViewBuilder private func meterRow(_ label: String, _ m: Meter?, pace: Bool = false) -> some View {
+    @ViewBuilder private func meterRow(_ label: String, _ m: Meter?, pace: Bool = false, missingReset: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(label).font(.subheadline.weight(.semibold))
@@ -609,7 +610,10 @@ struct PopoverView: View {
                 }
             }
             .frame(height: 8)
-            Text(resetText(m)).font(.caption).foregroundColor(.secondary)
+            Text(missingReset && m == nil
+                 ? L.t("reset unknown — waiting for Claude Code", "리셋 시간 모름 — Claude Code 응답을 기다리는 중",
+                       "リセット時刻は不明 — Claude Code の応答待ち", "重置时间未知 — 正在等待 Claude Code 回复")
+                 : resetText(m)).font(.caption).foregroundColor(.secondary)
         }
     }
 

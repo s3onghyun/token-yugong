@@ -170,7 +170,11 @@ struct Accounts: Equatable, Codable {
         if let t = r.account { return take(r, signedIn: t) }
         if let w = r.week?.resetsAt {
             if let cur = week, !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
-                if let p = previous, Self.same(w, p), let s = seen, r.at.timeIntervalSince(s) < Self.quiet { return reading }
+                // An older bridge can have no account hash. Its weekly-only payload is still
+                // useful evidence: if a previous switch left no current reading, show it rather
+                // than remaining permanently in the "don't know" state.
+                if let p = previous, Self.same(w, p), let s = seen, r.at.timeIntervalSince(s) < Self.quiet,
+                   let reading { return reading }
                 previous = cur; switchedAt = r.at; reading = nil
             }
             week = w
@@ -181,6 +185,7 @@ struct Accounts: Equatable, Codable {
     /// A reading from a bridge that names the signed-in account `t`.
     private mutating func take(_ r: Reading, signedIn t: String) -> Reading? {
         var known = weeks ?? [:]
+        let remainsCurrent = t == id
         if t != id {   // a /login (or the first named reading: the account is not new, only its name)
             if id != nil { previous = week; switchedAt = r.at }
             id = t; week = known[t]; reading = nil; seen = nil
@@ -188,8 +193,12 @@ struct Accounts: Equatable, Codable {
         }
         if let w = r.week?.resetsAt {
             // another account's week: an idle session still holding that account's numbers
-            if known.contains(where: { $0.key != t && Self.same($0.value, w) }) { return reading }
-            if let cur = known[t], !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
+            // Different accounts may legitimately share a weekly reset. Recover a known
+            // current account only when it has no reading at all; otherwise the matching
+            // reset is still the idle old-session redraw that must be ignored.
+            let recoverCurrent = remainsCurrent && reading == nil
+            if !recoverCurrent, known.contains(where: { $0.key != t && Self.same($0.value, w) }) { return reading }
+            if !recoverCurrent, let cur = known[t], !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
                 // a week never seen for any account: numbers from before this app knew it, unless this one went quiet
                 if let s = seen, r.at.timeIntervalSince(s) < Self.quiet { return reading }
                 reading = nil
