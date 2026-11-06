@@ -206,7 +206,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     var cycleTimer: Timer?
 
     func applicationDidFinishLaunching(_ note: Notification) {
-        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // Never use `variableLength` for an animated status item.  Re-measuring it for every
+        // sprite frame makes AppKit relayout the status-bar window.  This is wide enough for
+        // the fixed 20-point image and the widest supported label (`100%`).
+        item = NSStatusBar.system.statusItem(withLength: CGFloat(MenuAnimationPolicy.statusItemWidth))
         item.button?.target = self
         item.button?.action = #selector(toggleFromBar)
         item.button?.imagePosition = .imageLeading
@@ -577,14 +580,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             if showImage || showImage != barShowsImage {   // % only: the item has no picture to change
                 // a hidden bar item still costs a redraw per frame (measured 3% CPU at "high"): skip it
                 if !barHidden || args.contains("--anim-stats") { item.button?.image = showImage ? runImage : nil }
-                bar.image = showImage ? (runImage ?? NSImage()) : NSImage()
+                // `bar` backs the optional screenshot stage.  Do not publish SwiftUI state for
+                // every menu-bar frame when that stage is closed.
+                if stage != nil { bar.image = showImage ? (runImage ?? NSImage()) : NSImage() }
             }
             barShowsImage = showImage
             lastImage = runImage
             if miniVisible, let runImage { mini?.pet.image = runImage }
             drawCount += 1
         }
-        if title != lastTitle {
+        if MenuAnimationPolicy.shouldUpdateText(previous: lastTitle, next: title) {
             lastTitle = title
             bar.title = title
             item.button?.attributedTitle = NSAttributedString(string: title, attributes: [
