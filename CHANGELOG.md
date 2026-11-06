@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.8 (2026-11-07)
+
+### Changed
+- The Homebrew upgrade command's Copy button now briefly becomes **Copied** / **복사됨** with a checkmark, and announces the successful copy to VoiceOver.
+
 ## 0.2.7 (2026-11-07)
 
 ### Fixed
