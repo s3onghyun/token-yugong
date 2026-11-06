@@ -576,7 +576,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if needsImage {
             let l = loop(s.state, model.tempo, night: model.night, carrier: s.carrier, titles: model.rewards)
             let now = Date.timeIntervalSinceReferenceDate
-            let p = animate && l.period.isFinite ? model.phase(at: now).truncatingRemainder(dividingBy: l.period) : 0
+            let p = animate && l.period.isFinite
+                ? model.phase(at: now).truncatingRemainder(dividingBy: l.period)
+                : MenuAnimationPolicy.staticPoseTime(tempo: model.tempo)
             let run = l.runs.first { p < $0.end } ?? l.runs[l.runs.count - 1]
             runImage = run.img
             if animate { nextFrameWait = min(30, max(1.0 / 30, (run.end - p) / max(0.3, model.animSpeed))) }
