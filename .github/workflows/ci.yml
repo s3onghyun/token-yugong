@@ -9,9 +9,9 @@ permissions:
 
 jobs:
   test:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
-      # macos-14 includes this full Xcode; do not mix its newer Testing.framework
+      # macos-15 includes this full Xcode; do not mix its newer Testing.framework
       # with the Command Line Tools compiler selected by the image by default.
       DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
     steps:
