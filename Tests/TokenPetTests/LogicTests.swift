@@ -408,7 +408,8 @@ func json(_ s: String) -> Data { Data(s.utf8) }
             try p.run(); i.fileHandleForWriting.write(Data(input.utf8)); try i.fileHandleForWriting.close(); p.waitUntilExit()
             return String(decoding: o.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         }
-        _ = try run(#"{"session_id":"secret","cwd":"/x","rate_limits":{"seven_day":{"used_percentage":19,"resets_at":1794164400}}}"#)
+        let line = try run(#"{"session_id":"secret","cwd":"/x","rate_limits":{"seven_day":{"used_percentage":19,"resets_at":1794164400}}}"#)
+        #expect(line == "🐾 week 19%")
         let saved = try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8)
         #expect(!saved.contains("secret") && !saved.contains("cwd"))
         #expect(Limits.bridge(Data(saved.utf8), fileDate: Date())?.week?.pct == 19)

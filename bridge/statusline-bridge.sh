@@ -17,6 +17,7 @@ input=$(cat)
 if command -v jq >/dev/null 2>&1; then
   rl=$(printf '%s' "$input" | jq -c '.rate_limits // empty' 2>/dev/null)
   pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
+  week=$(printf '%s' "$rl" | jq -r '.seven_day.used_percentage // empty' 2>/dev/null)
   sid=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
   uuid=$(jq -r '.oauthAccount.accountUuid // empty' "$cfg" 2>/dev/null)
 else
@@ -33,6 +34,7 @@ else
   rl=$(/bin/cat "$limits_file")
   plutil -extract five_hour.used_percentage raw -o "$pct_file" "$limits_file" 2>/dev/null
   pct=$(/bin/cat "$pct_file")
+  week=$(plutil -extract seven_day.used_percentage raw -o - "$limits_file" 2>/dev/null)
   # `plutil -extract` can print its missing-key diagnostic to stdout on older macOS releases;
   # do not let an optional session_id leak into a chained status line.
   case "$input" in *'"session_id"'*) plutil -extract session_id raw -o "$sid_file" "$input_file" 2>/dev/null ;; esac
@@ -74,5 +76,9 @@ if [ "$1" = "--chain" ] && [ -n "$2" ]; then
   printf '%s' "$input" | sh -c "$2"
   exit $?
 fi
-[ -n "$pct" ] && printf '🐾 5h %.0f%%' "$pct"
+if [ -n "$pct" ]; then
+  printf '🐾 5h %.0f%%' "$pct"
+elif [ -n "$week" ]; then
+  printf '🐾 week %.0f%%' "$week"
+fi
 exit 0

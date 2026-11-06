@@ -171,6 +171,27 @@ import Testing
         #expect(a.take(max(login + hour, tag: nil))?.five == nil)
     }
 
+    @Test func anUntaggedWeeklyOnlyReadingRecoversAfterAnAccountSwitch() {
+        // Claude Code can omit both the five-hour window and the bridge account hash just
+        // after an update. A stale old-account guard must not turn that valid weekly reading
+        // into a permanent "don't know" state.
+        var a = Accounts(week: mWeek, previous: tWeek, switchedAt: login, seen: login, reading: nil)
+        let r = team(login + 60, five: nil, week: 73, tag: nil)
+        let shown = a.take(r)
+        #expect(shown?.five == nil)
+        #expect(shown?.week == r.week)
+    }
+
+    @Test func theCurrentTaggedAccountWinsWhenAccountsShareAWeeklyReset() {
+        // Two remembered accounts can have the same weekly reset. Once the bridge has
+        // identified the current session's account, that identity is stronger evidence than
+        // the coincident reset time.
+        var a = Accounts(week: mWeek, previous: tWeek, switchedAt: login, seen: login, reading: nil,
+                         id: T, weeks: [M: mWeek, T: tWeek], ids: [M, T])
+        let r = max(login + 60, tag: T)
+        #expect(a.take(r) == r)
+    }
+
     // PR #12's rule: with the bridge naming no account, 30 minutes of quiet lets an idle session of the
     // old account take the app back (overnight, any redraw of it). The named account ends that.
     @Test func anIdleOldSessionNeverTakesANamedAccountBack() {
