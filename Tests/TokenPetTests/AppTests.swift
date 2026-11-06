@@ -115,6 +115,8 @@ import Testing
     @Test func lowPowerHoldsOnePoseAndSlowsTheClock() {
         #expect(!MenuAnimationPolicy.shouldAnimate(lowPowerMode: true, showsImage: true, miniWindowVisible: false, staging: false, measuring: false))
         #expect(MenuAnimationPolicy.shouldAnimate(lowPowerMode: false, showsImage: true, miniWindowVisible: false, staging: false, measuring: false))
+        #expect(MenuAnimationPolicy.staticPoseTime(tempo: .idle) == 1.5)
+        #expect(MenuAnimationPolicy.staticPoseTime(tempo: .working) == 0)
         #expect(MenuAnimationPolicy.staticRefreshInterval(showsClock: true) == 60)
         #expect(MenuAnimationPolicy.staticRefreshInterval(showsClock: false) == 300)
     }
@@ -124,6 +126,12 @@ import Testing
         #expect(MenuAnimationPolicy.statusItemWidth == 72)
         #expect(!MenuAnimationPolicy.shouldUpdateText(previous: " 24%", next: " 24%"))
         #expect(MenuAnimationPolicy.shouldUpdateText(previous: " 24%", next: " 25%"))
+    }
+
+    @Test func usageRefreshUsesFileChangesWithASlowFallback() {
+        #expect(UsageRefreshPolicy.fallbackInterval == 5 * 60)
+        #expect(UsageRefreshPolicy.notificationDebounce == 1)
+        #expect(UsageRefreshPolicy.minimumNotificationInterval == 30)
     }
 }
 

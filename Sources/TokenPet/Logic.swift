@@ -29,6 +29,14 @@ enum MenuAnimationPolicy {
         showsClock ? 60 : 300
     }
 
+    /// Low Power Mode needs one representative pose, not the first key frame.  Idle starts
+    /// with Grandpa turned away to chat, which leaves only his pale beard and trousers visible
+    /// at menu-bar size.  Hold the forward-facing idle key instead so the normal blue jacket
+    /// and red sash remain legible on either menu-bar appearance.
+    static func staticPoseTime(tempo: Tempo) -> TimeInterval {
+        tempo == .idle ? 1.5 : 0
+    }
+
     /// Keep text changes out of the frame loop.  This is deliberately separate from the image
     /// decision: frames are frequent, but a percentage or clock label usually is not.
     static func shouldUpdateText(previous: String, next: String) -> Bool { previous != next }

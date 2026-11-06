@@ -263,6 +263,9 @@ final class UsageModel: ObservableObject {
     private var accounts = Accounts.load()
     private var accountJustSwitched = false
     private var timer: Timer?
+    private var refreshWork: DispatchWorkItem?
+    private var fileWatchers: [FileChangeWatcher] = []
+    private var lastRefreshAt = Date.distantPast
     @Published private(set) var signedInClaudeAccount = ClaudeAccount.read()
 
     init(bridgeURL: URL, logsRoot: URL) {
@@ -272,9 +275,33 @@ final class UsageModel: ObservableObject {
 
     func start() {
         StatusLineSetup.refreshInstalled(in: bridgeURL.deletingLastPathComponent())
+        watchUsageFiles()
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in self?.refresh() }
+        timer = Timer.scheduledTimer(withTimeInterval: UsageRefreshPolicy.fallbackInterval, repeats: true) { [weak self] _ in self?.refresh() }
         timer?.tolerance = 5
+    }
+
+    /// A response from one of the local CLIs changes a bridge or log directory. Refresh soon,
+    /// but coalesce bursts so a streamed response does not turn into repeated full scans.
+    private func watchUsageFiles() {
+        let directories = [bridgeURL.deletingLastPathComponent(), scanner.root, codexReader.root, geminiReader.root]
+        fileWatchers = directories.compactMap { directory in
+            FileChangeWatcher(directory: directory) { [weak self] in
+                DispatchQueue.main.async { self?.refreshAfterFileChange() }
+            }
+        }
+    }
+
+    private func refreshAfterFileChange() {
+        refreshWork?.cancel()
+        let next = lastRefreshAt.addingTimeInterval(UsageRefreshPolicy.minimumNotificationInterval)
+        let delay = max(UsageRefreshPolicy.notificationDebounce, next.timeIntervalSinceNow)
+        let work = DispatchWorkItem { [weak self] in
+            self?.refreshWork = nil
+            self?.refresh()
+        }
+        refreshWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     func refresh() {
@@ -282,6 +309,7 @@ final class UsageModel: ObservableObject {
         checkForUpdate()   // at most once a day (Update.isDue); nothing in demos
         guard !scanning else { return }
         scanning = true
+        lastRefreshAt = Date()
         queue.async { [self] in
             scanner.scan()
             codexReader.scan()
