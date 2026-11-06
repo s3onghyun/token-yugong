@@ -7,7 +7,7 @@
 - The animated menu-bar item now keeps a fixed width and swaps only cached sprite images. This avoids AppKit's menu-bar layout pass on every frame; the optional SwiftUI recording stage is no longer published to while closed, and text still changes only when its value changes.
 - AppKit gives one `NSStatusItem` one shared image, replicated by the system on every menu bar; it does not expose a per-display image or the display a copied item is being viewed on. Yugong therefore cannot animate only the active copy. It uses one cached image and skips all redraws when its item is not visible instead.
 
-## 0.2.5
+## 0.2.5 (2026-11-06)
 
 ### Added
 - The popover shows the masked signed-in Claude account and explains when the displayed limits belong to the previous account.
