@@ -1,5 +1,6 @@
 import Foundation
 import ServiceManagement
+import CryptoKit
 import TokenPetAssets
 
 /// One settings domain however the app is started (`swift run` or the .app bundle), so the
@@ -8,6 +9,47 @@ import TokenPetAssets
 enum Prefs {
     static let domain = ProcessInfo.processInfo.environment["TOKENPET_PREFS"] ?? "TokenPet"
     static let store = UserDefaults(suiteName: domain) ?? .standard
+}
+
+/// The local Claude Code login. Its email is only held in memory for the popover and is masked
+/// before it reaches the view.
+struct ClaudeAccount: Equatable {
+    var id: String?
+    var email: String?
+
+    static var configURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
+    }
+
+    static func read(from url: URL = configURL) -> ClaudeAccount {
+        guard let data = try? Data(contentsOf: url) else { return ClaudeAccount() }
+        return decode(data)
+    }
+
+    static func decode(_ data: Data) -> ClaudeAccount {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let oauth = root["oauthAccount"] as? [String: Any] else { return ClaudeAccount() }
+        let uuid = oauth["accountUuid"] as? String
+        let email = (oauth["emailAddress"] as? String) ?? (oauth["email"] as? String)
+        return ClaudeAccount(id: uuid.map(hash), email: email)
+    }
+
+    static func mask(_ email: String?) -> String? {
+        guard let email, let at = email.firstIndex(of: "@"), at != email.startIndex else { return nil }
+        return "\(String(email[..<at]).prefix(2))***\(email[at...])"
+    }
+
+    var maskedEmail: String? { Self.mask(email) }
+
+    /// An absent account identity is not evidence of a switch (older bridge payloads omit it).
+    func differs(from shownID: String?) -> Bool {
+        guard let id, let shownID else { return false }
+        return id != shownID
+    }
+
+    private static func hash(_ value: String) -> String {
+        String(SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined().prefix(12))
+    }
 }
 
 /// What the app read from the bridge and made of it, one line per new reading, for telling later which
@@ -221,6 +263,7 @@ final class UsageModel: ObservableObject {
     private var accounts = Accounts.load()
     private var accountJustSwitched = false
     private var timer: Timer?
+    @Published private(set) var signedInClaudeAccount = ClaudeAccount.read()
 
     init(bridgeURL: URL, logsRoot: URL) {
         self.bridgeURL = bridgeURL
@@ -244,12 +287,32 @@ final class UsageModel: ObservableObject {
             codexReader.scan()
             geminiReader.scan()
             let b = Self.readBridge(bridgeURL)
+            let account = ClaudeAccount.read()
             DispatchQueue.main.async { [self] in
+                signedInClaudeAccount = account
                 take(b)
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
                 budgets.refresh(Array(family.roles.values)) { [weak self] in self?.recompute() }
+            }
+        }
+    }
+
+    /// Re-read only Claude's local account and usage files. A fresh number still requires a
+    /// Claude response to have reached the status-line bridge; this never contacts a service.
+    func checkAccountNow() {
+        guard !scanning else { return }
+        signedInClaudeAccount = ClaudeAccount.read()
+        scanning = true
+        queue.async { [self] in
+            scanner.scan()
+            let b = Self.readBridge(bridgeURL)
+            DispatchQueue.main.async { [self] in
+                take(b)
+                scanning = false
+                mountain.absorb(allEvents)
+                recompute()
             }
         }
     }
@@ -338,6 +401,9 @@ final class UsageModel: ObservableObject {
     private var lastLogged: Reading?
     /// The popover's last line: which Claude account (A, B, ... and its short hash) and when its numbers came.
     var accountLine: (letter: String?, id: String?, seen: Date?) { (accounts.letter, accounts.id.map { String($0.prefix(6)) }, accounts.seen) }
+    /// The bridge account is hashed too, so no raw account identifier is retained.
+    var shownClaudeAccountID: String? { accounts.id }
+    var accountMismatch: Bool { signedInClaudeAccount.differs(from: shownClaudeAccountID) }
     /// "Account change detected" in the popover, for as long as the wife asks about it.
     var accountNote: Bool { accounts.switchedAt.map { Date().timeIntervalSince($0) < Visitors.afterChange } ?? false }
     /// An old session redrew first after `/login`; its payload is deliberately ignored until the new account replies.
