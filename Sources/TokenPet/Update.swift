@@ -1,5 +1,11 @@
 import AppKit
 
+/// Brief visual confirmation after putting a command on the pasteboard. Kept separate from the
+/// view so every copy affordance uses the same short, non-persistent acknowledgement.
+enum CopyFeedback {
+    static let visibleFor: TimeInterval = 1.5
+}
+
 /// A release version in SemVer order: MAJOR.MINOR.PATCH, then the prerelease (1.0.0-rc.1 < 1.0.0).
 /// A leading "v" is fine and build metadata ("+abc") is ignored. Anything else is nil.
 struct SemVer: Comparable, CustomStringConvertible {

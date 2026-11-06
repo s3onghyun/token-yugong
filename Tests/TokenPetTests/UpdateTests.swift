@@ -7,6 +7,10 @@ import Testing
 @Suite struct UpdateNotice {
     func v(_ s: String) -> SemVer { SemVer(s)! }
 
+    @Test func copyFeedbackIsBrief() {
+        #expect(CopyFeedback.visibleFor == 1.5)
+    }
+
     @Test func versionsCompareAsNumbers() {
         #expect(v("0.10.0") > v("0.9.9"))           // not as text
         #expect(v("1.0.0") > v("0.99.99"))

@@ -58,6 +58,8 @@ struct PopoverView: View {
     @State var showSettings = args.contains("--settings")   // demo: open with settings shown
     /// Off: the compact popover (scene, meters, pace, actions). On: title, sources, account, speed, capture. Remembered.
     @AppStorage("popover.more", store: Prefs.store) var showMore = args.contains("--more")
+    @State private var brewCommandCopied = false
+    @State private var clearBrewCopyFeedback: DispatchWorkItem?
 
     /// The Yugong window's ⋯ › Compact: only the scene and its headline. Remembered.
     @AppStorage("sceneWindow.compact", store: Prefs.store) var compactWindow = false
@@ -355,10 +357,16 @@ struct PopoverView: View {
                 HStack(spacing: 6) {
                     Text(Update.brewCommand).font(.caption.monospaced()).textSelection(.enabled).lineLimit(1).minimumScaleFactor(0.8)
                     Spacer()
-                    Button(L.t("Copy", "복사", "コピー", "复制")) {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(Update.brewCommand, forType: .string)
-                    }.buttonStyle(.link)
+                    Button { copyBrewCommand() } label: {
+                        Label(brewCommandCopied
+                              ? L.t("Copied", "복사됨", "コピー済み", "已复制")
+                              : L.t("Copy", "복사", "コピー", "复制"),
+                              systemImage: brewCommandCopied ? "checkmark" : "doc.on.doc")
+                    }
+                    .buttonStyle(.link)
+                    .accessibilityLabel(brewCommandCopied
+                                        ? L.t("Upgrade command copied", "업그레이드 명령어를 복사했어요", "アップグレードコマンドをコピーしました", "升级命令已复制")
+                                        : L.t("Copy upgrade command", "업그레이드 명령어 복사", "アップグレードコマンドをコピー", "复制升级命令"))
                 }
             } else if route == .manual {
                 Text(L.t("This copy can't be replaced in place. Download it from the release page.",
@@ -376,6 +384,20 @@ struct PopoverView: View {
         }
         .font(.caption)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func copyBrewCommand() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Update.brewCommand, forType: .string)
+        clearBrewCopyFeedback?.cancel()
+        brewCommandCopied = true
+        let announcement = L.t("Upgrade command copied", "업그레이드 명령어를 복사했어요", "アップグレードコマンドをコピーしました", "升级命令已复制")
+        if let app = NSApp {
+            NSAccessibility.post(element: app, notification: .announcementRequested, userInfo: [.announcement: announcement])
+        }
+        let clear = DispatchWorkItem { brewCommandCopied = false }
+        clearBrewCopyFeedback = clear
+        DispatchQueue.main.asyncAfter(deadline: .now() + CopyFeedback.visibleFor, execute: clear)
     }
 
     /// Settings: this version and what the last check found.
