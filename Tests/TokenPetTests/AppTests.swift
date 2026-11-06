@@ -118,6 +118,13 @@ import Testing
         #expect(MenuAnimationPolicy.staticRefreshInterval(showsClock: true) == 60)
         #expect(MenuAnimationPolicy.staticRefreshInterval(showsClock: false) == 300)
     }
+
+    @Test func statusItemFramesNeverNeedVariableWidthOrTextUpdates() {
+        // Its width covers a 20-point sprite and `100%`, but never changes during animation.
+        #expect(MenuAnimationPolicy.statusItemWidth == 72)
+        #expect(!MenuAnimationPolicy.shouldUpdateText(previous: " 24%", next: " 24%"))
+        #expect(MenuAnimationPolicy.shouldUpdateText(previous: " 24%", next: " 25%"))
+    }
 }
 
 @Suite struct SettingsAndSetup {

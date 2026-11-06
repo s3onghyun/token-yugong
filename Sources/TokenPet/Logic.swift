@@ -8,6 +8,11 @@ import TokenPetAssets
 /// has one image shared by the system's menu-bar copies, so visibility is deliberately a
 /// single "can anybody see it?" value rather than a display-specific setting.
 enum MenuAnimationPolicy {
+    /// A status item's variable length asks AppKit to measure and lay out the entire menu bar
+    /// every time its image changes.  Grandpa's 20-point sprite and the widest label (`100%`)
+    /// fit comfortably in this fixed slot, so animation only replaces layer contents.
+    static let statusItemWidth: Double = 72
+
     static func isPaused(screensAsleep: Bool, sessionAway: Bool, statusItemVisible: Bool,
                          miniWindowVisible: Bool, measuring: Bool) -> Bool {
         screensAsleep || sessionAway || !(statusItemVisible || miniWindowVisible || measuring)
@@ -23,6 +28,10 @@ enum MenuAnimationPolicy {
     static func staticRefreshInterval(showsClock: Bool) -> TimeInterval {
         showsClock ? 60 : 300
     }
+
+    /// Keep text changes out of the frame loop.  This is deliberately separate from the image
+    /// decision: frames are frequent, but a percentage or clock label usually is not.
+    static func shouldUpdateText(previous: String, next: String) -> Bool { previous != next }
 }
 
 /// One limit window: percent used (0...100) and when it resets.
