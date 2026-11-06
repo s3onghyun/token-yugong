@@ -204,6 +204,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     let popover = NSPopover()
     var animTimer: Timer?
     var cycleTimer: Timer?
+    // AppKit's `NSStatusBarButton.setImage` invalidates its cell even at a fixed item width.
+    // Keep the button for its normal click/hover behaviour, but put the frequently changing
+    // sprite in a sublayer so a frame swap is compositor-only.
+    private let statusSprite = CALayer()
+    private let statusText = CATextLayer()
 
     func applicationDidFinishLaunching(_ note: Notification) {
         // Never use `variableLength` for an animated status item.  Re-measuring it for every
@@ -212,7 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         item = NSStatusBar.system.statusItem(withLength: CGFloat(MenuAnimationPolicy.statusItemWidth))
         item.button?.target = self
         item.button?.action = #selector(toggleFromBar)
-        item.button?.imagePosition = .imageLeading
+        installStatusLayers()
         popover.behavior = .transient
         NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
             self?.anchorPanel?.orderOut(nil)
@@ -386,7 +391,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if args.contains("--pretend-hidden") { hidden = true }   // demo and testing of the fallback
         if hidden != barHidden || !barChecked { print("menu bar item \(hidden ? "hidden" : "visible"): \(f)") }
         barChecked = true
-        if barHidden && !hidden { item.button?.image = barShowsImage ? lastImage : nil }   // back in view: show the current frame
+        if barHidden && !hidden { setStatusSprite(barShowsImage ? lastImage : nil) }   // back in view: show the current frame
         barHidden = hidden
         if hidden && !Prefs.store.bool(forKey: "barHiddenWarned") {
             Prefs.store.set(true, forKey: "barHiddenWarned")
@@ -579,7 +584,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if runImage !== lastImage || showImage != barShowsImage {
             if showImage || showImage != barShowsImage {   // % only: the item has no picture to change
                 // a hidden bar item still costs a redraw per frame (measured 3% CPU at "high"): skip it
-                if !barHidden || args.contains("--anim-stats") { item.button?.image = showImage ? runImage : nil }
+                if !barHidden || args.contains("--anim-stats") { setStatusSprite(showImage ? runImage : nil) }
                 // `bar` backs the optional screenshot stage.  Do not publish SwiftUI state for
                 // every menu-bar frame when that stage is closed.
                 if stage != nil { bar.image = showImage ? (runImage ?? NSImage()) : NSImage() }
@@ -591,10 +596,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         if MenuAnimationPolicy.shouldUpdateText(previous: lastTitle, next: title) {
             lastTitle = title
-            bar.title = title
-            item.button?.attributedTitle = NSAttributedString(string: title, attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
-            ])
+            if stage != nil { bar.title = title }
+            CATransaction.begin(); CATransaction.setDisableActions(true)
+            statusText.string = title.trimmingCharacters(in: .whitespaces)
+            CATransaction.commit()
             mini?.update(image: runImage, title: title)
         }
         // Wake at a distinct pose only.  With no animation (notably Low Power Mode), the
@@ -604,6 +609,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let wait = nextFrameWait ?? MenuAnimationPolicy.staticRefreshInterval(showsClock: showsClock)
         animTimer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { [weak self] _ in self?.tick() }
         animTimer?.tolerance = wait * 0.1
+    }
+
+    private func installStatusLayers() {
+        guard let button = item.button else { return }
+        button.image = nil
+        button.title = ""
+        button.wantsLayer = true
+        guard let layer = button.layer else { return }
+        let scale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        statusSprite.frame = NSRect(x: 2, y: 2, width: 20, height: 20)
+        statusSprite.contentsGravity = .resize
+        statusSprite.magnificationFilter = .nearest
+        statusSprite.contentsScale = scale
+        statusText.frame = NSRect(x: 24, y: 5, width: CGFloat(MenuAnimationPolicy.statusItemWidth) - 26, height: 15)
+        statusText.font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        statusText.fontSize = 12
+        statusText.foregroundColor = NSColor.labelColor.cgColor
+        statusText.contentsScale = scale
+        layer.addSublayer(statusSprite)
+        layer.addSublayer(statusText)
+    }
+
+    private func setStatusSprite(_ image: NSImage?) {
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        statusSprite.contents = image?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        CATransaction.commit()
     }
 
     @objc func toggleFromBar() { toggle(from: barAnchor()) }
