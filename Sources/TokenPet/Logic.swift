@@ -4,6 +4,27 @@ import TokenPetAssets
 // The usage rules, written down in LOGIC.md. Pure functions of (readings, now): no files,
 // no clock, no saved state, so every rule has a unit test (Tests/TokenPetTests).
 
+/// Decides whether the menu bar needs work without depending on AppKit.  An `NSStatusItem`
+/// has one image shared by the system's menu-bar copies, so visibility is deliberately a
+/// single "can anybody see it?" value rather than a display-specific setting.
+enum MenuAnimationPolicy {
+    static func isPaused(screensAsleep: Bool, sessionAway: Bool, statusItemVisible: Bool,
+                         miniWindowVisible: Bool, measuring: Bool) -> Bool {
+        screensAsleep || sessionAway || !(statusItemVisible || miniWindowVisible || measuring)
+    }
+
+    /// Low Power Mode holds the current pose and updates only the textual clock.  A static
+    /// image is still useful, but never merits a frame timer or sprite lookup on each tick.
+    static func shouldAnimate(lowPowerMode: Bool, showsImage: Bool, miniWindowVisible: Bool,
+                              staging: Bool, measuring: Bool) -> Bool {
+        !lowPowerMode && (showsImage || miniWindowVisible || staging || measuring)
+    }
+
+    static func staticRefreshInterval(showsClock: Bool) -> TimeInterval {
+        showsClock ? 60 : 300
+    }
+}
+
 /// One limit window: percent used (0...100) and when it resets.
 struct Meter: Equatable, Codable {
     var pct: Double

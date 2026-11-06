@@ -104,6 +104,20 @@ import Testing
         #expect(MiniMode.always.shows(barHidden: false) && MiniMode.always.shows(barHidden: true))
         #expect(!MiniMode.off.shows(barHidden: true))
     }
+
+    @Test func menuAnimationStopsWhenNothingCanBeSeen() {
+        #expect(MenuAnimationPolicy.isPaused(screensAsleep: true, sessionAway: false, statusItemVisible: true, miniWindowVisible: false, measuring: false))
+        #expect(MenuAnimationPolicy.isPaused(screensAsleep: false, sessionAway: true, statusItemVisible: true, miniWindowVisible: false, measuring: false))
+        #expect(MenuAnimationPolicy.isPaused(screensAsleep: false, sessionAway: false, statusItemVisible: false, miniWindowVisible: false, measuring: false))
+        #expect(!MenuAnimationPolicy.isPaused(screensAsleep: false, sessionAway: false, statusItemVisible: false, miniWindowVisible: true, measuring: false))
+    }
+
+    @Test func lowPowerHoldsOnePoseAndSlowsTheClock() {
+        #expect(!MenuAnimationPolicy.shouldAnimate(lowPowerMode: true, showsImage: true, miniWindowVisible: false, staging: false, measuring: false))
+        #expect(MenuAnimationPolicy.shouldAnimate(lowPowerMode: false, showsImage: true, miniWindowVisible: false, staging: false, measuring: false))
+        #expect(MenuAnimationPolicy.staticRefreshInterval(showsClock: true) == 60)
+        #expect(MenuAnimationPolicy.staticRefreshInterval(showsClock: false) == 300)
+    }
 }
 
 @Suite struct SettingsAndSetup {

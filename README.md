@@ -66,6 +66,20 @@ mountains one shovel at a time, lives in your Mac menu bar and shows your Claude
 
 All of it is pixel art: the menu-bar sprite, the popover scene and the app icon.
 
+### Menu-bar power use
+
+Yugong renders each distinct 20-point pose once, then uses a one-shot timer (with tolerance) only
+until the next distinct pose. It does no menu-bar drawing while the item is hidden or occluded, the
+display sleeps, or the session is locked/inactive. Low Power Mode holds the current pose; a countdown
+then refreshes once a minute and a percentage-only label at most once every five minutes.
+
+On the development M5 Pro / macOS 26.6.2 machine, a forced high-tempo visible animation measured
+2.2–2.6% CPU and about 3,900–4,200 context switches per 10-second `top` sample before this change.
+The new Low Power Mode path recorded **3 wakes / 1 redraw in 30 seconds** and 0.0% instantaneous CPU
+after settling. This Mac had its built-in display plus two LG 4K displays attached. AppKit replicates
+one `NSStatusItem` image to every menu bar and offers no per-display image or active-copy API, so all
+copies share the same cached static pose rather than independently animating.
+
 ## Install
 
 Needs macOS 13 or later.
