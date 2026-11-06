@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5
+
+### Added
+- The popover shows the masked signed-in Claude account and explains when the displayed limits belong to the previous account.
+- **Check now** re-reads Claude's local account and usage files without making a network request.
+
 ## 0.2.4 (2026-11-05)
 
 ### Fixed

@@ -133,7 +133,18 @@ struct PopoverView: View {
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
             if !s.demo && !s.known { note(source(main, nil)) }   // how to connect: never folded away
-            if !s.demo && main == .claude && model.accountNote {
+            if !s.demo && main == .claude && model.accountMismatch {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(L.t("Account switched — updates after your next Claude response",
+                             "계정이 바뀌었어요 — 다음 Claude 응답 뒤에 업데이트돼요",
+                             "アカウントが切り替わりました。次の Claude 応答後に更新されます",
+                             "账号已切换 — 将在下一次 Claude 回复后更新"))
+                    Spacer(minLength: 0)
+                    Button(L.t("Check now", "지금 확인", "今すぐ確認", "立即检查")) { model.checkAccountNow() }
+                        .disabled(model.scanning)
+                }
+                .font(.caption).foregroundColor(.secondary)
+            } else if !s.demo && main == .claude && model.accountNote {
                 note(model.accountAwaitingReading
                      ? L.t("Account change detected — waiting for a reply from the new Claude account.",
                            "계정 바뀜 감지: 새 Claude 계정의 다음 응답을 기다려요.",
@@ -170,6 +181,13 @@ struct PopoverView: View {
                               "미리보기용 가상 상태입니다.",
                               "プレビュー用の仮の状態です。",
                               "预览用的模拟状态。") : source(main, s.captured))
+        }
+        if !s.demo && main == .claude, let email = model.signedInClaudeAccount.maskedEmail {
+            Text(L.t("Signed in to Claude as \(email)",
+                     "Claude 로그인 계정: \(email)",
+                     "Claude のログイン中アカウント：\(email)",
+                     "当前登录的 Claude 账号：\(email)"))
+                .font(.caption2).foregroundColor(.secondary)
         }
         if !s.demo && main == .claude, let seen = model.accountLine.seen {
             // which account the numbers are from: A, B, ... and its short hash ("?" = a bridge that names none)

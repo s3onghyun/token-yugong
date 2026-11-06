@@ -2,6 +2,28 @@ import Foundation
 import Testing
 @testable import TokenPet
 
+@Suite struct ClaudeAccountTests {
+    @Test func masksTheSignedInEmail() {
+        #expect(ClaudeAccount.mask("joshua@infograb.io") == "jo***@infograb.io")
+        #expect(ClaudeAccount.mask("a@example.com") == "a***@example.com")
+        #expect(ClaudeAccount.mask("not-an-email") == nil)
+    }
+
+    @Test func decodesAndHashesTheSignedInAccount() {
+        let account = ClaudeAccount.decode(Data(#"{"oauthAccount":{"accountUuid":"account-1","emailAddress":"joshua@infograb.io"}}"#.utf8))
+        #expect(account.maskedEmail == "jo***@infograb.io")
+        #expect(account.id == "07e998012c11")  // matches bridge/statusline-bridge.sh's SHA-256 prefix
+    }
+
+    @Test func comparesOnlyKnownAccountIdentities() {
+        let account = ClaudeAccount.decode(Data(#"{"oauthAccount":{"accountUuid":"account-1"}}"#.utf8))
+        #expect(!account.differs(from: account.id))
+        #expect(account.differs(from: "another-account"))
+        #expect(!account.differs(from: nil))
+        #expect(!ClaudeAccount().differs(from: "another-account"))
+    }
+}
+
 // Switching the Claude account (LOGIC.md "Another account"), as first read on 2026-11-03: the old account
 // hit its 5-hour limit, /login switched to another account, and readings with only a weekly window kept
 // coming into the same bridge file. (Corrected the next morning, `AccountSwitchMorning` below: those were
