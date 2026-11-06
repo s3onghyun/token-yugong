@@ -192,6 +192,16 @@ import Testing
         #expect(a.take(r) == r)
     }
 
+    @Test func aDuplicateWeeklyResetDoesNotReplaceAnExistingCurrentReading() {
+        // Recovery is only for an account that has not produced a reading yet. Once the
+        // current account is displayed, an idle session can still write a different account's
+        // coincident weekly reset into the bridge and must not replace it.
+        let current = team(login, five: Meter(pct: 26, resetsAt: tFive), tag: T)
+        var a = Accounts(week: tWeek, previous: mWeek, switchedAt: login, seen: login, reading: current,
+                         id: T, weeks: [M: mWeek, T: tWeek], ids: [M, T])
+        #expect(a.take(max(login + 60, tag: T)) == current)
+    }
+
     // PR #12's rule: with the bridge naming no account, 30 minutes of quiet lets an idle session of the
     // old account take the app back (overnight, any redraw of it). The named account ends that.
     @Test func anIdleOldSessionNeverTakesANamedAccountBack() {

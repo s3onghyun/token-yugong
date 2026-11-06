@@ -193,11 +193,12 @@ struct Accounts: Equatable, Codable {
         }
         if let w = r.week?.resetsAt {
             // another account's week: an idle session still holding that account's numbers
-            // Different accounts may legitimately share a weekly reset. A bridge-tagged
-            // reading for the account already on screen is authoritative; only an arriving
-            // other account with that reset is an idle old-session redraw to ignore.
-            if !remainsCurrent, known.contains(where: { $0.key != t && Self.same($0.value, w) }) { return reading }
-            if let cur = known[t], !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
+            // Different accounts may legitimately share a weekly reset. Recover a known
+            // current account only when it has no reading at all; otherwise the matching
+            // reset is still the idle old-session redraw that must be ignored.
+            let recoverCurrent = remainsCurrent && reading == nil
+            if !recoverCurrent, known.contains(where: { $0.key != t && Self.same($0.value, w) }) { return reading }
+            if !recoverCurrent, let cur = known[t], !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
                 // a week never seen for any account: numbers from before this app knew it, unless this one went quiet
                 if let s = seen, r.at.timeIntervalSince(s) < Self.quiet { return reading }
                 reading = nil
