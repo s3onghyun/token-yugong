@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  macos:
     runs-on: macos-15
     env:
       # Keep the compiler and Testing.framework from the same full Xcode installation.
@@ -29,6 +29,64 @@ jobs:
         run: ./test.sh
       - name: Build universal app and release archive
         run: ./scripts/release-artifacts.sh
+      - name: Upload macOS release assets
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: release-macos-assets
+          path: dist/*
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check tag and version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          test "$TAG" = "v$(tr -d '\r\n' < VERSION)"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux desktop dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Build Linux beta bundles
+        run: |
+          npm ci --prefix desktop
+          cargo test --manifest-path desktop/core/Cargo.toml
+          npm run tauri --prefix desktop -- build --bundles appimage,deb
+      - name: Stage Linux beta assets and checksums
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          version="${VERSION#v}"
+          mkdir release-assets
+          appimage="TokenYugong-${version}-linux-amd64-beta.AppImage"
+          deb="TokenYugong-${version}-linux-amd64-beta.deb"
+          cp desktop/target/release/bundle/appimage/*.AppImage "release-assets/$appimage"
+          cp desktop/target/release/bundle/deb/*.deb "release-assets/$deb"
+          (cd release-assets && sha256sum "$appimage" > "$appimage.sha256" && sha256sum "$deb" > "$deb.sha256")
+      - name: Upload Linux beta release assets
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: release-linux-beta-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  release:
+    needs: [macos, linux]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: release-*-assets
+          path: release-assets
+          merge-multiple: true
       - name: Extract release notes
         run: |
           version=$(tr -d '\r\n' < VERSION)
@@ -42,4 +100,4 @@ jobs:
           gh release create "$TAG" \
             --title "Token Yugong $VERSION" \
             --notes-file release-notes.md \
-            dist/*.zip dist/*.sha256
+            release-assets/*

@@ -90,10 +90,23 @@ Needs macOS 13 or later.
 [`desktop/`](desktop/). It reads local Claude Code and Codex JSONL data, shows an animated tray
 pet and a small usage window, and keeps its settings in the platform app-config directory.
 
-Linux builds target AppImage and `.deb`; Windows builds target unsigned MSI and NSIS installers.
-They are CI artifacts only for now: there is no release, auto-update, winget, or Flathub package.
+Linux builds are published as **beta** AppImage and `.deb` assets on the
+[latest release](https://github.com/s3onghyun/token-yugong/releases/latest). Windows builds target
+unsigned MSI and NSIS installers, but remain CI artifacts only until the project can obtain OSS
+signing. There is no auto-update, winget, or Flathub package yet.
 On Linux, open the window from the tray menu (some StatusNotifierItem implementations do not send
 tray-click events). On Windows, SmartScreen may warn until the project can obtain OSS signing.
+
+To install the Linux beta, download either `TokenYugong-<version>-linux-amd64-beta.AppImage` or
+`TokenYugong-<version>-linux-amd64-beta.deb` and its matching `.sha256` file from the latest
+release. Verify the download, then run or install it:
+
+```sh
+sha256sum -c TokenYugong-<version>-linux-amd64-beta.AppImage.sha256
+chmod +x TokenYugong-<version>-linux-amd64-beta.AppImage
+./TokenYugong-<version>-linux-amd64-beta.AppImage
+# or: sudo apt install ./TokenYugong-<version>-linux-amd64-beta.deb
+```
 
 Build the beta on a Linux or Windows machine with Rust and Node.js installed:
 
