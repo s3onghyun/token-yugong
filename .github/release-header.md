@@ -11,6 +11,11 @@ Or with Homebrew: `brew install --cask s3onghyun/tap/token-yugong` (`brew upgrad
 
 Then connect Claude Code: **Connect** in the app's first-run guide does it in one click, after showing you the change ([details](https://github.com/s3onghyun/token-yugong#connect-claude-code)). Codex needs no setup.
 
+## Linux desktop beta
+The Linux Tauri desktop beta is available below as AppImage and `.deb` assets. Download the
+matching `.sha256` file with the asset you choose, then verify it with `sha256sum -c <file>.sha256`.
+Windows beta installers remain CI-only while the project seeks OSS code signing.
+
 ## Privacy
 No account, no analytics, no telemetry. The app reads Claude Code, Codex and Gemini CLI files on your Mac. Its only network requests are a once-a-day check of this repository's latest release (can be turned off) and, only if you paste a key, the OpenAI costs or DeepSeek balance API. [Everything it reads](https://github.com/s3onghyun/token-yugong#privacy).
 
