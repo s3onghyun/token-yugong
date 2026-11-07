@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.9 (2026-11-08)
+
+### Added
+- Linux desktop beta releases now include an x86_64 AppImage and `.deb`, each with a SHA-256 checksum.
+  The Windows desktop beta remains a CI artifact while the project seeks OSS code signing.
+
 ## 0.2.8 (2026-11-07)
 
 ### Changed
