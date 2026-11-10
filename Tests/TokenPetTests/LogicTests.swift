@@ -36,6 +36,32 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         #expect(r.week?.pct == 19)
     }
 
+    @Test func maxPlanHistorySupplementsTheMissingFiveHourWindow() throws {
+        // Redacted shape captured on this Mac for a Claude Max x20 account.  `fh` is compact,
+        // timestamped in milliseconds, and has no reset time; the status line supplies the week.
+        let history = try #require(Limits.planUsageHistory(json(#"{"version":1,"samples":[{"t":1794000000000,"org":"<redacted>","u":{"fh":34,"sd":59}}]}"#)))
+        #expect(history.five == Meter(pct: 34, resetsAt: nil, resetUnavailable: true))
+        let bridge = try #require(Limits.bridge(json(#"{"captured_at":1794000005,"rate_limits":{"seven_day":{"used_percentage":59,"resets_at":1794164400}}}"#), fileDate: fileDate))
+        let r = try #require(Limits.supplement(bridge, with: history, now: Date(timeIntervalSince1970: 1_794_000_010)))
+        #expect(r.five == Meter(pct: 34, resetsAt: nil, resetUnavailable: true))
+        #expect(r.week == Meter(pct: 59, resetsAt: reset))
+        #expect(r.account == nil && r.at == bridge.at)       // status line remains the account authority
+    }
+
+    @Test func absentOrStaleMaxHistoryKeepsTheClearWeeklyFallback() throws {
+        let bridge = try #require(Limits.bridge(json(#"{"captured_at":1794000005,"rate_limits":{"seven_day":{"used_percentage":59,"resets_at":1794164400}}}"#), fileDate: fileDate))
+        let absent = Limits.planUsageHistory(json(#"{"version":1,"samples":[{"t":1794000000000,"u":{"fh":null,"sd":59}}]}"#))
+        #expect(absent == nil)
+        #expect(Limits.supplement(bridge, with: absent, now: Date(timeIntervalSince1970: 1_794_000_010))?.five == nil)
+        let stale = try #require(Limits.planUsageHistory(json(#"{"samples":[{"t":1793000000000,"u":{"fh":34}}]}"#)))
+        #expect(Limits.supplement(bridge, with: stale, now: Date(timeIntervalSince1970: 1_794_000_010))?.five == nil)
+    }
+
+    @Test func savedMetersFromBeforeTheHistoryFallbackStillDecode() throws {
+        let old = try JSONDecoder().decode(Meter.self, from: json(#"{"pct":34,"resetsAt":null}"#))
+        #expect(old == Meter(pct: 34, resetsAt: nil))
+    }
+
     @Test(arguments: [
         "",                                                     // empty file
         "not json",                                             // corrupt

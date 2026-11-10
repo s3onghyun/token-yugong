@@ -46,6 +46,32 @@ enum MenuAnimationPolicy {
 struct Meter: Equatable, Codable {
     var pct: Double
     var resetsAt: Date?
+    /// Claude Desktop's compact plan history has a percentage but does not include a reset time.
+    /// This is different from a window that Yugong knows has just reset.
+    var resetUnavailable: Bool
+
+    init(pct: Double, resetsAt: Date?, resetUnavailable: Bool = false) {
+        self.pct = pct
+        self.resetsAt = resetsAt
+        self.resetUnavailable = resetUnavailable
+    }
+
+    private enum CodingKeys: String, CodingKey { case pct, resetsAt, resetUnavailable }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        pct = try c.decode(Double.self, forKey: .pct)
+        resetsAt = try c.decodeIfPresent(Date.self, forKey: .resetsAt)
+        // Read the account state written by older Yugong releases too.
+        resetUnavailable = try c.decodeIfPresent(Bool.self, forKey: .resetUnavailable) ?? false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(pct, forKey: .pct)
+        try c.encodeIfPresent(resetsAt, forKey: .resetsAt)
+        if resetUnavailable { try c.encode(true, forKey: .resetUnavailable) }
+    }
 }
 
 /// One reading of the official limits. Any window may be absent.
@@ -78,6 +104,34 @@ enum Limits {
         }
         let r = Reading(five: meter(rl["five_hour"], "used_percentage"), week: meter(rl["seven_day"], "used_percentage"), at: at, account: account)
         return r.five == nil && r.week == nil ? nil : r
+    }
+
+    /// Claude Desktop's local plan history records the same Max usage with compact names:
+    /// `samples[].t` is milliseconds since epoch and `samples[].u.fh` is the 5-hour percentage.
+    /// It deliberately does not supply a reset time.  Select the newest sample first: an omitted or
+    /// null `fh` means the current source did not report the window, not that an older value is current.
+    static func planUsageHistory(_ data: Data) -> Reading? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let samples = root["samples"] as? [[String: Any]],
+              let newest = samples.compactMap({ sample -> (Date, [String: Any])? in
+                  guard let ms = (sample["t"] as? NSNumber)?.doubleValue, ms.isFinite, ms > 0,
+                        let usage = sample["u"] as? [String: Any] else { return nil }
+                  return (Date(timeIntervalSince1970: ms / 1_000), usage)
+              }).max(by: { $0.0 < $1.0 }),
+              let pct = (newest.1["fh"] as? NSNumber)?.doubleValue, pct.isFinite, pct >= 0 else { return nil }
+        return Reading(five: Meter(pct: min(pct, 100), resetsAt: nil, resetUnavailable: true), week: nil, at: newest.0)
+    }
+
+    /// A status-line response remains the authority for the account and weekly reset.  Claude
+    /// Desktop can fill only its missing five-hour percentage, and only when both local sources
+    /// describe the same fresh moment.  This avoids reviving a stale `fh` after the API omits it.
+    static func supplement(_ bridge: Reading?, with planHistory: Reading?, now: Date,
+                           maximumSkew: TimeInterval = 5 * 60, maximumAge: TimeInterval = 10 * 60) -> Reading? {
+        guard var bridge, bridge.five == nil, let history = planHistory, let five = history.five,
+              abs(history.at.timeIntervalSince(bridge.at)) <= maximumSkew,
+              now.timeIntervalSince(history.at) <= maximumAge else { return bridge }
+        bridge.five = five
+        return bridge
     }
 
     /// One Codex rollout line whose payload carries `rate_limits` (primary/secondary windows).
