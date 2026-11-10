@@ -244,6 +244,28 @@ struct Accounts: Equatable, Codable {
         return add(r)
     }
 
+    /// The account in `~/.claude.json` is newer evidence than a status-line session.  A session
+    /// created before `/login` keeps writing its old account's numbers, so never let that tagged
+    /// payload replace the account currently signed in on this Mac.  Until a matching session
+    /// replies, clear the old numbers rather than presenting them as the new account's usage.
+    mutating func take(_ r: Reading, expectedAccount: String?) -> Reading? {
+        guard let expectedAccount else { return take(r) }
+        guard r.account == expectedAccount else {
+            expect(expectedAccount, at: r.at)
+            return reading
+        }
+        return take(r)
+    }
+
+    /// Select the account known from the local Claude login, with no claimed usage until its own
+    /// status-line session replies.  `id` and `ids` are hashes only.
+    mutating func expect(_ account: String, at: Date) {
+        guard account != id else { return }
+        if id != nil { previous = week; switchedAt = at }
+        id = account; week = (weeks ?? [:])[account]; reading = nil; seen = nil
+        if !(ids ?? []).contains(account) { ids = (ids ?? []) + [account] }
+    }
+
     /// A reading from a bridge that names the signed-in account `t`.
     private mutating func take(_ r: Reading, signedIn t: String) -> Reading? {
         var known = weeks ?? [:]

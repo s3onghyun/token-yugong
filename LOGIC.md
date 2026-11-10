@@ -86,6 +86,7 @@ installed bridge older than the app is replaced at launch (settings.json is not 
 | When | Then |
 |---|---|
 | A reading naming another account than the current one | **Account switch** (a `/login`): it is current, lettered A, B, ... in the order first seen; nothing of the old one's windows is kept. The popover says "계정 바뀜 감지" for 10 minutes, the wife comes to ask, and the limit notification is not sent for the switch itself. The first named reading after an update is not a switch |
+| The signed-in account in `.claude.json` differs from the bridge's named session | That bridge session predates `/login`: its numbers are cleared immediately, never relabelled or shown for the newly signed-in account. Yugong says it is waiting for the new account's next Claude response. |
 | A named reading whose weekly reset is another named account's | That account's numbers from an idle session: ignored, however long the current one has been quiet |
 | A named reading with a weekly reset never seen, not the current account's next week | Ignored while the current account reported in the last 30 minutes; else it is the current account's week |
 | Unnamed: a reading with another weekly reset, not this account's next week (the current reset has not passed, or the new one is earlier) | Account switch, as above |

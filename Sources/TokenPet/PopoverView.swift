@@ -136,7 +136,7 @@ struct PopoverView: View {
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
             if !s.demo && !s.known { note(source(main, nil)) }   // how to connect: never folded away
-            if !s.demo && main == .claude && model.accountMismatch {
+            if !s.demo && main == .claude && (model.accountMismatch || model.accountAwaitingReading) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(L.t("Account switched — updates after your next Claude response",
                              "계정이 바뀌었어요 — 다음 Claude 응답 뒤에 업데이트돼요",
