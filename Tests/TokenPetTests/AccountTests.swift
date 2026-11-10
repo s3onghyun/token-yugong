@@ -220,6 +220,18 @@ import Testing
         #expect(a.switchedAt == login + 30 && a.id == T)
     }
 
+    @Test func signedInAccountRejectsAnOldSessionBeforeTheNewOneReplies() {
+        var a = Accounts()
+        _ = a.take(max(login - hour, tag: M))
+        // The local login has already changed to T, but the bridge redraw is from M's old session.
+        #expect(a.take(max(login + 30, tag: M), expectedAccount: T) == nil)
+        #expect(a.id == T && a.reading == nil && a.awaitingReading)
+        // T's first reply is accepted; subsequent M redraws remain ignored.
+        let fresh = team(login + 60, five: Meter(pct: 26, resetsAt: tFive), tag: T)
+        #expect(a.take(fresh, expectedAccount: T) == fresh)
+        #expect(a.take(max(login + 90, tag: M), expectedAccount: T) == fresh)
+    }
+
     @Test func aLoginBackIsASwitchBack() {
         var a = Accounts()
         _ = a.take(max(login - hour, tag: M))

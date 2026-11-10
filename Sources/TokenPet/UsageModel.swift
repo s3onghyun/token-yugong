@@ -322,7 +322,7 @@ final class UsageModel: ObservableObject {
             let account = ClaudeAccount.read()
             DispatchQueue.main.async { [self] in
                 signedInClaudeAccount = account
-                take(Limits.supplement(b, with: plan, now: Date()))
+                take(Limits.supplement(b, with: plan, now: Date()), signedIn: account)
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
@@ -341,8 +341,10 @@ final class UsageModel: ObservableObject {
             scanner.scan()
             let b = Self.readBridge(bridgeURL)
             let plan = Self.readPlanUsage(planUsageURL)
+            let account = ClaudeAccount.read()
             DispatchQueue.main.async { [self] in
-                take(Limits.supplement(b, with: plan, now: Date()))
+                signedInClaudeAccount = account
+                take(Limits.supplement(b, with: plan, now: Date()), signedIn: account)
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
@@ -371,7 +373,9 @@ final class UsageModel: ObservableObject {
         scanner.scan()
         codexReader.scan()
         geminiReader.scan()
-        take(Limits.supplement(Self.readBridge(bridgeURL), with: Self.readPlanUsage(planUsageURL), now: Date()))
+        let account = ClaudeAccount.read()
+        signedInClaudeAccount = account
+        take(Limits.supplement(Self.readBridge(bridgeURL), with: Self.readPlanUsage(planUsageURL), now: Date()), signedIn: account)
         mountain.absorb(allEvents)
         recompute()
     }
@@ -417,9 +421,14 @@ final class UsageModel: ObservableObject {
     var openWindow: (() -> Void)?
 
     /// A bridge reading, sorted by account (`Accounts`). A switch brings the wife to ask about it.
-    private func take(_ b: Reading?) {
+    private func take(_ b: Reading?, signedIn account: ClaudeAccount) {
         let before = accounts.switchedAt
-        claude = b.flatMap { accounts.take($0) }
+        if b == nil, let expected = account.id, expected != accounts.id {
+            accounts.expect(expected, at: Date())
+            claude = nil
+        } else {
+            claude = b.flatMap { accounts.take($0, expectedAccount: account.id) }
+        }
         accounts.save()
         if let b, b != lastLogged {
             lastLogged = b
