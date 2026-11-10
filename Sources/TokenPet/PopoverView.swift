@@ -114,14 +114,14 @@ struct PopoverView: View {
                 meterRow(L.t("Limit", "한도", "リミット", "额度"), nil)
             } else if let d = s.daily {
                 // Claude Code did not report a 5-hour window: the weekly limit is the carrier, today's share only sets the pace
-                meterRow(L.t("5-hour", "5시간", "5時間", "5 小时"), nil, missingReset: true)
+                meterRow(L.t("5-hour", "5시간", "5時間", "5 小时"), nil, missingWindow: true)
                 meterRow(L.t("Weekly (the carrier)", "주간 (지게)", "週間（背負子）", "每周（背架）"), s.week)
                 meterRow(L.t("Today's share: pace (1/7 of the week)",
                              "오늘 몫: 속도 (주간의 1/7)",
                              "今日の取り分：ペース（週の1/7）",
                              "今日份额：节奏（每周的 1/7）"), Meter(pct: d.fill * 100, resetsAt: d.dayEnd), pace: true)
-                if showMore { Text(L.t("Claude Code is not reporting a 5-hour window right now, so Yugong is showing the weekly limit. Grandpa naps only when that weekly limit runs out\(weeklyReset(s)); going past today's share just makes him sweat.",
-                         "Claude Code가 지금은 5시간 구간을 알려주지 않아 주간 한도를 보여요. 할아버지는 주간 한도를 다 쓸 때만 쉬어요\(weeklyReset(s)). 오늘 몫을 넘으면 땀만 흘려요.",
+                if showMore { Text(L.t("The latest Claude response did not include a 5-hour value, so Yugong is showing the weekly limit instead. This is not a plan error; the 5-hour meter returns when Claude reports it. Grandpa naps only when that weekly limit runs out\(weeklyReset(s)); going past today's share just makes him sweat.",
+                         "가장 최근 Claude 응답에 5시간 사용량이 없어 우공은 대신 주간 한도를 보여요. 요금제 오류가 아니며 Claude가 다시 알려 주면 5시간 미터도 돌아와요. 할아버지는 주간 한도를 다 쓸 때만 쉬어요\(weeklyReset(s)). 오늘 몫을 넘으면 땀만 흘려요.",
                          "Claude Code が今は5時間リミットを報告していないため、愚公は週間リミットを表示しています。おじいさんが休むのはその週間リミットを使い切ったときだけです\(weeklyReset(s))。今日の取り分を超えても汗をかくだけです。",
                          "Claude Code 目前没有报告 5 小时额度，因此愚公显示每周额度。只有该每周额度用完时爷爷才会打盹\(weeklyReset(s))；超过今日份额只会让他流汗。"))
                     .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true) }
@@ -613,7 +613,7 @@ struct PopoverView: View {
     }
 
     /// `pace`: a pace guide, not a limit, so 100% and over is not drawn as "full, resting".
-    @ViewBuilder private func meterRow(_ label: String, _ m: Meter?, pace: Bool = false, missingReset: Bool = false) -> some View {
+    @ViewBuilder private func meterRow(_ label: String, _ m: Meter?, pace: Bool = false, missingWindow: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(label).font(.subheadline.weight(.semibold))
@@ -621,7 +621,8 @@ struct PopoverView: View {
                 if let m {
                     Text(pace ? "\(Int(m.pct.rounded()))%" : Fmt.pct(m.pct)).font(.subheadline.monospacedDigit().weight(.semibold))
                 } else {
-                    Text(L.t("don't know", "모름", "わからない", "不知道")).font(.caption).foregroundColor(.secondary)
+                    Text(missingWindow ? L.t("not reported", "이번 응답에는 없음", "今回の応答にはなし", "本次响应未报告")
+                                       : L.t("don't know", "모름", "わからない", "不知道")).font(.caption).foregroundColor(.secondary)
                 }
             }
             GeometryReader { g in
@@ -632,9 +633,9 @@ struct PopoverView: View {
                 }
             }
             .frame(height: 8)
-            Text(missingReset && m == nil
-                 ? L.t("reset unknown — waiting for Claude Code", "리셋 시간 모름 — Claude Code 응답을 기다리는 중",
-                       "リセット時刻は不明 — Claude Code の応答待ち", "重置时间未知 — 正在等待 Claude Code 回复")
+            Text(missingWindow && m == nil
+                 ? L.t("showing the weekly limit below", "아래에 주간 한도를 보여 줘요",
+                       "下に週間リミットを表示しています", "下方显示每周额度")
                  : resetText(m)).font(.caption).foregroundColor(.secondary)
         }
     }
@@ -654,6 +655,10 @@ struct PopoverView: View {
 
     private func resetText(_ m: Meter?) -> String {
         guard let m else { return " " }
+        if m.resetUnavailable {
+            return L.t("reset time was not reported", "리셋 시간은 보고되지 않았어요",
+                       "リセット時刻は報告されていません", "未报告重置时间")
+        }
         guard let r = m.resetsAt else { return L.t("fresh window — starts with your next message",
                                                    "새 구간 — 다음 메시지부터 시작",
                                                    "新しい区間 — 次のメッセージから開始",

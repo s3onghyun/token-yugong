@@ -254,6 +254,8 @@ final class UsageModel: ObservableObject {
     var demo: PetState?
     var demoCycle = false
     let bridgeURL: URL
+    let planUsageURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/Claude/plan-usage-history.json")
     let scanner: LogScanner
     let codexReader = CodexReader(root: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/sessions"))
     let geminiReader = GeminiReader(root: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/tmp"))
@@ -284,7 +286,8 @@ final class UsageModel: ObservableObject {
     /// A response from one of the local CLIs changes a bridge or log directory. Refresh soon,
     /// but coalesce bursts so a streamed response does not turn into repeated full scans.
     private func watchUsageFiles() {
-        let directories = [bridgeURL.deletingLastPathComponent(), scanner.root, codexReader.root, geminiReader.root]
+        let directories = [bridgeURL.deletingLastPathComponent(), scanner.root, codexReader.root, geminiReader.root,
+                           planUsageURL.deletingLastPathComponent()]
         fileWatchers = directories.compactMap { directory in
             FileChangeWatcher(directory: directory) { [weak self] in
                 DispatchQueue.main.async { self?.refreshAfterFileChange() }
@@ -315,10 +318,11 @@ final class UsageModel: ObservableObject {
             codexReader.scan()
             geminiReader.scan()
             let b = Self.readBridge(bridgeURL)
+            let plan = Self.readPlanUsage(planUsageURL)
             let account = ClaudeAccount.read()
             DispatchQueue.main.async { [self] in
                 signedInClaudeAccount = account
-                take(b)
+                take(Limits.supplement(b, with: plan, now: Date()))
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
@@ -336,8 +340,9 @@ final class UsageModel: ObservableObject {
         queue.async { [self] in
             scanner.scan()
             let b = Self.readBridge(bridgeURL)
+            let plan = Self.readPlanUsage(planUsageURL)
             DispatchQueue.main.async { [self] in
-                take(b)
+                take(Limits.supplement(b, with: plan, now: Date()))
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
@@ -366,7 +371,7 @@ final class UsageModel: ObservableObject {
         scanner.scan()
         codexReader.scan()
         geminiReader.scan()
-        take(Self.readBridge(bridgeURL))
+        take(Limits.supplement(Self.readBridge(bridgeURL), with: Self.readPlanUsage(planUsageURL), now: Date()))
         mountain.absorb(allEvents)
         recompute()
     }
@@ -441,6 +446,11 @@ final class UsageModel: ObservableObject {
         guard let data = try? Data(contentsOf: url) else { return nil }
         let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
         return Limits.bridge(data, fileDate: mtime)
+    }
+
+    static func readPlanUsage(_ url: URL) -> Reading? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return Limits.planUsageHistory(data)
     }
 
     func setDemo(_ s: PetState?) { demo = s; recompute() }

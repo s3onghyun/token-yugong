@@ -11,6 +11,7 @@ app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup
 | Input | Where it comes from | Used for |
 |---|---|---|
 | Claude `five_hour`, `seven_day`: used %, reset time | Claude Code's status line JSON, saved by `bridge/statusline-bridge.sh` with its capture time | the meter of whoever watches Claude |
+| Claude Max 5-hour fallback: `samples[].u.fh` | Claude Desktop's local `~/Library/Application Support/Claude/plan-usage-history.json`; only the newest numeric `fh`, within 5 minutes of a fresh status-line response | fills a missing 5-hour percentage; this compact history has no reset time, and is ignored when `fh` is absent or null |
 | Claude limit hits: `five_hour` or `seven_day`, reset time | the rejected request Claude Code logs in `~/.claude/projects/**/*.jsonl` (`apiError: usage_limit_reached`, `apiErrorParams.rate_limit_info`) | that window is at 100% (see "Limit reached") |
 | Codex 5-hour (300 min) and weekly (10080 min) windows | newest `rate_limits` line in `~/.codex/sessions/**/*.jsonl` | the meter of whoever watches Codex |
 | Gemini: nothing | Gemini CLI saves no limits or reset times on the Mac | its meter is always "don't know" |
