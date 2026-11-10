@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.10 (2026-11-10)
+
+### Fixed
+- Claude Max accounts now recover a freshly reported 5-hour percentage from Claude Desktop's local
+  plan history when the Claude Code status line omits `five_hour`. The status line still supplies
+  account identity and reset times; an absent or stale 5-hour value clearly falls back to the weekly limit.
+
 ## 0.2.9 (2026-11-08)
 
 ### Added
