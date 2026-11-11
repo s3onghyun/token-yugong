@@ -41,7 +41,6 @@ if args.contains("--scan-report") {
     func t(_ d: Date?) -> String { d.map { Fmt.clock($0) } ?? "-" }
     print(String(format: "scanned %.1f MB in %.2fs; %d usage events", Double(sc.bytesRead) / 1e6, sc.lastScanSeconds, sc.events.count))
     print("claude: " + (s.known ? "official, captured \(t(s.captured))" : "don't know (no usable status-line reading)"))
-    if model.accountNote { print("account change detected") }
     if let f = s.five { print("5h: \(Fmt.pct(f.pct)) resets \(t(f.resetsAt))") }
     if let w = s.week { print("week: \(Fmt.pct(w.pct)) resets \(t(w.resetsAt))") }
     if let d = s.daily { print(String(format: "no 5-hour window: today's share %.0f%%, day %@ - %@", d.fill * 100, t(d.dayStart), t(d.dayEnd))) }
@@ -71,6 +70,23 @@ if args.contains("--scan-report") {
     }
     let now = Date()
     let ko = L.pseudo ? "-pseudo" : L.lang == .en ? "" : "-\(L.lang.rawValue)"
+    if args.contains("--render-accounts") {
+        // Synthetic hashes and percentages only: never render a requester's local account data.
+        model.setFixtureAccounts([
+            Reading(five: Meter(pct: 24, resetsAt: now.addingTimeInterval(2 * 3600)),
+                    week: Meter(pct: 36, resetsAt: now.addingTimeInterval(4 * 86400)),
+                    at: now.addingTimeInterval(-3 * 60), account: "1111aaaabbbb"),
+            Reading(five: Meter(pct: 67, resetsAt: now.addingTimeInterval(3 * 3600)),
+                    week: Meter(pct: 58, resetsAt: now.addingTimeInterval(5 * 86400)),
+                    at: now.addingTimeInterval(-18 * 60), account: "2222ccccdddd"),
+        ])
+        model.setDemo(.steady)
+        let renderer = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now)
+            .background(Color(nsColor: .windowBackgroundColor)))
+        renderer.scale = 2
+        if let image = renderer.nsImage { png(image, "popover-accounts-fixture\(ko).png") }
+        return
+    }
     model.demoMountainLeft = 0.62
     for st in PetState.allCases {
         model.setDemo(st)

@@ -55,11 +55,12 @@ struct PopoverView: View {
     var inWindow = false             // shown in the Yugong window (SceneWindow), not the popover
 
     static let sceneSize = CGSize(width: 292, height: 176)
-    @State var showSettings = args.contains("--settings")   // demo: open with settings shown
+    @State var showSettings = args.contains("--settings") || args.contains("--render-accounts")   // demo: open with settings shown
     /// Off: the compact popover (scene, meters, pace, actions). On: title, sources, account, speed, capture. Remembered.
     @AppStorage("popover.more", store: Prefs.store) var showMore = args.contains("--more")
     @State private var brewCommandCopied = false
     @State private var clearBrewCopyFeedback: DispatchWorkItem?
+    @State private var editingNickname: String?
 
     /// The Yugong window's ⋯ › Compact: only the scene and its headline. Remembered.
     @AppStorage("sceneWindow.compact", store: Prefs.store) var compactWindow = false
@@ -136,27 +137,11 @@ struct PopoverView: View {
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
             if !s.demo && !s.known { note(source(main, nil)) }   // how to connect: never folded away
-            if !s.demo && main == .claude && (model.accountMismatch || model.accountAwaitingReading) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(L.t("Account switched — updates after your next Claude response",
-                             "계정이 바뀌었어요 — 다음 Claude 응답 뒤에 업데이트돼요",
-                             "アカウントが切り替わりました。次の Claude 応答後に更新されます",
-                             "账号已切换 — 将在下一次 Claude 回复后更新"))
-                    Spacer(minLength: 0)
-                    Button(L.t("Check now", "지금 확인", "今すぐ確認", "立即检查")) { model.checkAccountNow() }
-                        .disabled(model.scanning)
-                }
-                .font(.caption).foregroundColor(.secondary)
-            } else if !s.demo && main == .claude && model.accountNote {
-                note(model.accountAwaitingReading
-                     ? L.t("Account change detected — waiting for a reply from the new Claude account.",
-                           "계정 바뀜 감지: 새 Claude 계정의 다음 응답을 기다려요.",
-                           "アカウントの切り替えを検出：新しい Claude アカウントからの応答を待っています。",
-                           "检测到账号切换：正在等待新 Claude 账号的回复。")
-                     : L.t("Account change detected: showing the new Claude account's limits.",
-                           "계정 바뀜 감지: 새 Claude 계정의 한도를 보여 줘요.",
-                           "アカウントの切り替えを検出：新しい Claude アカウントのリミットを表示します。",
-                           "检测到账号切换：显示新 Claude 账号的额度。"))
+            if !s.demo && main == .claude && model.unattributedClaudeLimitHit {
+                note(L.t("Couldn't attribute the limit rejection to an account",
+                         "한도 거절을 계정에 귀속할 수 없음",
+                         "上限拒否をアカウントに紐付けられません",
+                         "无法将额度拒绝归属到账号"))
             }
             ForEach([Role.son, .grandson, .boy].filter { model.family.roles[$0] != nil }) { role in
                 // one row each: his headline window (5-hour, else weekly, else the month's budget)
@@ -184,23 +169,6 @@ struct PopoverView: View {
                               "미리보기용 가상 상태입니다.",
                               "プレビュー用の仮の状態です。",
                               "预览用的模拟状态。") : source(main, s.captured))
-        }
-        if !s.demo && main == .claude, let email = model.signedInClaudeAccount.maskedEmail {
-            Text(L.t("Signed in to Claude as \(email)",
-                     "Claude 로그인 계정: \(email)",
-                     "Claude のログイン中アカウント：\(email)",
-                     "当前登录的 Claude 账号：\(email)"))
-                .font(.caption2).foregroundColor(.secondary)
-        }
-        if !s.demo && main == .claude, let seen = model.accountLine.seen {
-            // which account the numbers are from: A, B, ... and its short hash ("?" = a bridge that names none)
-            let a = model.accountLine, who = a.letter.map { "\($0) · \(a.id ?? "")" } ?? "?"
-            let when = Fmt.clock(seen, now: clockNow)
-            Text(L.t("Claude account \(who) · last update \(when)",
-                     "Claude 계정 \(who) · 마지막 갱신 \(when)",
-                     "Claude アカウント \(who) · 最終更新 \(when)",
-                     "Claude 账号 \(who) · 最后更新 \(when)"))
-                .font(.caption2).foregroundColor(.secondary)
         }
         if !s.demo {
             Text(L.t("Shovel speed: \(Int(model.pace.smoothed.rounded())) output tokens/min (last 3 min, this Mac)",
@@ -279,6 +247,7 @@ struct PopoverView: View {
                 Text(L.t("Always", "항상", "常に", "始终")).tag(MiniMode.always)
                 Text(L.t("Never", "끔", "表示しない", "从不")).tag(MiniMode.off)
             }
+            accountSettings
             familySettings
             Toggle(L.t("Notify when the limit is used up and when it resets",
                        "한도가 다 찼을 때와 다시 풀릴 때 알림",
@@ -326,6 +295,83 @@ struct PopoverView: View {
                 .buttonStyle(.link)
         }
         .font(.callout)
+    }
+
+    @ViewBuilder private var accountSettings: some View {
+        let rows = model.accountRows
+        if !rows.isEmpty {
+            Divider()
+            Text(L.t("Accounts", "계정", "アカウント", "账号"))
+                .font(.caption.weight(.bold)).foregroundColor(.secondary)
+            accountRows(rows.filter { !$0.stale })
+            let old = rows.filter(\.stale)
+            if !old.isEmpty {
+                Text(L.t("Past accounts", "지난 계정", "過去のアカウント", "过去的账号"))
+                    .font(.caption.weight(.semibold)).foregroundColor(.secondary)
+                accountRows(old)
+            }
+        }
+    }
+
+    @ViewBuilder private func accountRows(_ rows: [AccountRow]) -> some View {
+        ForEach(rows) { row in
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Button { model.selectClaudeAccount(row.key) } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: row.selected ? "checkmark.circle.fill" : "circle")
+                            Text(accountLabel(row))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(row.key.isUnknownClaude ? .secondary : .primary)
+                    .disabled(row.key.isUnknownClaude || row.key == .local)
+                    Spacer(minLength: 0)
+                    Text(accountMeters(row.reading)).font(.caption.monospacedDigit()).foregroundColor(.secondary)
+                }
+                Text(accountReadTime(row))
+                    .font(.caption2).foregroundColor(.secondary)
+                if editingNickname == row.id {
+                    TextField(L.t("Nickname", "별명", "ニックネーム", "昵称"), text: Binding(
+                        get: { model.accountNickname(row.key) },
+                        set: { model.setAccountNickname($0, for: row.key) }))
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { editingNickname = nil }
+                } else {
+                    Button { editingNickname = row.id } label: {
+                        Label(row.nickname ?? L.t("Add nickname", "별명 추가", "ニックネームを追加", "添加昵称"),
+                              systemImage: "pencil")
+                    }
+                    .buttonStyle(.plain).font(.caption).foregroundColor(.accentColor)
+                }
+                if row.stale && row.key != .local {
+                    Button(role: .destructive) { model.deleteAccount(row.key) } label: {
+                        Text(L.t("Delete", "삭제", "削除", "删除"))
+                    }
+                    .buttonStyle(.link)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func accountLabel(_ row: AccountRow) -> String {
+        if let nickname = row.nickname { return nickname }
+        if row.key == .local { return L.t("Codex · this Mac", "Codex · 이 Mac", "Codex · この Mac", "Codex · 此 Mac") }
+        if row.key.isUnknownClaude {
+            return L.t("Unidentified Claude reading", "확인되지 않은 Claude 읽기", "未確認の Claude 読み取り", "未识别的 Claude 读取")
+        }
+        return L.t("Claude account", "Claude 계정", "Claude アカウント", "Claude 账号") + " · " + String(row.key.value.suffix(6))
+    }
+
+    private func accountReadTime(_ row: AccountRow) -> String {
+        let current = row.selected ? L.t("Current", "현재", "現在", "当前") : L.t("Last read", "마지막 읽기", "最終読み取り", "最后读取")
+        return "\(current) · \(Fmt.clock(row.reading.at, now: clockNow))"
+    }
+
+    private func accountMeters(_ reading: Reading) -> String {
+        [reading.five.map { "5h \(Fmt.pct($0.pct))" }, reading.week.map { "W \(Fmt.pct($0.pct))" }]
+            .compactMap { $0 }.joined(separator: " · ")
     }
 
     /// The update notice: shown until the user updates or skips this version.
