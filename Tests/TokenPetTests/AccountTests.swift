@@ -24,6 +24,62 @@ import Testing
     }
 }
 
+@Suite struct AccountReadingAdapterTests {
+    let now = Date(timeIntervalSince1970: 1_793_700_000)
+    let alpha = "aaaa11112222", beta = "bbbb33334444"
+
+    func reading(_ account: String?, five: Double?, week: Double = 30, weekReset: TimeInterval = 7 * day, at: TimeInterval = 0) -> Reading {
+        Reading(five: five.map { Meter(pct: $0, resetsAt: now + 5 * hour) },
+                week: Meter(pct: week, resetsAt: now + weekReset), at: now + at, account: account)
+    }
+
+    /// These six synthetic bridge shapes are the current popover contract: account letter and
+    /// headline percent must stay byte-for-byte stable while account storage changes underneath.
+    @Test func preservesTheCurrentDisplayGoldens() {
+        struct Fixture {
+            let name: String
+            let readings: [Reading]
+            let expectedAccounts: [String?]
+            let golden: String
+        }
+        let fixtures = [
+            Fixture(name: "first named account", readings: [reading(alpha, five: 26)], expectedAccounts: [alpha], golden: "A|26%"),
+            Fixture(name: "same account merge", readings: [reading(alpha, five: 26), reading(alpha, five: 34, at: 60)], expectedAccounts: [alpha, alpha], golden: "A|34%"),
+            Fixture(name: "new account", readings: [reading(alpha, five: 26), reading(beta, five: 41, weekReset: 14 * day, at: 60)], expectedAccounts: [alpha, beta], golden: "B|41%"),
+            Fixture(name: "old session after switch", readings: [reading(alpha, five: 26), reading(beta, five: 41, weekReset: 14 * day, at: 60), reading(alpha, five: 99, at: 120)], expectedAccounts: [alpha, beta, beta], golden: "B|41%"),
+            Fixture(name: "weekly only", readings: [reading(beta, five: nil, week: 37)], expectedAccounts: [beta], golden: "A|37%"),
+            Fixture(name: "untagged bridge", readings: [reading(nil, five: 23)], expectedAccounts: [nil], golden: "?|23%"),
+        ]
+        for fixture in fixtures {
+            var adapter = ClaudeReadingAdapter()
+            var shown: Reading?
+            for (reading, expectedAccount) in zip(fixture.readings, fixture.expectedAccounts) {
+                shown = adapter.take(reading, expectedAccount: expectedAccount)
+            }
+            let snap = Logic.evaluate(main: shown, now: now)
+            let output = "\(adapter.letter ?? "?")|\(BarText.percent.text(snap, cutscene: false, now: now))"
+            #expect(output == fixture.golden, "\(fixture.name): \(output)")
+        }
+    }
+
+    @Test func persistsTheSelectedKeyAndReadingAcrossARestart() {
+        let d = UserDefaults(suiteName: "TokenPetTests.reading-store")!
+        d.removePersistentDomain(forName: "TokenPetTests.reading-store")
+        var adapter = ClaudeReadingAdapter()
+        let source = reading(alpha, five: 26)
+        #expect(adapter.take(source, expectedAccount: alpha) == source)
+        adapter.save(d)
+        let restarted = ClaudeReadingAdapter.load(d)
+        #expect(restarted.current == source)
+        #expect(restarted.letter == "A")
+        #expect(AccountKey.local.value == "local")
+        var local = ReadingStore()
+        local[.local] = source
+        #expect(local[.local] == source)
+        d.removePersistentDomain(forName: "TokenPetTests.reading-store")
+    }
+}
+
 // Switching the Claude account (LOGIC.md "Another account"), as first read on 2026-11-03: the old account
 // hit its 5-hour limit, /login switched to another account, and readings with only a weekly window kept
 // coming into the same bridge file. (Corrected the next morning, `AccountSwitchMorning` below: those were

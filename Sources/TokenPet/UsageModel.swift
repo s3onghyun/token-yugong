@@ -90,6 +90,11 @@ enum ReadingLog {
         return "5h=\(m(r.five, "HH:mm")) week=\(m(r.week, "MM-dd HH:mm"))"
     }
 
+    static func line(read r: Reading, decision: String, shown: Reading?, accounts a: ClaudeReadingAdapter) -> String {
+        "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) captured=\(stamp(r.at, "HH:mm:ss")) account=\(r.account ?? "-") "
+            + "\(describe(r)) -> \(decision) current=\(a.letter.map { "\($0):\(a.id ?? "")" } ?? "unnamed") shown: \(describe(shown))"
+    }
+
     static func line(read r: Reading, decision: String, shown: Reading?, accounts a: Accounts) -> String {
         "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) captured=\(stamp(r.at, "HH:mm:ss")) account=\(r.account ?? "-") "
             + "\(describe(r)) -> \(decision) current=\(a.letter.map { "\($0):\(a.id ?? "")" } ?? "unnamed") shown: \(describe(shown))"
@@ -220,6 +225,17 @@ extension Accounts {
     func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.account") }
 }
 
+extension ClaudeReadingAdapter {
+    static func load(_ d: UserDefaults = Prefs.store) -> ClaudeReadingAdapter {
+        if let data = d.data(forKey: "claude.readings"), let saved = try? JSONDecoder().decode(ClaudeReadingAdapter.self, from: data) {
+            return saved
+        }
+        return ClaudeReadingAdapter(legacy: Accounts.load(d))
+    }
+
+    func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.readings") }
+}
+
 // MARK: - Model
 
 final class UsageModel: ObservableObject {
@@ -262,7 +278,8 @@ final class UsageModel: ObservableObject {
     let budgets = BudgetClient()
     private let queue = DispatchQueue(label: "tokenpet.scan", qos: .utility)
     private var claude: Reading?
-    private var accounts = Accounts.load()
+    private var claudeReadings = ClaudeReadingAdapter.load()
+    private var localReadings = ReadingStore()
     private var accountJustSwitched = false
     private var timer: Timer?
     private var refreshWork: DispatchWorkItem?
@@ -361,8 +378,10 @@ final class UsageModel: ObservableObject {
     func reading(_ p: Provider) -> Reading? {
         switch p {
         case .claude: return Limits.apply(Array(scanner.hits.values), to: claude, lastAnswer: scanner.events.last?.time, now: Date(),
-                                          switchedAt: accounts.switchedAt)
-        case .codex: return codexReader.reading
+                                          switchedAt: claudeReadings.switchedAt)
+        case .codex:
+            localReadings[.local] = codexReader.reading
+            return localReadings[.local]
         case .gemini, .deepseek: return nil
         case .openai: return budgets.state[.openai].flatMap { st in st.spent.flatMap { Budget.reading(spent: $0, budget: openAIBudget, at: st.at) } }
         }
@@ -420,36 +439,36 @@ final class UsageModel: ObservableObject {
     /// Opens the big scene in a window of its own (SceneWindow).
     var openWindow: (() -> Void)?
 
-    /// A bridge reading, sorted by account (`Accounts`). A switch brings the wife to ask about it.
+    /// A bridge reading, selected through the compatibility adapter. A switch brings the wife to ask about it.
     private func take(_ b: Reading?, signedIn account: ClaudeAccount) {
-        let before = accounts.switchedAt
-        if b == nil, let expected = account.id, expected != accounts.id {
-            accounts.expect(expected, at: Date())
+        let before = claudeReadings.switchedAt
+        if b == nil, let expected = account.id, expected != claudeReadings.id {
+            claudeReadings.expect(expected, at: Date())
             claude = nil
         } else {
-            claude = b.flatMap { accounts.take($0, expectedAccount: account.id) }
+            claude = b.flatMap { claudeReadings.take($0, expectedAccount: account.id) }
         }
-        accounts.save()
+        claudeReadings.save()
         if let b, b != lastLogged {
             lastLogged = b
             // taken: the shown reading is at least this new; else the numbers were another account's
-            let decision = accounts.switchedAt != before ? "switch" : (claude.map { $0.at >= b.at } ?? false) ? "taken" : "ignored"
-            ReadingLog.append(ReadingLog.line(read: b, decision: decision, shown: claude, accounts: accounts))
+            let decision = claudeReadings.switchedAt != before ? "switch" : (claude.map { $0.at >= b.at } ?? false) ? "taken" : "ignored"
+            ReadingLog.append(ReadingLog.line(read: b, decision: decision, shown: claude, accounts: claudeReadings))
         }
-        guard accounts.switchedAt != before else { return }
+        guard claudeReadings.switchedAt != before else { return }
         changedAt = Date()
         accountJustSwitched = true
     }
     private var lastLogged: Reading?
     /// The popover's last line: which Claude account (A, B, ... and its short hash) and when its numbers came.
-    var accountLine: (letter: String?, id: String?, seen: Date?) { (accounts.letter, accounts.id.map { String($0.prefix(6)) }, accounts.seen) }
+    var accountLine: (letter: String?, id: String?, seen: Date?) { (claudeReadings.letter, claudeReadings.id.map { String($0.prefix(6)) }, claudeReadings.seen) }
     /// The bridge account is hashed too, so no raw account identifier is retained.
-    var shownClaudeAccountID: String? { accounts.id }
+    var shownClaudeAccountID: String? { claudeReadings.id }
     var accountMismatch: Bool { signedInClaudeAccount.differs(from: shownClaudeAccountID) }
     /// "Account change detected" in the popover, for as long as the wife asks about it.
-    var accountNote: Bool { accounts.switchedAt.map { Date().timeIntervalSince($0) < Visitors.afterChange } ?? false }
+    var accountNote: Bool { claudeReadings.switchedAt.map { Date().timeIntervalSince($0) < Visitors.afterChange } ?? false }
     /// An old session redrew first after `/login`; its payload is deliberately ignored until the new account replies.
-    var accountAwaitingReading: Bool { accounts.awaitingReading }
+    var accountAwaitingReading: Bool { claudeReadings.awaitingReading }
 
     static func readBridge(_ url: URL) -> Reading? {
         guard let data = try? Data(contentsOf: url) else { return nil }
