@@ -80,6 +80,86 @@ import Testing
     }
 }
 
+@Suite struct AccountReadingsTests {
+    let now = Date(timeIntervalSince1970: 1_793_700_000)
+    let alpha = "aaaa11112222", beta = "bbbb33334444"
+
+    func reading(_ key: String?, five: Double, week: Double, at: TimeInterval = 0) -> Reading {
+        Reading(five: Meter(pct: five, resetsAt: now + 5 * hour),
+                week: Meter(pct: week, resetsAt: now + 7 * day), at: now + at, account: key)
+    }
+
+    @Test func readingsStayIndependentAndSelectionChangesTheDisplayImmediately() {
+        var accounts = AccountReadings()
+        let a = reading(alpha, five: 24, week: 31)
+        let b = reading(beta, five: 72, week: 48, at: 60)
+        accounts.takeClaude(a)
+        accounts.takeClaude(b)
+        #expect(accounts.selectedClaude == a) // first identified key is saved, not replaced by new input
+        accounts.select(.claude(beta))
+        #expect(accounts.selectedClaude == b)
+        #expect(BarText.percent.text(Logic.evaluate(main: accounts.selectedClaude, now: now), cutscene: false, now: now) == "72%")
+        accounts.select(.claude(alpha))
+        #expect(BarText.percent.text(Logic.evaluate(main: accounts.selectedClaude, now: now), cutscene: false, now: now) == "24%")
+    }
+
+    @Test func aNewKeyNeverMutatesAnExistingReading() {
+        var accounts = AccountReadings()
+        let a = reading(alpha, five: 24, week: 31)
+        accounts.takeClaude(a)
+        accounts.takeClaude(reading(beta, five: 72, week: 48, at: 60))
+        accounts.takeClaude(reading(beta, five: 79, week: 52, at: 120))
+        accounts.select(.claude(alpha))
+        #expect(accounts.selectedClaude == a)
+        accounts.select(.claude(beta))
+        #expect(accounts.selectedClaude?.five?.pct == 79)
+    }
+
+    @Test func unknownClaudeIsSeparateAndNeverAutoSelected() {
+        var accounts = AccountReadings()
+        let unknown = reading(nil, five: 44, week: 51)
+        accounts.takeClaude(unknown)
+        #expect(accounts.selected == nil)
+        #expect(accounts.unknownClaude == unknown)
+        accounts.select(.unknownClaude)
+        #expect(accounts.selected == nil)
+        #expect(accounts.rows(now: now).first?.key == .unknownClaude)
+    }
+
+    @Test func anUnattributedLimitHitCannotChangeTheSelectedAccount() {
+        let selected = AccountKey.claude(alpha)
+        let source = reading(alpha, five: 99, week: 31)
+        let hit = Limits.Hit(time: now, week: false, resetsAt: now + hour)
+        let shown = ClaudeLimitHits.apply([hit], to: source, hitAccount: nil, selected: selected, lastAnswer: nil, now: now)
+        #expect(shown == source)
+    }
+
+    @Test func selectionAndNicknameSurviveARestart() {
+        let d = UserDefaults(suiteName: "TokenPetTests.account-readings")!
+        d.removePersistentDomain(forName: "TokenPetTests.account-readings")
+        var accounts = AccountReadings()
+        accounts.takeClaude(reading(alpha, five: 24, week: 31))
+        accounts.takeClaude(reading(beta, five: 72, week: 48, at: 60))
+        accounts.select(.claude(beta))
+        accounts.setNickname("Work", for: .claude(beta))
+        accounts.save(d)
+        let restored = AccountReadings.load(d)
+        #expect(restored.selected == .claude(beta))
+        #expect(restored.nickname(for: .claude(beta)) == "Work")
+        d.removePersistentDomain(forName: "TokenPetTests.account-readings")
+    }
+
+    @Test func oldRowsAreKeptUntilTheUserDeletesThemAndCodexIsLocal() {
+        var accounts = AccountReadings()
+        accounts.takeClaude(reading(alpha, five: 24, week: 31, at: -31 * day))
+        accounts.takeCodex(Reading(five: Meter(pct: 13, resetsAt: now + hour), week: nil, at: now))
+        #expect(accounts.rows(now: now).first(where: { $0.key == .claude(alpha) })?.stale == true)
+        #expect(accounts.rows(now: now).first(where: { $0.key == .local })?.reading.five?.pct == 13)
+        accounts.remove(.claude(alpha))
+        #expect(!accounts.rows(now: now).contains(where: { $0.key == .claude(alpha) }))
+    }
+}
+
 // Switching the Claude account (LOGIC.md "Another account"), as first read on 2026-11-03: the old account
 // hit its 5-hour limit, /login switched to another account, and readings with only a weekly window kept
 // coming into the same bridge file. (Corrected the next morning, `AccountSwitchMorning` below: those were

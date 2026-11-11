@@ -20,8 +20,8 @@ app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup
 | Output tokens with timestamps | `~/.claude/projects/**/*.jsonl` (`message.usage`), Codex `token_count` events, Gemini CLI `~/.gemini/tmp/*/chats/session-*.json` | shovel speed only |
 | Tokens: Claude input + output + cache writes; Codex input without the cached part + output; Gemini `total` | the same logs | the mountain only |
 
-No saved limit state beyond which Claude account is current and its last numbers (see "Another
-account"), and token counts never become a limit percentage. The network is used
+Saved account readings contain only hashed keys, last readings and optional local nicknames; token
+counts never become a limit percentage. The network is used
 only for an OpenAI or DeepSeek member you set up: the request carries your key (kept in the
 login Keychain, never in a file or the settings) and nothing else leaves the Mac. The update check
 (below) is the one other request.
@@ -65,38 +65,25 @@ reading is (`16:57 · 6분 전`). One notification when Grandpa's limit is used 
 and one when it resets; the last state is saved, so a restart does not repeat them (Settings, on by
 default). A used-up **weekly** limit is a long rest: a full moon instead of the crescent.
 
-### Another account
+### Accounts
 
-Claude Code tells the status line a `session_id`, and every session writes the same `limits.json`.
-After `/login` the running sessions use the new account, but each one keeps the numbers of its last
-answer until it answers again, and redraws them (an idle session writes the old account's numbers
-for hours). Claude Code also drops a window from the status line once it resets, so an idle
-session's numbers often lack the 5-hour window.
+The bridge names a Claude account with a 12-character SHA-256 hash of its
+`oauthAccount.accountUuid`. That hash is pinned to a Claude session's first reply, so an old
+session that redraws after `/login` keeps its old key. Raw account and session ids are never saved.
 
-The bridge names the signed-in account with a 12-character SHA-256 hash of `oauthAccount.accountUuid`
-in `.claude.json` (under `CLAUDE_CONFIG_DIR` when set). It pins that hash to the session's own
-SHA-256 hash on its first reply, so a session which redraws after `/login` stays attributed to its
-old account instead of receiving the new global login's hash. The raw account and session ids are
-never stored. Which numbers belong to which account is otherwise told by the **weekly reset time**
-(each account's week resets at its own time). Older bridges name no account; then the weekly reset
-alone decides. The app keeps which account is current, each named account's weekly reset and the
-merged numbers in the settings (`claude.account`: hashes, reset times and percentages only). An
-installed bridge older than the app is replaced at launch (settings.json is not touched).
+Each keyed Claude reading is merged only with the reading under the same key. The picker keeps the
+key explicitly selected by the user; with no saved selection, the first identified Claude key is
+selected. There are no weekly-reset, quiet-time or signed-in-account heuristics. Switching the
+picker immediately changes Grandpa and the menu-bar number, and the selected key persists across a
+restart. Codex is one `local` row, not an account-registration flow.
 
 | When | Then |
 |---|---|
-| A reading naming another account than the current one | **Account switch** (a `/login`): it is current, lettered A, B, ... in the order first seen; nothing of the old one's windows is kept. The popover says "계정 바뀜 감지" for 10 minutes, the wife comes to ask, and the limit notification is not sent for the switch itself. The first named reading after an update is not a switch |
-| The signed-in account in `.claude.json` differs from the bridge's named session | That bridge session predates `/login`: its numbers are cleared immediately, never relabelled or shown for the newly signed-in account. Yugong says it is waiting for the new account's next Claude response. |
-| A named reading whose weekly reset is another named account's | That account's numbers from an idle session: ignored, however long the current one has been quiet |
-| A named reading with a weekly reset never seen, not the current account's next week | Ignored while the current account reported in the last 30 minutes; else it is the current account's week |
-| Unnamed: a reading with another weekly reset, not this account's next week (the current reset has not passed, or the new one is earlier) | Account switch, as above |
-| Unnamed: a reading of the account switched away from, while the current one reported in the last 30 minutes | Ignored |
-| Unnamed: the same, the current account silent for 30 minutes or more | A switch back to it |
-| Unnamed: a reading without a weekly window | Cannot be told apart: taken as the current account |
-| A reading of the current account | Merged window by window: a window the reading lacks is kept until it resets (an idle session's numbers can be older), and within one window the percent only grows. A window that has reset and that the reading lacks is a new, empty window (0%, reset not known yet), not a sign of an account without it: no "only weekly" note and no change of plan |
-| A limit hit logged before the switch | Not the new account's: ignored |
-| After a switch, a hit whose window the current reading shows with another reset that has not passed, does not show at all (a weekly-only account), or shows empty after a reset | The old account's: ignored |
-| Before any switch, a hit whose window a reading taken after it shows with another reset | Ignored |
+| A reading has an identified Claude hash | Store and update only `claude:<hash>`; it never changes another key's reading |
+| A reading has no account hash | Store it as `claude:unknown`, shown as "확인되지 않은 Claude 읽기"; it is never selected automatically |
+| A user chooses a row | Save that key and show its 5-hour/weekly limits immediately |
+| A Claude rejection log has no account key | Do not apply it to the selected row; show "한도 거절을 계정에 귀속할 수 없음" |
+| A row has not been updated for 30 days | Put it under "지난 계정"; keep it until the user deletes it |
 
 ## Family
 

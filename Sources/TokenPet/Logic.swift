@@ -334,21 +334,129 @@ struct AccountKey: Hashable, Codable {
     let value: String
 
     static let local = AccountKey(value: "local")
-    static let untaggedClaude = AccountKey(value: "claude:untagged")
+    /// A bridge without an account hash is useful to inspect, but is never picked for Grandpa.
+    static let unknownClaude = AccountKey(value: "claude:unknown")
 
     static func claude(_ hash: String?) -> AccountKey {
-        hash.map { AccountKey(value: "claude:\($0)") } ?? untaggedClaude
+        hash.map { AccountKey(value: "claude:\($0)") } ?? unknownClaude
     }
+
+    var isUnknownClaude: Bool { self == .unknownClaude }
+    var isClaude: Bool { value.hasPrefix("claude:") && !isUnknownClaude }
 }
 
-/// The persisted shape for the next account-listing phase. Keep its keyed interface small while
-/// the current screen still selects one Claude reading through `ClaudeReadingAdapter`.
+/// Readings and the user's optional labels, all local. A key with no reading does not exist:
+/// accounts are learned from local CLI output, never registered by the user.
 struct ReadingStore: Equatable, Codable {
     private var values: [String: Reading] = [:]
+    private var nicknames: [String: String] = [:]
 
     subscript(_ key: AccountKey) -> Reading? {
         get { values[key.value] }
         set { values[key.value] = newValue }
+    }
+
+    var keys: [AccountKey] { values.keys.map(AccountKey.init(value:)).sorted { $0.value < $1.value } }
+
+    func nickname(for key: AccountKey) -> String? { nicknames[key.value] }
+
+    mutating func setNickname(_ nickname: String, for key: AccountKey) {
+        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { nicknames.removeValue(forKey: key.value) }
+        else { nicknames[key.value] = trimmed }
+    }
+
+    mutating func remove(_ key: AccountKey) {
+        values.removeValue(forKey: key.value)
+        nicknames.removeValue(forKey: key.value)
+    }
+
+    mutating func migrateLegacyUnknownKey() {
+        guard let reading = values.removeValue(forKey: "claude:untagged") else { return }
+        values[AccountKey.unknownClaude.value] = reading
+        if let nickname = nicknames.removeValue(forKey: "claude:untagged") {
+            nicknames[AccountKey.unknownClaude.value] = nickname
+        }
+    }
+}
+
+/// The account picker intentionally has one rule: keep the key the user saved; until there is
+/// one, select the first *identified* Claude reading. An unknown bridge reading is a separate
+/// row and never becomes selection evidence.
+struct AccountReadings: Equatable, Codable {
+    static let staleAfter: TimeInterval = 30 * 86400
+
+    private var store = ReadingStore()
+    private(set) var selected: AccountKey?
+
+    init() {}
+
+    init(legacy: ClaudeReadingAdapter) {
+        store = legacy.storedReadings
+        store.migrateLegacyUnknownKey()
+        let key = AccountKey.claude(legacy.id)
+        if key.isClaude, store[key] != nil { selected = key }
+    }
+
+    init(legacy: Accounts) {
+        if let reading = legacy.reading {
+            let key = AccountKey.claude(legacy.id)
+            store[key] = reading
+            if key.isClaude { selected = key }
+        }
+    }
+
+    mutating func takeClaude(_ reading: Reading) {
+        let key = AccountKey.claude(reading.account)
+        store[key] = Accounts.merge(store[key], reading)
+        if selected == nil && key.isClaude { selected = key }
+    }
+
+    mutating func takeCodex(_ reading: Reading?) { store[.local] = reading }
+
+    mutating func select(_ key: AccountKey) {
+        guard key.isClaude, store[key] != nil else { return }
+        selected = key
+    }
+
+    mutating func setNickname(_ nickname: String, for key: AccountKey) { store.setNickname(nickname, for: key) }
+
+    mutating func remove(_ key: AccountKey) {
+        store.remove(key)
+        if selected == key { selected = nil }
+    }
+
+    var selectedClaude: Reading? { selected.flatMap { store[$0] } }
+    var unknownClaude: Reading? { store[.unknownClaude] }
+    var codex: Reading? { store[.local] }
+
+    func nickname(for key: AccountKey) -> String? { store.nickname(for: key) }
+
+    func rows(now: Date = Date()) -> [AccountRow] {
+        store.keys.compactMap { key in
+            guard let reading = store[key] else { return nil }
+            return AccountRow(key: key, reading: reading, nickname: store.nickname(for: key), selected: selected == key,
+                              stale: now.timeIntervalSince(reading.at) >= Self.staleAfter)
+        }
+    }
+}
+
+struct AccountRow: Identifiable, Equatable {
+    let key: AccountKey
+    let reading: Reading
+    let nickname: String?
+    let selected: Bool
+    let stale: Bool
+    var id: String { key.value }
+}
+
+/// A Claude rejection log has no account hash. Never turn it into a limit for whichever account
+/// happens to be selected; a later reader that provides a key can opt into this boundary.
+enum ClaudeLimitHits {
+    static func apply(_ hits: [Limits.Hit], to reading: Reading?, hitAccount: AccountKey?, selected: AccountKey?,
+                      lastAnswer: Date?, now: Date) -> Reading? {
+        guard hitAccount != nil, hitAccount == selected else { return reading }
+        return Limits.apply(hits, to: reading, lastAnswer: lastAnswer, now: now)
     }
 }
 
@@ -382,6 +490,7 @@ struct ClaudeReadingAdapter: Equatable, Codable {
     var id: String? { legacy.id }
     var seen: Date? { legacy.seen }
     var awaitingReading: Bool { legacy.awaitingReading }
+    var storedReadings: ReadingStore { store }
 
     private mutating func saveCurrent() {
         guard let reading = legacy.reading else { return }

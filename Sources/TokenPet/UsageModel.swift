@@ -225,12 +225,29 @@ extension Accounts {
     func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.account") }
 }
 
+/// Phase-1 persistence remains readable for migration and its focused regression tests. The live
+/// model writes `AccountReadings` below; deleting this compatibility boundary is phase 3 work.
 extension ClaudeReadingAdapter {
     static func load(_ d: UserDefaults = Prefs.store) -> ClaudeReadingAdapter {
         if let data = d.data(forKey: "claude.readings"), let saved = try? JSONDecoder().decode(ClaudeReadingAdapter.self, from: data) {
             return saved
         }
         return ClaudeReadingAdapter(legacy: Accounts.load(d))
+    }
+
+    func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.readings") }
+}
+
+extension AccountReadings {
+    static func load(_ d: UserDefaults = Prefs.store) -> AccountReadings {
+        guard let data = d.data(forKey: "claude.readings") else { return AccountReadings(legacy: Accounts.load(d)) }
+        // Phase 1 saved `legacy` alongside its keyed cache. Preserve every cached key while
+        // migrating; phase 3 can remove that compatibility type after this version has shipped.
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["legacy"] != nil,
+           let old = try? JSONDecoder().decode(ClaudeReadingAdapter.self, from: data) {
+            return AccountReadings(legacy: old)
+        }
+        return (try? JSONDecoder().decode(AccountReadings.self, from: data)) ?? AccountReadings(legacy: Accounts.load(d))
     }
 
     func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.readings") }
@@ -277,15 +294,11 @@ final class UsageModel: ObservableObject {
     let geminiReader = GeminiReader(root: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/tmp"))
     let budgets = BudgetClient()
     private let queue = DispatchQueue(label: "tokenpet.scan", qos: .utility)
-    private var claude: Reading?
-    private var claudeReadings = ClaudeReadingAdapter.load()
-    private var localReadings = ReadingStore()
-    private var accountJustSwitched = false
+    private var accountReadings = AccountReadings.load()
     private var timer: Timer?
     private var refreshWork: DispatchWorkItem?
     private var fileWatchers: [FileChangeWatcher] = []
     private var lastRefreshAt = Date.distantPast
-    @Published private(set) var signedInClaudeAccount = ClaudeAccount.read()
 
     init(bridgeURL: URL, logsRoot: URL) {
         self.bridgeURL = bridgeURL
@@ -336,10 +349,8 @@ final class UsageModel: ObservableObject {
             geminiReader.scan()
             let b = Self.readBridge(bridgeURL)
             let plan = Self.readPlanUsage(planUsageURL)
-            let account = ClaudeAccount.read()
             DispatchQueue.main.async { [self] in
-                signedInClaudeAccount = account
-                take(Limits.supplement(b, with: plan, now: Date()), signedIn: account)
+                take(Limits.supplement(b, with: plan, now: Date()))
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
@@ -352,16 +363,13 @@ final class UsageModel: ObservableObject {
     /// Claude response to have reached the status-line bridge; this never contacts a service.
     func checkAccountNow() {
         guard !scanning else { return }
-        signedInClaudeAccount = ClaudeAccount.read()
         scanning = true
         queue.async { [self] in
             scanner.scan()
             let b = Self.readBridge(bridgeURL)
             let plan = Self.readPlanUsage(planUsageURL)
-            let account = ClaudeAccount.read()
             DispatchQueue.main.async { [self] in
-                signedInClaudeAccount = account
-                take(Limits.supplement(b, with: plan, now: Date()), signedIn: account)
+                take(Limits.supplement(b, with: plan, now: Date()))
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
@@ -377,11 +385,16 @@ final class UsageModel: ObservableObject {
     /// The latest reading for an AI; nil = nothing to read (Gemini, DeepSeek spend, no key or budget yet).
     func reading(_ p: Provider) -> Reading? {
         switch p {
-        case .claude: return Limits.apply(Array(scanner.hits.values), to: claude, lastAnswer: scanner.events.last?.time, now: Date(),
-                                          switchedAt: claudeReadings.switchedAt)
+        case .claude:
+            // The log records a rejection but not its account. It is deliberately not applied to
+            // the selected account; see `unattributedClaudeLimitHit` in the popover.
+            return ClaudeLimitHits.apply(Array(scanner.hits.values), to: accountReadings.selectedClaude,
+                                         hitAccount: nil, selected: accountReadings.selected,
+                                         lastAnswer: scanner.events.last?.time, now: Date())
         case .codex:
-            localReadings[.local] = codexReader.reading
-            return localReadings[.local]
+            accountReadings.takeCodex(codexReader.reading)
+            accountReadings.save()
+            return accountReadings.codex
         case .gemini, .deepseek: return nil
         case .openai: return budgets.state[.openai].flatMap { st in st.spent.flatMap { Budget.reading(spent: $0, budget: openAIBudget, at: st.at) } }
         }
@@ -392,9 +405,7 @@ final class UsageModel: ObservableObject {
         scanner.scan()
         codexReader.scan()
         geminiReader.scan()
-        let account = ClaudeAccount.read()
-        signedInClaudeAccount = account
-        take(Limits.supplement(Self.readBridge(bridgeURL), with: Self.readPlanUsage(planUsageURL), now: Date()), signedIn: account)
+        take(Limits.supplement(Self.readBridge(bridgeURL), with: Self.readPlanUsage(planUsageURL), now: Date()))
         mountain.absorb(allEvents)
         recompute()
     }
@@ -439,36 +450,51 @@ final class UsageModel: ObservableObject {
     /// Opens the big scene in a window of its own (SceneWindow).
     var openWindow: (() -> Void)?
 
-    /// A bridge reading, selected through the compatibility adapter. A switch brings the wife to ask about it.
-    private func take(_ b: Reading?, signedIn account: ClaudeAccount) {
-        let before = claudeReadings.switchedAt
-        if b == nil, let expected = account.id, expected != claudeReadings.id {
-            claudeReadings.expect(expected, at: Date())
-            claude = nil
-        } else {
-            claude = b.flatMap { claudeReadings.take($0, expectedAccount: account.id) }
-        }
-        claudeReadings.save()
-        if let b, b != lastLogged {
+    /// A bridge reading belongs only to its stable bridge key. Selection is explicit and saved;
+    /// there is no weekly-reset or signed-in-account inference here.
+    private func take(_ b: Reading?) {
+        guard let b else { return }
+        accountReadings.takeClaude(b)
+        accountReadings.save()
+        if b != lastLogged {
             lastLogged = b
-            // taken: the shown reading is at least this new; else the numbers were another account's
-            let decision = claudeReadings.switchedAt != before ? "switch" : (claude.map { $0.at >= b.at } ?? false) ? "taken" : "ignored"
-            ReadingLog.append(ReadingLog.line(read: b, decision: decision, shown: claude, accounts: claudeReadings))
+            ReadingLog.append(ReadingLog.line(read: b, decision: "stored", shown: accountReadings.selectedClaude,
+                                               accounts: Accounts()))
         }
-        guard claudeReadings.switchedAt != before else { return }
-        changedAt = Date()
-        accountJustSwitched = true
     }
     private var lastLogged: Reading?
-    /// The popover's last line: which Claude account (A, B, ... and its short hash) and when its numbers came.
-    var accountLine: (letter: String?, id: String?, seen: Date?) { (claudeReadings.letter, claudeReadings.id.map { String($0.prefix(6)) }, claudeReadings.seen) }
-    /// The bridge account is hashed too, so no raw account identifier is retained.
-    var shownClaudeAccountID: String? { claudeReadings.id }
-    var accountMismatch: Bool { signedInClaudeAccount.differs(from: shownClaudeAccountID) }
-    /// "Account change detected" in the popover, for as long as the wife asks about it.
-    var accountNote: Bool { claudeReadings.switchedAt.map { Date().timeIntervalSince($0) < Visitors.afterChange } ?? false }
-    /// An old session redrew first after `/login`; its payload is deliberately ignored until the new account replies.
-    var accountAwaitingReading: Bool { claudeReadings.awaitingReading }
+    var accountRows: [AccountRow] { accountReadings.rows() }
+    var selectedClaudeAccount: AccountKey? { accountReadings.selected }
+    var unattributedClaudeLimitHit: Bool { accountReadings.selected != nil && !scanner.hits.isEmpty }
+
+    func selectClaudeAccount(_ key: AccountKey) {
+        accountReadings.select(key)
+        accountReadings.save()
+        recompute()
+    }
+
+    func accountNickname(_ key: AccountKey) -> String { accountReadings.nickname(for: key) ?? "" }
+
+    func setAccountNickname(_ nickname: String, for key: AccountKey) {
+        accountReadings.setNickname(nickname, for: key)
+        accountReadings.save()
+        objectWillChange.send()
+    }
+
+    func deleteAccount(_ key: AccountKey) {
+        accountReadings.remove(key)
+        accountReadings.save()
+        recompute()
+    }
+
+    /// Screenshot fixtures only: the renderer calls this with invented bridge hashes and never
+    /// saves them. It keeps review images free of the requester's account data.
+    func setFixtureAccounts(_ readings: [Reading]) {
+        var fixture = AccountReadings()
+        readings.forEach { fixture.takeClaude($0) }
+        accountReadings = fixture
+        objectWillChange.send()
+    }
 
     static func readBridge(_ url: URL) -> Reading? {
         guard let data = try? Data(contentsOf: url) else { return nil }
@@ -525,9 +551,8 @@ final class UsageModel: ObservableObject {
         // one notification when the limit is used up and one when it resets, even across a restart
         if snap.known, snap.resting != Prefs.store.bool(forKey: "limit.resting") {
             Prefs.store.set(snap.resting, forKey: "limit.resting")
-            if notifyLimits && !accountJustSwitched { onLimit?(snap) }   // another account is not a used-up or reset limit
+            if notifyLimits { onLimit?(snap) }
         }
-        accountJustSwitched = false
         if let p = Visitors.plan(family, snap) {
             if let old = Prefs.store.string(forKey: "visitors.plan"), old != p { changedAt = now }
             Prefs.store.set(p, forKey: "visitors.plan")
