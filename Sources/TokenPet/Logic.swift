@@ -328,6 +328,67 @@ struct Accounts: Equatable, Codable {
     }
 }
 
+/// A stable identity supplied by a local reader. Claude supplies a hashed bridge id; Codex has
+/// one local reader, so it never needs an account-registration step.
+struct AccountKey: Hashable, Codable {
+    let value: String
+
+    static let local = AccountKey(value: "local")
+    static let untaggedClaude = AccountKey(value: "claude:untagged")
+
+    static func claude(_ hash: String?) -> AccountKey {
+        hash.map { AccountKey(value: "claude:\($0)") } ?? untaggedClaude
+    }
+}
+
+/// The persisted shape for the next account-listing phase. Keep its keyed interface small while
+/// the current screen still selects one Claude reading through `ClaudeReadingAdapter`.
+struct ReadingStore: Equatable, Codable {
+    private var values: [String: Reading] = [:]
+
+    subscript(_ key: AccountKey) -> Reading? {
+        get { values[key.value] }
+        set { values[key.value] = newValue }
+    }
+}
+
+/// Compatibility boundary for the current screen. `Accounts` remains the authority for choosing
+/// the one reading that legacy Yugong displayed; the selected result is also written by key for
+/// the simpler account-store model that follows.
+struct ClaudeReadingAdapter: Equatable, Codable {
+    private var legacy: Accounts
+    private var store: ReadingStore
+
+    init(legacy: Accounts = Accounts(), store: ReadingStore = ReadingStore()) {
+        self.legacy = legacy
+        self.store = store
+        saveCurrent()
+    }
+
+    mutating func take(_ reading: Reading, expectedAccount: String?) -> Reading? {
+        _ = legacy.take(reading, expectedAccount: expectedAccount)
+        saveCurrent()
+        return current
+    }
+
+    mutating func expect(_ account: String, at: Date) {
+        legacy.expect(account, at: at)
+        saveCurrent()
+    }
+
+    var current: Reading? { store[AccountKey.claude(legacy.id)] }
+    var switchedAt: Date? { legacy.switchedAt }
+    var letter: String? { legacy.letter }
+    var id: String? { legacy.id }
+    var seen: Date? { legacy.seen }
+    var awaitingReading: Bool { legacy.awaitingReading }
+
+    private mutating func saveCurrent() {
+        guard let reading = legacy.reading else { return }
+        store[AccountKey.claude(legacy.id)] = reading
+    }
+}
+
 /// Weekly-only accounts: the week (counted back from its reset) is 7 equal days, and by the end
 /// of day d (0...6) the fair use is (d+1)/7 of the week. fill = (used - d/7) / (1/7):
 /// 0 = nothing of today's share used yet (unused days carry over), 1 = today's share used up.
