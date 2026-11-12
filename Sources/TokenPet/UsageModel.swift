@@ -304,10 +304,10 @@ final class UsageModel: ObservableObject {
     /// A response from one of the local CLIs changes a bridge or log directory. Refresh soon,
     /// but coalesce bursts so a streamed response does not turn into repeated full scans.
     private func watchUsageFiles() {
-        let directories = [bridgeURL.deletingLastPathComponent(), scanner.root, codexReader.root, geminiReader.root,
-                           planUsageURL.deletingLastPathComponent()]
-        fileWatchers = directories.compactMap { directory in
-            FileChangeWatcher(directory: directory) { [weak self] in
+        let paths = [bridgeURL.deletingLastPathComponent(), scanner.root, codexReader.root, geminiReader.root,
+                     planUsageURL.deletingLastPathComponent(), ClaudeAccount.configURL]
+        fileWatchers = paths.compactMap { path in
+            FileChangeWatcher(path: path) { [weak self] in
                 DispatchQueue.main.async { self?.refreshAfterFileChange() }
             }
         }
@@ -338,6 +338,7 @@ final class UsageModel: ObservableObject {
             let b = Self.readBridge(bridgeURL)
             let plan = Self.readPlanUsage(planUsageURL)
             DispatchQueue.main.async { [self] in
+                syncLoggedInClaude()
                 take(Limits.supplement(b, with: plan, now: Date()))
                 scanning = false
                 mountain.absorb(allEvents)
@@ -357,6 +358,7 @@ final class UsageModel: ObservableObject {
             let b = Self.readBridge(bridgeURL)
             let plan = Self.readPlanUsage(planUsageURL)
             DispatchQueue.main.async { [self] in
+                syncLoggedInClaude()
                 take(Limits.supplement(b, with: plan, now: Date()))
                 scanning = false
                 mountain.absorb(allEvents)
@@ -393,6 +395,7 @@ final class UsageModel: ObservableObject {
         scanner.scan()
         codexReader.scan()
         geminiReader.scan()
+        syncLoggedInClaude()
         take(Limits.supplement(Self.readBridge(bridgeURL), with: Self.readPlanUsage(planUsageURL), now: Date()))
         mountain.absorb(allEvents)
         recompute()
@@ -449,6 +452,12 @@ final class UsageModel: ObservableObject {
             ReadingLog.append(ReadingLog.line(read: b, decision: "stored", shown: accountReadings.selectedClaude,
                                                selected: accountReadings.selected))
         }
+    }
+
+    private func syncLoggedInClaude() {
+        let before = accountReadings.selected
+        accountReadings.syncLogin(ClaudeAccount.read().id)
+        if accountReadings.selected != before { accountReadings.save() }
     }
     private var lastLogged: Reading?
     var accountRows: [AccountRow] { accountReadings.rows() }

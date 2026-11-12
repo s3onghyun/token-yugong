@@ -1,14 +1,15 @@
 import Foundation
 import Darwin
 
-/// A cheap nudge to refresh local usage data after a directory changes. The five-minute timer
-/// remains as a recovery path for paths that do not exist yet and for nested tool log folders.
+/// A cheap nudge to refresh local usage data after a watched file or directory changes. The
+/// five-minute timer remains as a recovery path for paths that do not exist yet and for nested
+/// tool log folders.
 final class FileChangeWatcher {
     private let descriptor: CInt
     private let source: DispatchSourceFileSystemObject
 
-    init?(directory: URL, queue: DispatchQueue = .global(qos: .utility), changed: @escaping () -> Void) {
-        let descriptor = open(directory.path, O_EVTONLY)
+    init?(path: URL, queue: DispatchQueue = .global(qos: .utility), changed: @escaping () -> Void) {
+        let descriptor = open(path.path, O_EVTONLY)
         guard descriptor >= 0 else { return nil }
         self.descriptor = descriptor
         source = DispatchSource.makeFileSystemObjectSource(
