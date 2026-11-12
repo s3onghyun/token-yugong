@@ -72,16 +72,17 @@ The bridge names every Claude reading with a 12-character SHA-256 hash of the ac
 before the switch is an old redraw and is ignored; a changed response or a session begun after the
 login is stored under the current hash. Raw account and session ids are never saved.
 
-Each keyed Claude reading is merged only with the reading under the same key. The picker keeps the
-key explicitly selected by the user; with no saved selection, the first identified Claude key is
-selected. There are no weekly-reset, quiet-time or signed-in-account heuristics. Switching the
-picker immediately changes Grandpa and the menu-bar number, and the selected key persists across a
-restart. Codex is one `local` row, not an account-registration flow.
+Each keyed Claude reading is merged only with the reading under the same key. When the hash in
+`~/.claude.json` changes, Yugong selects that account—even before its first reading arrives. Until
+the next login change, the picker keeps any row the user explicitly selects. Switching the picker
+immediately changes Grandpa and the menu-bar number, and the selected key persists across a restart.
+Codex is one `local` row, not an account-registration flow.
 
 | When | Then |
 |---|---|
 | A reading has an identified Claude hash | Store and update only `claude:<hash>`; it never changes another key's reading |
 | `/login` while sessions remain open | Ignore each unchanged pre-login redraw; the first fresh response is stored under the new hash |
+| The hash in `~/.claude.json` changes | Select `claude:<hash>`; an explicit picker choice can override it until the next login change |
 | A reading has no account hash | Store it as `claude:unknown`, shown as "확인되지 않은 Claude 읽기"; it is never selected automatically |
 | A user chooses a row | Save that key and show its 5-hour/weekly limits immediately |
 | A Claude rejection log has no account key | Do not apply it to the selected row; show "한도 거절을 계정에 귀속할 수 없음" |

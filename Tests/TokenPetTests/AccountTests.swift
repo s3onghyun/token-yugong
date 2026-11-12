@@ -26,7 +26,7 @@ import Testing
 
 @Suite struct AccountReadingsTests {
     let now = Date(timeIntervalSince1970: 1_793_700_000)
-    let alpha = "aaaa11112222", beta = "bbbb33334444"
+    let alpha = "aaaa11112222", beta = "bbbb33334444", gamma = "cccc55556666"
 
     func reading(_ key: String?, five: Double, week: Double, at: TimeInterval = 0) -> Reading {
         Reading(five: Meter(pct: five, resetsAt: now + 5 * hour),
@@ -45,6 +45,33 @@ import Testing
         #expect(BarText.percent.text(Logic.evaluate(main: accounts.selectedClaude, now: now), cutscene: false, now: now) == "72%")
         accounts.select(.claude(alpha))
         #expect(BarText.percent.text(Logic.evaluate(main: accounts.selectedClaude, now: now), cutscene: false, now: now) == "24%")
+    }
+
+    @Test func aLoginChangeResetsAnEarlierPickerChoice() {
+        var accounts = AccountReadings()
+        accounts.syncLogin(alpha)
+        accounts.takeClaude(reading(alpha, five: 24, week: 31))
+        accounts.takeClaude(reading(beta, five: 72, week: 48, at: 60))
+        accounts.select(.claude(alpha))
+
+        accounts.syncLogin(beta)
+
+        #expect(accounts.selected == .claude(beta))
+        #expect(accounts.selectedClaude?.week?.pct == 48)
+    }
+
+    @Test func pickerChoiceAfterLoginSticksUntilTheNextLoginChange() {
+        var accounts = AccountReadings()
+        accounts.takeClaude(reading(alpha, five: 24, week: 31))
+        accounts.takeClaude(reading(beta, five: 72, week: 48, at: 60))
+        accounts.syncLogin(beta)
+        accounts.select(.claude(alpha))
+
+        accounts.syncLogin(beta)
+        #expect(accounts.selected == .claude(alpha))
+
+        accounts.syncLogin(gamma)
+        #expect(accounts.selected == .claude(gamma))
     }
 
     @Test func sessionsOfTheSameAccountMergeWithoutAccountInference() {

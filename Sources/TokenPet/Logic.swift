@@ -258,14 +258,17 @@ struct ReadingStore: Equatable, Codable {
     }
 }
 
-/// The account picker intentionally has one rule: keep the key the user saved; until there is
-/// one, select the first *identified* Claude reading. An unknown bridge reading is a separate
-/// row and never becomes selection evidence.
+/// The account picker follows the currently logged-in Claude account. A user choice stays put
+/// until the next login change. An unknown bridge reading is a separate row and never becomes
+/// selection evidence.
 struct AccountReadings: Equatable, Codable {
     static let staleAfter: TimeInterval = 30 * 86400
 
     private var store = ReadingStore()
     private(set) var selected: AccountKey?
+    /// The last account observed in ~/.claude.json. A different login is stronger evidence than
+    /// an older picker choice, but the picker remains in charge until the next login change.
+    private var loggedIn: String?
 
     init() {}
 
@@ -284,6 +287,14 @@ struct AccountReadings: Equatable, Codable {
         let key = AccountKey.claude(reading.account)
         store[key] = Self.merge(store[key], reading)
         if selected == nil && key.isClaude { selected = key }
+    }
+
+    /// One account rule: a newly observed Claude login selects that account. An explicit picker
+    /// choice made afterwards stays put because the same login is a no-op.
+    mutating func syncLogin(_ account: String?) {
+        guard let account, account != loggedIn else { return }
+        loggedIn = account
+        selected = .claude(account)
     }
 
     mutating func takeCodex(_ reading: Reading?) { store[.local] = reading }
