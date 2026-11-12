@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 (2026-11-12)
+
+### Fixed
+- After a Claude Code login change, Grandpa follows the newly signed-in account. Choosing another
+  account in the picker stays in effect until the next login change.
+- Claude Code에서 로그인 계정이 바뀌면 할아버지가 새로 로그인한 계정을 바로 봅니다. 계정 목록에서
+  다른 계정을 고르면 다음 로그인 변경 전까지 그 선택을 유지합니다.
+
 ## 0.3.0 (2026-11-12)
 
 ### Changed
