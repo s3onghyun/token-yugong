@@ -5,9 +5,9 @@
 # $TOKENPET_DIR/limits.json. No prompts, paths, session ids, or credentials are stored,
 # and nothing goes over the network. To tell Claude accounts apart, it adds a short SHA-256 hash of
 # the signed-in account's id (oauthAccount.accountUuid in .claude.json); the id itself is never stored.
-# A status-line session is pinned to that hash on its first reply.  This matters after /login: an old
-# Claude Code session can redraw its old numbers, but it must not be relabelled as the newly signed-in account.
-# Only SHA-256 hashes of the session id and account id are kept locally in $TOKENPET_DIR/sessions/.
+# Each write uses that current hash. After /login, an old session can redraw the exact limits it had
+# before the switch; that unchanged redraw is ignored instead of being labelled as the new account.
+# Only SHA-256 hashes of session ids, account ids and rate-limit payloads are kept in $TOKENPET_DIR/sessions/.
 # `--chain '<command>'` keeps a status line you already had: it gets the same JSON and its output is shown.
 dir="${TOKENPET_DIR:-$HOME/.claude/token-pet}"
 cfg="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
@@ -45,29 +45,29 @@ else
 fi
 account=""
 [ -n "$uuid" ] && account=$(printf '%s' "$uuid" | /usr/bin/shasum -a 256 | /usr/bin/cut -c1-12)
-# `oauthAccount` is global to Claude Code, not to the session which produced this payload.  Remember
-# which account a status-line session first belonged to, using hashes only, so an old session's redraw
-# remains an old-account reading after /login.
-if [ -n "$sid" ]; then
+write_reading=1
+# `oauthAccount` is global to Claude Code, not to the session which produced this payload.  A session
+# that reports the same limits after the login changed is therefore an old redraw, not a reading for
+# the new account. Keep its previous account and a hash of its limits only long enough to reject that
+# unchanged redraw. A changed response is a fresh reading and is tagged with the current account.
+if [ -n "$sid" ] && [ -n "$rl" ] && [ "$rl" != "null" ]; then
   session_hash=$(printf '%s' "$sid" | /usr/bin/shasum -a 256 | /usr/bin/cut -c1-24)
   session_dir="$dir/sessions"
   session_file="$session_dir/$session_hash"
+  limits_hash=$(printf '%s' "$rl" | /usr/bin/shasum -a 256 | /usr/bin/cut -c1-64)
   if [ -f "$session_file" ]; then
-    mapped_account=$(/bin/cat "$session_file" 2>/dev/null)
-    case "$mapped_account" in
-      ???????????? )
-        case "$mapped_account" in
-          *[!0123456789abcdef]* ) ;;
-          * ) account="$mapped_account" ;;
-        esac
-        ;;
-    esac
-  elif [ -n "$account" ]; then
+    previous_account=$(/usr/bin/sed -n '1p' "$session_file" 2>/dev/null)
+    previous_limits=$(/usr/bin/sed -n '2p' "$session_file" 2>/dev/null)
+    if [ -n "$account" ] && [ "$previous_account" != "$account" ] && [ "$previous_limits" = "$limits_hash" ]; then
+      write_reading=0
+    fi
+  fi
+  if [ "$write_reading" = 1 ] && [ -n "$account" ]; then
     (umask 077; mkdir -p "$session_dir" && /bin/chmod 700 "$session_dir" &&
-      printf '%s\n' "$account" > "$session_file.tmp.$$" && mv "$session_file.tmp.$$" "$session_file") 2>/dev/null
+      printf '%s\n%s\n' "$account" "$limits_hash" > "$session_file.tmp.$$" && mv "$session_file.tmp.$$" "$session_file") 2>/dev/null
   fi
 fi
-if [ -n "$rl" ] && [ "$rl" != "null" ]; then
+if [ "$write_reading" = 1 ] && [ -n "$rl" ] && [ "$rl" != "null" ]; then
   mkdir -p "$dir"
   printf '{"captured_at":%s,%s"rate_limits":%s}\n' "$(date +%s)" "${account:+\"account\":\"$account\",}" "$rl" > "$dir/limits.json.tmp" &&
     mv "$dir/limits.json.tmp" "$dir/limits.json"
