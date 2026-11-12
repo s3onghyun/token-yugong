@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 (2026-11-12)
+
+### Changed
+- Claude readings are saved separately for each account. Choose the account Grandpa watches from the
+  account list; old accounts stay there until you remove them.
+- Claude 계정별 읽기를 따로 저장합니다. 계정 목록에서 할아버지가 볼 계정을 고를 수 있고,
+  예전 계정은 직접 지울 때까지 목록에 남아 있습니다.
+
+### Fixed
+- Switching Claude accounts while sessions are still open now finds the new account's next response.
+  An unchanged redraw from before the switch is ignored instead of keeping the old account forever.
+- Claude 계정을 바꾼 뒤에도 열려 있던 세션이 새 계정의 다음 응답을 가로막지 않습니다.
+  전환 전과 같은 다시 그리기는 무시하고, 예전 계정에 계속 묶어 두지 않습니다.
+
 ## 0.2.10 (2026-11-10)
 
 ### Fixed
