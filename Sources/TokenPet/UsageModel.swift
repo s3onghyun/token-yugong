@@ -90,14 +90,9 @@ enum ReadingLog {
         return "5h=\(m(r.five, "HH:mm")) week=\(m(r.week, "MM-dd HH:mm"))"
     }
 
-    static func line(read r: Reading, decision: String, shown: Reading?, accounts a: ClaudeReadingAdapter) -> String {
+    static func line(read r: Reading, decision: String, shown: Reading?, selected: AccountKey?) -> String {
         "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) captured=\(stamp(r.at, "HH:mm:ss")) account=\(r.account ?? "-") "
-            + "\(describe(r)) -> \(decision) current=\(a.letter.map { "\($0):\(a.id ?? "")" } ?? "unnamed") shown: \(describe(shown))"
-    }
-
-    static func line(read r: Reading, decision: String, shown: Reading?, accounts a: Accounts) -> String {
-        "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) captured=\(stamp(r.at, "HH:mm:ss")) account=\(r.account ?? "-") "
-            + "\(describe(r)) -> \(decision) current=\(a.letter.map { "\($0):\(a.id ?? "")" } ?? "unnamed") shown: \(describe(shown))"
+            + "\(describe(r)) -> \(decision) selected=\(selected?.value ?? "none") shown: \(describe(shown))"
     }
 
     private static func stamp(_ d: Date, _ format: String) -> String {
@@ -215,39 +210,32 @@ struct MountainLedger {
     }
 }
 
-/// Which Claude account is current and its numbers, saved so a restart still ignores the old account's
-/// sessions. Only reset times, percentages and the bridge's hashed account ids: no name, no raw id.
-extension Accounts {
-    static func load(_ d: UserDefaults = Prefs.store) -> Accounts {
-        d.data(forKey: "claude.account").flatMap { try? JSONDecoder().decode(Accounts.self, from: $0) } ?? Accounts()
-    }
-
-    func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.account") }
+private struct LegacyAccountState: Decodable {
+    let reading: Reading?
+    let id: String?
 }
 
-/// Phase-1 persistence remains readable for migration and its focused regression tests. The live
-/// model writes `AccountReadings` below; deleting this compatibility boundary is phase 3 work.
-extension ClaudeReadingAdapter {
-    static func load(_ d: UserDefaults = Prefs.store) -> ClaudeReadingAdapter {
-        if let data = d.data(forKey: "claude.readings"), let saved = try? JSONDecoder().decode(ClaudeReadingAdapter.self, from: data) {
-            return saved
-        }
-        return ClaudeReadingAdapter(legacy: Accounts.load(d))
-    }
-
-    func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.readings") }
+/// Reads only the persisted snapshot from releases before the keyed store. It deliberately does
+/// not retain their account-switch inference: a later bridge write supplies the authoritative key.
+private struct LegacyReadingState: Decodable {
+    let legacy: LegacyAccountState?
+    let store: ReadingStore?
 }
 
 extension AccountReadings {
     static func load(_ d: UserDefaults = Prefs.store) -> AccountReadings {
-        guard let data = d.data(forKey: "claude.readings") else { return AccountReadings(legacy: Accounts.load(d)) }
-        // Phase 1 saved `legacy` alongside its keyed cache. Preserve every cached key while
-        // migrating; phase 3 can remove that compatibility type after this version has shipped.
-        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["legacy"] != nil,
-           let old = try? JSONDecoder().decode(ClaudeReadingAdapter.self, from: data) {
-            return AccountReadings(legacy: old)
+        if let data = d.data(forKey: "claude.readings") {
+            if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["legacy"] != nil,
+               let old = try? JSONDecoder().decode(LegacyReadingState.self, from: data) {
+                return AccountReadings(migrating: old.store ?? ReadingStore(), selected: nil,
+                                       reading: old.legacy?.reading, account: old.legacy?.id)
+            }
+            if let current = try? JSONDecoder().decode(AccountReadings.self, from: data) { return current }
         }
-        return (try? JSONDecoder().decode(AccountReadings.self, from: data)) ?? AccountReadings(legacy: Accounts.load(d))
+        if let data = d.data(forKey: "claude.account"), let old = try? JSONDecoder().decode(LegacyAccountState.self, from: data) {
+            return AccountReadings(migrating: ReadingStore(), selected: nil, reading: old.reading, account: old.id)
+        }
+        return AccountReadings()
     }
 
     func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.readings") }
@@ -459,7 +447,7 @@ final class UsageModel: ObservableObject {
         if b != lastLogged {
             lastLogged = b
             ReadingLog.append(ReadingLog.line(read: b, decision: "stored", shown: accountReadings.selectedClaude,
-                                               accounts: Accounts()))
+                                               selected: accountReadings.selected))
         }
     }
     private var lastLogged: Reading?

@@ -67,9 +67,10 @@ default). A used-up **weekly** limit is a long rest: a full moon instead of the 
 
 ### Accounts
 
-The bridge names a Claude account with a 12-character SHA-256 hash of its
-`oauthAccount.accountUuid`. That hash is pinned to a Claude session's first reply, so an old
-session that redraws after `/login` keeps its old key. Raw account and session ids are never saved.
+The bridge names every Claude reading with a 12-character SHA-256 hash of the account currently in
+`~/.claude.json` when it writes. After `/login`, a session whose `rate_limits` are unchanged from
+before the switch is an old redraw and is ignored; a changed response or a session begun after the
+login is stored under the current hash. Raw account and session ids are never saved.
 
 Each keyed Claude reading is merged only with the reading under the same key. The picker keeps the
 key explicitly selected by the user; with no saved selection, the first identified Claude key is
@@ -80,6 +81,7 @@ restart. Codex is one `local` row, not an account-registration flow.
 | When | Then |
 |---|---|
 | A reading has an identified Claude hash | Store and update only `claude:<hash>`; it never changes another key's reading |
+| `/login` while sessions remain open | Ignore each unchanged pre-login redraw; the first fresh response is stored under the new hash |
 | A reading has no account hash | Store it as `claude:unknown`, shown as "확인되지 않은 Claude 읽기"; it is never selected automatically |
 | A user chooses a row | Save that key and show its 5-hour/weekly limits immediately |
 | A Claude rejection log has no account key | Do not apply it to the selected row; show "한도 거절을 계정에 귀속할 수 없음" |

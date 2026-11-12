@@ -181,21 +181,17 @@ enum Limits {
     /// The status-line reading with the logged limit hits on top: a hit fills its window to 100% until
     /// it resets, unless Claude answered again after it (another account, extra usage) or the reading
     /// already shows a later window. Hits that reset more than `Logic.morningFor` ago are over.
-    /// After an account switch (`Accounts`), the old account's hits are not the new one's: those logged
-    /// before it, and later ones the newer reading shows as another window or (no such window) not at all.
-    static func apply(_ hits: [Hit], to reading: Reading?, lastAnswer: Date?, now: Date, switchedAt: Date? = nil) -> Reading? {
+    static func apply(_ hits: [Hit], to reading: Reading?, lastAnswer: Date?, now: Date) -> Reading? {
         var r = reading
-        for h in hits where h.resetsAt > now.addingTimeInterval(-Logic.morningFor) && (lastAnswer.map { $0 <= h.time } ?? true)
-                            && (switchedAt.map { $0 < h.time } ?? true) {
+        for h in hits where h.resetsAt > now.addingTimeInterval(-Logic.morningFor) && (lastAnswer.map { $0 <= h.time } ?? true) {
             var x = r ?? Reading(five: nil, week: nil, at: h.time)
             let old = h.week ? x.week : x.five
             if let o = old?.resetsAt, o > h.resetsAt.addingTimeInterval(60) { continue }   // a newer window
             if let rd = reading {
-                // another account's hit: the reading shows another window that has not reset (since a switch;
-                // before one, only a reading taken after the hit tells), or after a switch no such window
+                // A reading after the refusal that shows another window is newer evidence.
                 let shown = h.week ? rd.week : rd.five
-                let other = shown?.resetsAt.map { !Accounts.same($0, h.resetsAt) && (switchedAt != nil ? $0 > now : rd.at > h.time) } ?? false
-                if other || (shown?.resetsAt == nil && switchedAt != nil) { continue }   // none, or one that reset and is empty
+                let other = shown?.resetsAt.map { abs($0.timeIntervalSince(h.resetsAt)) > 60 && rd.at > h.time } ?? false
+                if other { continue }
             }
             let full = Meter(pct: 100, resetsAt: h.resetsAt)
             if h.week { x.week = full } else { x.five = full }
@@ -208,124 +204,6 @@ enum Limits {
     static let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
     }()
-}
-
-/// Which Claude account the bridge readings belong to (LOGIC.md "Another account"). Every Claude Code
-/// session writes the one bridge file. After a /login the sessions use the new account, but an idle one
-/// keeps the numbers of its last answer, from the old account, and writes them again whenever its
-/// status line redraws. The bridge names the signed-in account (a hash); its numbers are told apart by
-/// each account's weekly reset time. Older bridges name no account: then the weekly reset alone decides.
-/// One account's sessions are merged window by window.
-struct Accounts: Equatable, Codable {
-    static let quiet: TimeInterval = 30 * 60   // the current account silent this long: the other one is back in use
-    var week: Date?          // the current account's weekly reset
-    var previous: Date?      // the account switched away from
-    var switchedAt: Date?
-    var seen: Date?          // the current account's newest reading
-    var reading: Reading?    // its windows, merged
-    var id: String?          // the signed-in account, as the bridge names it
-    var weeks: [String: Date]? = nil   // each named account's weekly reset
-    var ids: [String]? = nil           // named accounts in the order first seen: A, B, ...
-
-    /// nil = an old account's reading and nothing of the current one since the app started.
-    mutating func take(_ r: Reading) -> Reading? {
-        if let t = r.account { return take(r, signedIn: t) }
-        if let w = r.week?.resetsAt {
-            if let cur = week, !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
-                // An older bridge can have no account hash. Its weekly-only payload is still
-                // useful evidence: if a previous switch left no current reading, show it rather
-                // than remaining permanently in the "don't know" state.
-                if let p = previous, Self.same(w, p), let s = seen, r.at.timeIntervalSince(s) < Self.quiet,
-                   let reading { return reading }
-                previous = cur; switchedAt = r.at; reading = nil
-            }
-            week = w
-        }
-        return add(r)
-    }
-
-    /// The account in `~/.claude.json` is newer evidence than a status-line session.  A session
-    /// created before `/login` keeps writing its old account's numbers, so never let that tagged
-    /// payload replace the account currently signed in on this Mac.  Until a matching session
-    /// replies, clear the old numbers rather than presenting them as the new account's usage.
-    mutating func take(_ r: Reading, expectedAccount: String?) -> Reading? {
-        guard let expectedAccount else { return take(r) }
-        guard r.account == expectedAccount else {
-            expect(expectedAccount, at: r.at)
-            return reading
-        }
-        return take(r)
-    }
-
-    /// Select the account known from the local Claude login, with no claimed usage until its own
-    /// status-line session replies.  `id` and `ids` are hashes only.
-    mutating func expect(_ account: String, at: Date) {
-        guard account != id else { return }
-        if id != nil { previous = week; switchedAt = at }
-        id = account; week = (weeks ?? [:])[account]; reading = nil; seen = nil
-        if !(ids ?? []).contains(account) { ids = (ids ?? []) + [account] }
-    }
-
-    /// A reading from a bridge that names the signed-in account `t`.
-    private mutating func take(_ r: Reading, signedIn t: String) -> Reading? {
-        var known = weeks ?? [:]
-        let remainsCurrent = t == id
-        if t != id {   // a /login (or the first named reading: the account is not new, only its name)
-            if id != nil { previous = week; switchedAt = r.at }
-            id = t; week = known[t]; reading = nil; seen = nil
-            if !(ids ?? []).contains(t) { ids = (ids ?? []) + [t] }
-        }
-        if let w = r.week?.resetsAt {
-            // another account's week: an idle session still holding that account's numbers
-            // Different accounts may legitimately share a weekly reset. Recover a known
-            // current account only when it has no reading at all; otherwise the matching
-            // reset is still the idle old-session redraw that must be ignored.
-            let recoverCurrent = remainsCurrent && reading == nil
-            if !recoverCurrent, known.contains(where: { $0.key != t && Self.same($0.value, w) }) { return reading }
-            if !recoverCurrent, let cur = known[t], !Self.same(w, cur), !Self.next(w, after: cur, at: r.at) {
-                // a week never seen for any account: numbers from before this app knew it, unless this one went quiet
-                if let s = seen, r.at.timeIntervalSince(s) < Self.quiet { return reading }
-                reading = nil
-            }
-            known[t] = w; weeks = known; week = w
-        }
-        return add(r)
-    }
-
-    private mutating func add(_ r: Reading) -> Reading? {
-        reading = Self.merge(reading, r)
-        seen = max(seen ?? r.at, r.at)
-        return reading
-    }
-
-    /// "A", "B", ... for a named account; nil for an unnamed one (an older bridge).
-    var letter: String? {
-        guard let id, let i = ids?.firstIndex(of: id) else { return nil }
-        return i < 26 ? String(UnicodeScalar(65 + i)!) : "#\(i + 1)"
-    }
-
-    /// A `/login` was seen, but its first status-line redraw belonged to an already-known account.
-    /// Wait for a reply from the newly signed-in account instead of showing that old payload as new.
-    var awaitingReading: Bool { id != nil && reading == nil }
-
-    static func same(_ a: Date, _ b: Date) -> Bool { abs(a.timeIntervalSince(b)) <= 60 }
-    /// `w` is the week after `cur`: `cur` has passed (as of `at`) and `w` is later.
-    static func next(_ w: Date, after cur: Date, at: Date) -> Bool { cur <= at && w > cur }
-
-    /// `n` is the newer reading. A window it lacks is kept while it has not reset; within one window the percent only grows.
-    /// A window that has reset and that `n` lacks stays as a new, empty one: Claude Code drops a window from the status
-    /// line once it resets, which does not make it an account without that window.
-    static func merge(_ o: Reading?, _ n: Reading) -> Reading {
-        guard let o else { return n }
-        func window(_ a: Meter?, _ b: Meter?) -> Meter? {
-            guard let a else { return b }
-            guard let ra = a.resetsAt, ra > n.at else { return b ?? Meter(pct: 0, resetsAt: nil) }
-            guard let b else { return a }
-            guard let rb = b.resetsAt, same(ra, rb) else { return b }
-            return Meter(pct: max(a.pct, b.pct), resetsAt: rb)
-        }
-        return Reading(five: window(o.five, n.five), week: window(o.week, n.week), at: max(o.at, n.at), month: n.month, account: n.account)
-    }
 }
 
 /// A stable identity supplied by a local reader. Claude supplies a hashed bridge id; Codex has
@@ -391,24 +269,20 @@ struct AccountReadings: Equatable, Codable {
 
     init() {}
 
-    init(legacy: ClaudeReadingAdapter) {
-        store = legacy.storedReadings
-        store.migrateLegacyUnknownKey()
-        let key = AccountKey.claude(legacy.id)
-        if key.isClaude, store[key] != nil { selected = key }
-    }
-
-    init(legacy: Accounts) {
-        if let reading = legacy.reading {
-            let key = AccountKey.claude(legacy.id)
-            store[key] = reading
-            if key.isClaude { selected = key }
+    init(migrating store: ReadingStore, selected: AccountKey?, reading: Reading?, account: String?) {
+        self.store = store
+        self.store.migrateLegacyUnknownKey()
+        if let selected, selected.isClaude, self.store[selected] != nil { self.selected = selected }
+        else if let reading {
+            let key = AccountKey.claude(account)
+            self.store[key] = reading
+            if key.isClaude { self.selected = key }
         }
     }
 
     mutating func takeClaude(_ reading: Reading) {
         let key = AccountKey.claude(reading.account)
-        store[key] = Accounts.merge(store[key], reading)
+        store[key] = Self.merge(store[key], reading)
         if selected == nil && key.isClaude { selected = key }
     }
 
@@ -439,6 +313,21 @@ struct AccountReadings: Equatable, Codable {
                               stale: now.timeIntervalSince(reading.at) >= Self.staleAfter)
         }
     }
+
+    /// Two current sessions of the same account can redraw different windows. Keep a still-live
+    /// window and the highest percentage in that window; a reset makes an omitted window empty.
+    static func merge(_ old: Reading?, _ incoming: Reading) -> Reading {
+        guard let old else { return incoming }
+        let incomingReading = incoming
+        func window(_ old: Meter?, _ incoming: Meter?) -> Meter? {
+            guard let old else { return incoming }
+            guard let oldReset = old.resetsAt, oldReset > incomingReading.at else { return incoming ?? Meter(pct: 0, resetsAt: nil) }
+            guard let incoming else { return old }
+            guard let newReset = incoming.resetsAt, abs(oldReset.timeIntervalSince(newReset)) <= 60 else { return incoming }
+            return Meter(pct: max(old.pct, incoming.pct), resetsAt: newReset)
+        }
+        return Reading(five: window(old.five, incoming.five), week: window(old.week, incoming.week), at: max(old.at, incoming.at), month: incoming.month, account: incoming.account)
+    }
 }
 
 struct AccountRow: Identifiable, Equatable {
@@ -457,44 +346,6 @@ enum ClaudeLimitHits {
                       lastAnswer: Date?, now: Date) -> Reading? {
         guard hitAccount != nil, hitAccount == selected else { return reading }
         return Limits.apply(hits, to: reading, lastAnswer: lastAnswer, now: now)
-    }
-}
-
-/// Compatibility boundary for the current screen. `Accounts` remains the authority for choosing
-/// the one reading that legacy Yugong displayed; the selected result is also written by key for
-/// the simpler account-store model that follows.
-struct ClaudeReadingAdapter: Equatable, Codable {
-    private var legacy: Accounts
-    private var store: ReadingStore
-
-    init(legacy: Accounts = Accounts(), store: ReadingStore = ReadingStore()) {
-        self.legacy = legacy
-        self.store = store
-        saveCurrent()
-    }
-
-    mutating func take(_ reading: Reading, expectedAccount: String?) -> Reading? {
-        _ = legacy.take(reading, expectedAccount: expectedAccount)
-        saveCurrent()
-        return current
-    }
-
-    mutating func expect(_ account: String, at: Date) {
-        legacy.expect(account, at: at)
-        saveCurrent()
-    }
-
-    var current: Reading? { store[AccountKey.claude(legacy.id)] }
-    var switchedAt: Date? { legacy.switchedAt }
-    var letter: String? { legacy.letter }
-    var id: String? { legacy.id }
-    var seen: Date? { legacy.seen }
-    var awaitingReading: Bool { legacy.awaitingReading }
-    var storedReadings: ReadingStore { store }
-
-    private mutating func saveCurrent() {
-        guard let reading = legacy.reading else { return }
-        store[AccountKey.claude(legacy.id)] = reading
     }
 }
 

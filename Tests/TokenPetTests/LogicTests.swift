@@ -443,7 +443,7 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         #expect(try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8) == saved)   // kept, not wiped
     }
 
-    @Test func bridgePinsAStatusLineSessionToItsFirstAccount() throws {
+    @Test func bridgeTagsTheCurrentLoginAndDropsAnUnchangedPreLoginRedraw() throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
         let config = dir.appendingPathComponent("config")
         try FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)
@@ -458,15 +458,23 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         }
         let oldID = "old-account-id", newID = "new-account-id"
         let old = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":37,"resets_at":1794164400}}}"#, accountID: oldID)
-        // `/login` changes the global config. An old session redraw must retain its first account hash.
-        let oldRedraw = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":38,"resets_at":1794164400}}}"#, accountID: newID)
+        // `/login` changes the global config while this session is idle. Its unchanged redraw is
+        // not a reading for the new account, so it cannot replace the displayed fresh response.
+        let oldRedraw = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":37,"resets_at":1794164400}}}"#, accountID: newID)
         let fresh = try run(#"{"session_id":"new-session","rate_limits":{"seven_day":{"used_percentage":57,"resets_at":1794164400}}}"#, accountID: newID)
-        #expect(old.account != nil && oldRedraw.account == old.account && fresh.account != old.account)
+        let idleAfterFresh = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":37,"resets_at":1794164400}}}"#, accountID: newID)
+        #expect(old.account != nil && oldRedraw == old && fresh.account != old.account && idleAfterFresh == fresh)
+        var accounts = AccountReadings()
+        accounts.takeClaude(old)
+        accounts.takeClaude(fresh) // the proven path: a session begun after /login is current
+        accounts.select(.claude(fresh.account))
+        #expect(accounts.selectedClaude?.week?.pct == 57)
         let stored = try FileManager.default.contentsOfDirectory(at: dir.appendingPathComponent("sessions"), includingPropertiesForKeys: nil)
         #expect(stored.count == 2)
         for u in stored {
             let text = try String(contentsOf: u, encoding: .utf8)
-            #expect(!u.lastPathComponent.contains("session") && !text.contains(oldID) && !text.contains(newID))
+            #expect(!u.lastPathComponent.contains("session") && !text.contains(oldID) && !text.contains(newID)
+                && text.split(separator: "\n").count == 2)
         }
     }
 }
