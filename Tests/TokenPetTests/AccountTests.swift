@@ -74,13 +74,49 @@ import Testing
         #expect(accounts.selected == .claude(gamma))
     }
 
-    @Test func sessionsOfTheSameAccountMergeWithoutAccountInference() {
+    @Test func theNewerCaptureOfTheSameWindowWins() {
         var accounts = AccountReadings()
-        let first = reading(alpha, five: 24, week: 31)
-        accounts.takeClaude(first)
+        accounts.takeClaude(reading(alpha, five: 24, week: 31))
         accounts.takeClaude(reading(alpha, five: 19, week: 36, at: 60))
-        #expect(accounts.selectedClaude?.five?.pct == 24)
+        #expect(accounts.selectedClaude?.five?.pct == 19)
         #expect(accounts.selectedClaude?.week?.pct == 36)
+    }
+
+    @Test func aWeeklyResetWithTheSameResetTimeShowsZero() {
+        var accounts = AccountReadings()
+        accounts.takeClaude(reading(alpha, five: 40, week: 87))
+        accounts.takeClaude(reading(alpha, five: 0, week: 0, at: 600)) // reset mid-window; resets_at unchanged
+        #expect(accounts.selectedClaude?.week?.pct == 0)
+        #expect(BarText.percent.text(Logic.evaluate(main: accounts.selectedClaude, now: now + 600), cutscene: false, now: now + 600) == "0%")
+        accounts.takeClaude(reading(alpha, five: 1, week: 1, at: 660))  // and it keeps counting up from there
+        #expect(accounts.selectedClaude?.week?.pct == 1)
+    }
+
+    @Test func anOlderCaptureArrivingLaterDoesNotOverwriteANewerOne() {
+        var accounts = AccountReadings()
+        accounts.takeClaude(reading(alpha, five: 30, week: 50, at: 60))
+        accounts.takeClaude(reading(alpha, five: 20, week: 45))
+        #expect(accounts.selectedClaude?.five?.pct == 30)
+        #expect(accounts.selectedClaude?.week?.pct == 50)
+        #expect(accounts.selectedClaude?.at == now + 60)
+    }
+
+    @Test func aStaleSavedMaximumIsCorrectedByTheBridgeReadingItCameFrom() {
+        // 0.3.1 saved max(old, new) with the newest capture time, so the saved row can carry the
+        // bridge's own captured_at with an older, higher weekly percentage.
+        let suite = "TokenPetTests.stale-weekly-max"
+        let d = UserDefaults(suiteName: suite)!
+        d.removePersistentDomain(forName: suite)
+        let bridge = reading(alpha, five: 0, week: 0, at: 600)
+        var stale = bridge
+        stale.week?.pct = 87
+        var saved = AccountReadings()
+        saved.takeClaude(stale)
+        saved.save(d)
+        var accounts = AccountReadings.load(d)
+        accounts.takeClaude(bridge)
+        #expect(accounts.selectedClaude?.week?.pct == 0)
+        d.removePersistentDomain(forName: suite)
     }
 
     @Test func unknownClaudeIsSeparateAndNeverAutoSelected() {
