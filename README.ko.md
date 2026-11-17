@@ -1,7 +1,7 @@
 <h1 align="center">Token Yugong 愚公 (토큰 우공)</h1>
 
-<p align="center"><b>우공 할아버지가 토큰 한 삽씩 산을 옮깁니다.</b><br>
-Claude Code와 Codex 사용 한도를 보여 주는 픽셀 아트 메뉴바 펫:
+<p align="center"><b>Claude Code와 Codex 사용 한도를 macOS 메뉴바에서 한눈에 봅니다.</b><br>
+픽셀 아트 메뉴바 펫: 우공 할아버지가 토큰 한 삽씩 산을 옮깁니다.
 5시간 한도만큼 지게가 차고, 다 쓰면 낮잠을 자고, 쓴 토큰만큼 산이 깎입니다.</p>
 
 <p align="center">
