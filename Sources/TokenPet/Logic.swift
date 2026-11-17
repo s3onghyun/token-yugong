@@ -326,16 +326,16 @@ struct AccountReadings: Equatable, Codable {
     }
 
     /// Two current sessions of the same account can redraw different windows. Keep a still-live
-    /// window and the highest percentage in that window; a reset makes an omitted window empty.
+    /// window the newer capture omits; a reset makes an omitted window empty. Within a window the
+    /// newer capture wins, even when it is lower: a limit can be reset before its `resets_at`.
     static func merge(_ old: Reading?, _ incoming: Reading) -> Reading {
         guard let old else { return incoming }
-        let incomingReading = incoming
+        let oldReading = old, incomingReading = incoming
         func window(_ old: Meter?, _ incoming: Meter?) -> Meter? {
             guard let old else { return incoming }
             guard let oldReset = old.resetsAt, oldReset > incomingReading.at else { return incoming ?? Meter(pct: 0, resetsAt: nil) }
             guard let incoming else { return old }
-            guard let newReset = incoming.resetsAt, abs(oldReset.timeIntervalSince(newReset)) <= 60 else { return incoming }
-            return Meter(pct: max(old.pct, incoming.pct), resetsAt: newReset)
+            return incomingReading.at >= oldReading.at ? incoming : old
         }
         return Reading(five: window(old.five, incoming.five), week: window(old.week, incoming.week), at: max(old.at, incoming.at), month: incoming.month, account: incoming.account)
     }

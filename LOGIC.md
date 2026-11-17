@@ -81,6 +81,7 @@ Codex is one `local` row, not an account-registration flow.
 | When | Then |
 |---|---|
 | A reading has an identified Claude hash | Store and update only `claude:<hash>`; it never changes another key's reading |
+| Two readings under one key report the same window | The newer capture wins, even when it is lower: a limit can be reset before its reset time. An older capture read later changes nothing |
 | `/login` while sessions remain open | Ignore each unchanged pre-login redraw; the first fresh response is stored under the new hash |
 | The hash in `~/.claude.json` changes | Select `claude:<hash>`; an explicit picker choice can override it until the next login change |
 | A reading has no account hash | Store it as `claude:unknown`, shown as "확인되지 않은 Claude 읽기"; it is never selected automatically |
@@ -136,7 +137,7 @@ weekly limit itself runs out (row 3), and the popover says when it resets. It ne
 
 - Every rule compares absolute times (epoch seconds), so the time zone never changes a result.
   Only the printed clock times use this Mac's time zone (e.g. reset `1794164400` prints `월 04:00` in Seoul, `Sun 19:00` in UTC).
-- Old readings are shown as they were, with their capture time: usage can only have grown since, unless a reset passed (row 2).
+- Old readings are shown as they were, with their capture time: usage can only have grown since, unless a reset passed (row 2) or the limit was reset early.
 - A clock moved backwards changes nothing: readings stamped "in the future" still count, and smoothing ignores negative time.
 
 ## The mountain and the milestone

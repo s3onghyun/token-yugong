@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- After a Claude limit is reset early (its reset time unchanged), Grandpa shows the new, lower
+  percentage from the next status-line reading instead of keeping the old high one until the window
+  ends. A higher number saved by 0.3.1 is replaced by that reading too; an older reading read later
+  never overwrites a newer one.
+- Claude 한도가 예정보다 일찍 초기화되어도(초기화 시각은 그대로) 다음 상태 줄 읽기부터 새로 낮아진
+  사용량을 보여 줍니다. 창이 끝날 때까지 예전의 높은 값을 붙들지 않으며, 0.3.1이 저장해 둔 높은 값도
+  그 읽기로 바로잡힙니다. 나중에 읽힌 더 오래된 읽기는 새 읽기를 덮어쓰지 않습니다.
+
 ## 0.3.1 (2026-11-12)
 
 ### Fixed
