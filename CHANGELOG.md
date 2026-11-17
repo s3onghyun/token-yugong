@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.2 (2026-11-17)
 
 ### Fixed
 - After a Claude limit is reset early (its reset time unchanged), Grandpa shows the new, lower
