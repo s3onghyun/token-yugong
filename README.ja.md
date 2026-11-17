@@ -1,7 +1,7 @@
 <h1 align="center">Token Yugong 愚公</h1>
 
-<p align="center"><b>愚公じいさんが、トークンひとすくいずつ山を移します。</b><br>
-Claude Code と Codex の使用リミットを見せる、ドット絵のメニューバーペットです。
+<p align="center"><b>Claude Code と Codex の使用リミットを、macOS のメニューバーでひと目で確認できます。</b><br>
+ドット絵のメニューバーペットで、愚公じいさんがトークンひとすくいずつ山を移します。
 5時間リミットの分だけ背負子が埋まり、使い切ると昼寝して、使ったトークンの分だけ山が削れていきます。</p>
 
 <p align="center">

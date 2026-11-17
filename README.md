@@ -1,8 +1,8 @@
 <h1 align="center">Token Yugong 愚公</h1>
 
-<p align="center"><b>Grandpa Yugong moves a mountain one token at a time.</b><br>
-A pixel-art menu-bar pet for your Claude Code and Codex usage limits:
-his carrier fills with your 5-hour limit, he naps when it runs out, and the mountain wears down with every token.</p>
+<p align="center"><b>See your Claude Code and Codex usage limits at a glance in the macOS menu bar.</b><br>
+A pixel-art menu-bar pet: Grandpa Yugong moves a mountain one token at a time.
+His carrier fills with your 5-hour limit, he naps when it runs out, and the mountain wears down with every token.</p>
 
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a>

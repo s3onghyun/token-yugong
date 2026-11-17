@@ -1,7 +1,7 @@
 <h1 align="center">Token Yugong 愚公</h1>
 
-<p align="center"><b>愚公爷爷一个 token 一个 token 地移山。</b><br>
-一只像素风菜单栏宠物，帮你看着 Claude Code 和 Codex 的用量额度：背架随 5 小时额度慢慢装满，额度用完他就打盹，每用掉一个 token，山就矮一点。</p>
+<p align="center"><b>在 macOS 菜单栏一眼看清 Claude Code 和 Codex 的用量额度。</b><br>
+一只像素风菜单栏宠物：愚公爷爷一个 token 一个 token 地移山。背架随 5 小时额度慢慢装满，额度用完他就打盹，每用掉一个 token，山就矮一点。</p>
 
 <p align="center">
   <a href="README.md">English</a> · 简体中文 · <a href="README.ja.md">日本語</a> · <a href="README.ko.md">한국어</a>
