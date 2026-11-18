@@ -278,6 +278,8 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
 
 コントリビュートについては [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
+メニューからフィードバック：ポップオーバーの吹き出しボタン（またはミニウィンドウの右クリック）›「**フィードバックを送る…**」で、内容が入力済みの GitHub Issue がブラウザーで開きます。アプリ自身は何も送信しません。
+
 ## ライセンス
 
 - アプリのコード（`Package.swift`、`Sources/`、`bridge/`、`scripts/`、`Tests/`）：MIT。[LICENSE](LICENSE) を参照してください。

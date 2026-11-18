@@ -129,6 +129,7 @@ final class MiniView: NSView {
                                  "작은 창 숨기기",
                                  "ミニウィンドウを隠す",
                                  "隐藏小窗口"), action: #selector(hide), keyEquivalent: "").target = self
+        m.addItem(Feedback.submenu())
         m.addItem(withTitle: L.t("Quit", "종료", "終了", "退出"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         NSMenu.popUpContextMenu(m, with: event, for: self)
     }
