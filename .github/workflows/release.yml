@@ -55,12 +55,12 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then tag="$GITHUB_REF_NAME"; else tag="$TAG_INPUT"; fi
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Phase 1 needs a tag vX.Y.Z (got '${tag}')" >&2; exit 1; }
           { echo "tag=$tag"; echo "version=${tag#v}"; } >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ steps.tag.outputs.tag }}
           persist-credentials: false
       # The notarization script always comes from this workflow's commit: an older tag may predate it
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           path: .release-tools
@@ -166,7 +166,7 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then tag="$GITHUB_REF_NAME"; else tag="$TAG_INPUT"; fi
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Phase 1 needs a tag vX.Y.Z (got '${tag}')" >&2; exit 1; }
           { echo "tag=$tag"; echo "version=${tag#v}"; } >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ steps.tag.outputs.tag }}
           persist-credentials: false
@@ -229,7 +229,7 @@ jobs:
       version: ${{ steps.phase1.outputs.version }}
       commit: ${{ steps.submission.outputs.commit }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Find the phase-1 artifacts
@@ -325,7 +325,7 @@ jobs:
       VERSION: ${{ needs.notarized.outputs.version }}
       COMMIT: ${{ needs.notarized.outputs.commit }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/v${{ needs.notarized.outputs.version }}
           persist-credentials: false
