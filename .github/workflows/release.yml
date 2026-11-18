@@ -258,7 +258,7 @@ jobs:
             || fail "Run $RUN_ID has no token-yugong-linux-beta-$version artifact"
           { echo "signed=$signed"; echo "version=$version"; } >> "$GITHUB_OUTPUT"
           echo "Phase-1 run $RUN_ID: $signed"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ steps.phase1.outputs.signed }}
           path: dist/notary
@@ -329,11 +329,11 @@ jobs:
         with:
           ref: refs/tags/v${{ needs.notarized.outputs.version }}
           persist-credentials: false
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: token-yugong-notarized-${{ needs.notarized.outputs.version }}
           path: release-assets
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: token-yugong-linux-beta-${{ needs.notarized.outputs.version }}
           path: release-assets
