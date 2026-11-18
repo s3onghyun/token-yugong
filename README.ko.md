@@ -147,7 +147,7 @@ Code가 자기 세션 기록에 남기는 거절(`usage_limit_reached`, 구간�
 ```
 
 어느 쪽이든 브리지를 `~/.claude/token-pet/`에 넣고 `~/.claude/settings.json`의 `statusLine` 키만
-바꿉니다. 나머지 바이트는 그대로이고, 백업은 `~/.claude/token-pet/settings.json.<시각>.bak`에 남고,
+바꿉니다. 나머지 바이트는 그대로이고, 백업은 `~/.claude/token-pet/settings.json.<시각>.bak`에 남고(나만 읽을 수 있고, 최근 세 개만 둡니다),
 다시 실행해도 바뀌는 게 없고, 심볼릭 링크는 링크로 남습니다. 이미 쓰던 상태줄은 살려 둡니다:
 `sh ~/.claude/token-pet/statusline-bridge.sh --chain '<원래 명령>'`이 되어 같은 입력을 받고, 화면에는
 원래 출력이 그대로 나옵니다. `--undo`는 원래 명령을 돌려놓습니다. 이 Mac에 Claude Code가
@@ -222,8 +222,9 @@ macOS는 메뉴바에 자리가 없는 아이콘을 말없이 숨기거나 카�
 새 버전이 나오면 팝오버에 **업데이트**, **릴리스 페이지**, **이 버전 건너뛰기**가 있는 줄이 보이고,
 그 버전마다 알림이 한 번 옵니다. **업데이트**를 누르기 전에는 아무것도 내려받지 않습니다. 누르면
 `github.com/s3onghyun/token-yugong/releases/download/v<버전>/`에서 그 릴리스의 ZIP을 받아 임시 폴더에 풀고,
-같은 번들 ID의 Token Yugong인지, 정확히 그 버전인지, 서명이 유효한지(`codesign --verify`) 확인한 뒤 지금
-실행 중인 자리의 앱과 바꾸고 다시 엽니다. 중간에 실패하면 지금 앱은 그대로 남습니다. Homebrew로 설치했다면
+같은 번들 ID의 Token Yugong인지, 정확히 그 버전인지, 지금 앱과 같은 Developer ID 팀의 유효한 서명인지(`codesign --verify`),
+공증을 받았는지(`spctl --assess`) 확인한 뒤 지금 실행 중인 자리의 앱과 바꾸고 다시 엽니다. 직접 빌드한 앱(ad-hoc 서명)은
+서명만 확인합니다. 중간에 실패하면 지금 앱은 그대로 남습니다. Homebrew로 설치했다면
 대신 `brew upgrade --cask s3onghyun/tap/token-yugong`과 복사 버튼을 보여 줍니다(Homebrew 기록이 어긋나지
 않게). 앱을 바꿀 수 없는 위치(쓰기 권한이 없는 폴더)라면 릴리스 페이지에서 받아 [설치](#설치)처럼 바꿔 주세요. 설정 › *새 버전 확인 (하루 한 번)*으로 끄고, *지금 확인*으로 바로 묻습니다.
 

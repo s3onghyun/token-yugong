@@ -116,12 +116,45 @@ enum ClaudeConnect {
             var name = "settings.json.\(f.string(from: now)).bak", n = 1
             while fm.fileExists(atPath: backupDir.appendingPathComponent(name).path) { n += 1; name = "settings.json.\(f.string(from: now))-\(n).bak" }
             backup = backupDir.appendingPathComponent(name)
-            try old.write(to: backup!, options: .withoutOverwriting)
+            try writePrivate(old, to: backup!)
+            pruneBackups(in: backupDir, keeping: backup!)
         }
         let perms = (try? fm.attributesOfItem(atPath: target.path))?[.posixPermissions]
         try c.new.write(to: target, options: .atomic)
         if let perms { try fm.setAttributes([.posixPermissions: perms], ofItemAtPath: target.path) }
         return backup
+    }
+
+    /// How many settings.json backups stay in the folder.
+    static let keptBackups = 3
+
+    /// A backup of a config file is for its owner only: created new (never over a file or through a link), 0600.
+    static func writePrivate(_ data: Data, to url: URL) throws {
+        let fd = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard fd >= 0 else { throw CocoaError(errno == EEXIST ? .fileWriteFileExists : .fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path]) }
+        let h = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        guard fchmod(fd, 0o600) == 0 else { throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path]) }
+        try h.write(contentsOf: data)
+        try h.close()
+    }
+
+    /// Keeps the newest `keptBackups` settings.json backups (always `keeping`, the one just made) and removes the rest.
+    static func pruneBackups(in dir: URL, keeping: URL) {
+        let fm = FileManager.default, prefix = "settings.json.", suffix = ".bak"
+        // "settings.json.<yyyyMMdd-HHmmss>[-<n>].bak" -> its order: the time, then n (no -n is 1)
+        func order(_ name: String) -> (String, Int)? {
+            guard name.hasPrefix(prefix), name.hasSuffix(suffix) else { return nil }
+            let stamp = name.dropFirst(prefix.count).dropLast(suffix.count)
+            guard stamp.count >= 15, stamp.allSatisfy({ $0.isASCII && ($0.isNumber || $0 == "-") }) else { return nil }
+            let rest = stamp.dropFirst(15)
+            guard rest.isEmpty || rest.first == "-", let n = rest.isEmpty ? 1 : Int(rest.dropFirst()) else { return nil }
+            return (String(stamp.prefix(15)), n)
+        }
+        guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
+        let older = names.filter { $0 != keeping.lastPathComponent }
+            .compactMap { n in order(n).map { (n, $0) } }
+            .sorted { $0.1 > $1.1 }   // newest first
+        for (name, _) in older.dropFirst(keptBackups - 1) { try? fm.removeItem(at: dir.appendingPathComponent(name)) }
     }
 
     // MARK: - the command string

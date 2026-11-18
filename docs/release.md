@@ -7,7 +7,7 @@ it once Apple is done. Nothing is ever published without notarization.
 
 | Phase | When | What it does | Publishes |
 |---|---|---|---|
-| 1 (submit) | push of a `vX.Y.Z` tag, or a manual run with `-f tag=vX.Y.Z` | `macos`: test → universal build (`scripts/release-artifacts.sh`) → Developer ID signature → notarization submit, no waiting → keeps the signed zip, its `.sha256` and `submission.json` (submission id) as artifact `token-yugong-signed-X.Y.Z` for 90 days. `linux`: the Linux beta AppImage and `.deb` with their `.sha256` files as `token-yugong-linux-beta-X.Y.Z` for 90 days | nothing |
+| 1 (submit) | push of a `vX.Y.Z` tag, or a manual run with `-f tag=vX.Y.Z` | `macos`: test → universal build (`scripts/release-artifacts.sh`) → Developer ID signature → notarization submit, no waiting → keeps the signed zip, its `.sha256` and `submission.json` (submission id) as artifact `token-yugong-signed-X.Y.Z` for 90 days. `linux`: the Linux beta AppImage and `.deb` with their `.sha256` files and build provenance attestations, as `token-yugong-linux-beta-X.Y.Z` for 90 days | nothing |
 | 2 (publish) | manual run with `-f run_id=<phase-1 run id>`, after Apple says `Accepted` | `notarized`: downloads the signed artifact → checks its sha256 → `notarytool info` → staples the same app → `stapler validate` and `spctl` → `TokenYugong-X.Y.Z-macos-universal.zip` and `.sha256` → build provenance attestation. `release`: GitHub Release with the mac zip, the Linux beta assets, their checksums and notes from `CHANGELOG.md` | Release |
 
 While Apple is still `In Progress`, phase 2 fails and changes nothing; run the same command again later. The phase-1
@@ -86,7 +86,7 @@ app, so use this run's id for phase 2 and wait for its submission.
 2. Re-signs `build/TokenYugong.app` (ad-hoc from `scripts/bundle.sh`) with the Developer ID Application certificate of
    `APPLE_TEAM_ID`: `codesign --force --options runtime --timestamp`. Hardened runtime and a secure timestamp are what
    notarization requires. The signing identifier stays the bundle id `dev.yugongpet.app`. No entitlements are needed:
-   the app only reads files and runs `/usr/bin` tools (`ditto`, `codesign`, `/bin/sh`) as separate processes.
+   the app only reads files and runs system tools (`ditto`, `codesign`, `spctl`, `/bin/sh`) as separate processes.
 3. Zips the signed app to `dist/notary/TokenYugong-X.Y.Z-macos-universal-signed.zip` with a `.sha256` and submits that
    exact zip with `xcrun notarytool submit` (no `--wait`).
 4. Writes the submission id, version, zip name, zip sha256, built commit and time to `dist/notary/submission.json` and
@@ -146,8 +146,12 @@ problems are the usual ones). Fix them and tag a new patch version; never move a
 
 ## Notes on the first notarized release (0.3.3)
 
-- The in-app update from 0.3.2 and older works: it accepts a new app with the same bundle id, the offered version and
-  a valid signature (`Update.install`), and does not pin a signing team. Homebrew users get it with `brew upgrade`.
+- The in-app update from 0.3.2 and older works: those versions accept a new app with the same bundle id, the offered
+  version and a valid signature (`Update.install`), without pinning a signing team. Homebrew users get it with `brew upgrade`.
+- From 0.3.4 a Developer ID signed copy pins its own team: `Update.install` also requires the new app to satisfy
+  `anchor apple generic and certificate leaf[subject.OU] = "<the running app's TeamIdentifier>"` and to pass
+  `spctl --assess --type execute` (notarized). An ad-hoc build (no team) still checks the signature only. Every
+  release must therefore stay signed by the same team and notarized, or the in-app update refuses it.
 - The tap's cask caveat about "ad-hoc signed and not notarized" goes away with the 0.3.3 cask bump; the caveat about
   the `statusLine` entry stays.
 - A Developer ID certificate is valid for five years. Thanks to the secure timestamp, published releases keep opening

@@ -10,7 +10,7 @@ enum Fmt {
         return f.string(from: d)
     }
     static func until(_ d: Date, now: Date = Date()) -> String {
-        let m = max(0, Int(d.timeIntervalSince(now) / 60))
+        let m = max(0, Limits.whole(d.timeIntervalSince(now) / 60))
         if m >= 24 * 60 { return L.t("in \(m / 1440)d \((m % 1440) / 60)h",
                                      "\(m / 1440)일 \((m % 1440) / 60)시간 뒤",
                                      "\(m / 1440)日\((m % 1440) / 60)時間後",
@@ -23,7 +23,7 @@ enum Fmt {
     }
     /// "3m ago", "2h 5m ago": how old a reading is.
     static func ago(_ d: Date, now: Date = Date()) -> String {
-        let m = max(0, Int(now.timeIntervalSince(d) / 60))
+        let m = max(0, Limits.whole(now.timeIntervalSince(d) / 60))
         if m >= 60 { return L.t("\(m / 60)h \(m % 60)m ago", "\(m / 60)시간 \(m % 60)분 전", "\(m / 60)時間\(m % 60)分前", "\(m / 60)小时\(m % 60)分钟前") }
         return L.t("\(m)m ago", "\(m)분 전", "\(m)分前", "\(m)分钟前")
     }
@@ -31,7 +31,7 @@ enum Fmt {
     static func pct(_ p: Double) -> String { p >= 100 ? "100%" : "\(min(99, Int(p.rounded())))%" }
     /// Compact time left for the menu bar: "5d 2h", "3h 12m", "12m".
     static func left(_ d: Date, now: Date = Date()) -> String {
-        let m = max(0, Int(d.timeIntervalSince(now) / 60))
+        let m = max(0, Limits.whole(d.timeIntervalSince(now) / 60))
         if m >= 24 * 60 { return "\(m / 1440)d \((m % 1440) / 60)h" }
         if m >= 60 { return "\(m / 60)h \(m % 60)m" }
         return "\(m)m"

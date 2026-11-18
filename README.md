@@ -196,7 +196,7 @@ the window and reset time) to show 100% and let Grandpa rest.
 
 Either way it copies the bridge into `~/.claude/token-pet/` and changes only the `statusLine` key of
 `~/.claude/settings.json`: every other byte stays, a backup goes to
-`~/.claude/token-pet/settings.json.<time>.bak`, running it again changes nothing, and a symlinked
+`~/.claude/token-pet/settings.json.<time>.bak` (readable by you only; the newest three are kept), running it again changes nothing, and a symlinked
 file stays a symlink. A status line you already have is kept: it becomes
 `sh ~/.claude/token-pet/statusline-bridge.sh --chain '<your command>'`, so it gets the same input and
 what it prints is still what you see; `--undo` gives your command back. No Claude Code on this Mac
@@ -279,7 +279,9 @@ sent, and there is no telemetry. When a newer version is out, the popover shows 
 downloaded until you click **Update**: then the app fetches that release's ZIP from
 `github.com/s3onghyun/token-yugong/releases/download/v<version>/`, unzips it to a temporary folder,
 checks it is Token Yugong (same bundle id) at exactly that version with a valid signature
-(`codesign --verify`), swaps it in for the app where it runs and restarts. If anything fails, the
+(`codesign --verify`) from the same Developer ID team as the running app and notarized (`spctl --assess`),
+swaps it in for the app where it runs and restarts. A build you made yourself (ad-hoc signed) checks the
+signature only. If anything fails, the
 current app stays as it was. Installed with Homebrew, the row shows
 `brew upgrade --cask s3onghyun/tap/token-yugong` with a Copy button instead, so Homebrew's record stays
 right; where the app cannot be replaced (a folder you cannot write to), use the release page and

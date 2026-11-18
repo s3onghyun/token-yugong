@@ -163,6 +163,7 @@ import Testing
     }
 
     /// Macs before macOS 15 have no jq: the bridge falls back to plutil and saves the same thing.
+    /// The bridge looks for its tools in system folders only, so the test asks for the fallback.
     @Test func bridgeWorksWithoutJq() throws {
         let fm = FileManager.default
         let tmp = fm.temporaryDirectory.appendingPathComponent("tokenpet-nojq-\(UUID().uuidString)")
@@ -175,7 +176,7 @@ import Testing
         let script = try #require(StatusLineSetup.bundledBridge)
         func run(_ input: String) throws -> String {
             let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
-            p.environment = ["TOKENPET_DIR": out.path, "PATH": bin.path]
+            p.environment = ["TOKENPET_DIR": out.path, "PATH": bin.path, "TOKENPET_BRIDGE_NO_JQ": "1"]
             let i = Pipe(), o = Pipe(); p.standardInput = i; p.standardOutput = o
             try p.run(); i.fileHandleForWriting.write(Data(input.utf8)); try i.fileHandleForWriting.close(); p.waitUntilExit()
             return String(decoding: o.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)

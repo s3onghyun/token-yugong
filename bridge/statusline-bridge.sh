@@ -9,12 +9,16 @@
 # before the switch; that unchanged redraw is ignored instead of being labelled as the new account.
 # Only SHA-256 hashes of session ids, account ids and rate-limit payloads are kept in $TOKENPET_DIR/sessions/.
 # `--chain '<command>'` keeps a status line you already had: it gets the same JSON and its output is shown.
+# Our own tools come only from system and Homebrew folders, not from whatever PATH Claude Code passes in;
+# a chained status line still runs with that PATH. Session files older than 30 days are removed.
+caller_path=$PATH
+PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin; export PATH
 dir="${TOKENPET_DIR:-$HOME/.claude/token-pet}"
 cfg="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
 cfg="${cfg:-$HOME/.claude.json}"
 input=$(cat)
-# jq when installed (built into macOS 15+), otherwise plutil (every macOS)
-if command -v jq >/dev/null 2>&1; then
+# jq when installed (built into macOS 15+), otherwise plutil (every macOS); TOKENPET_BRIDGE_NO_JQ=1 picks plutil (tests)
+if [ -z "${TOKENPET_BRIDGE_NO_JQ:-}" ] && command -v jq >/dev/null 2>&1; then
   rl=$(printf '%s' "$input" | jq -c '.rate_limits // empty' 2>/dev/null)
   pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
   week=$(printf '%s' "$rl" | jq -r '.seven_day.used_percentage // empty' 2>/dev/null)
@@ -65,6 +69,7 @@ if [ -n "$sid" ] && [ -n "$rl" ] && [ "$rl" != "null" ]; then
   if [ "$write_reading" = 1 ] && [ -n "$account" ]; then
     (umask 077; mkdir -p "$session_dir" && /bin/chmod 700 "$session_dir" &&
       printf '%s\n%s\n' "$account" "$limits_hash" > "$session_file.tmp.$$" && mv "$session_file.tmp.$$" "$session_file") 2>/dev/null
+    /usr/bin/find "$session_dir" -type f -mtime +30 -exec /bin/rm -f {} + 2>/dev/null
   fi
 fi
 if [ "$write_reading" = 1 ] && [ -n "$rl" ] && [ "$rl" != "null" ]; then
@@ -73,7 +78,7 @@ if [ "$write_reading" = 1 ] && [ -n "$rl" ] && [ "$rl" != "null" ]; then
     mv "$dir/limits.json.tmp" "$dir/limits.json"
 fi
 if [ "$1" = "--chain" ] && [ -n "$2" ]; then
-  printf '%s' "$input" | sh -c "$2"
+  printf '%s' "$input" | PATH=$caller_path /bin/sh -c "$2"
   exit $?
 fi
 if [ -n "$pct" ]; then
