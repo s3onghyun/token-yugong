@@ -1,26 +1,77 @@
 name: Release
 
+# Two phases, so a notarization that takes Apple hours never throws away the signed app (docs/release.md).
+#   Phase 1 - a v* tag push, or a manual run with tag=<existing tag>:
+#     macos: test -> universal build -> Developer ID sign -> notarization submit (no waiting) -> keep the
+#            signed zip, its .sha256 and submission.json as a 90-day artifact.
+#     linux: the Linux beta AppImage and .deb with their .sha256 files, kept as an artifact.
+#     Nothing is published.
+#   Phase 2 - a manual run with run_id=<phase-1 run>, once Apple has accepted:
+#     notarized: download that run's signed zip, staple the same app, stapler validate, spctl, attest.
+#     release:   GitHub Release with the notarized mac zip, the Linux beta assets and their checksums.
+#     While Apple is still in progress, phase 2 fails and changes nothing (run the same command later).
+# Without the signing secrets, phase 1 still tests and builds the ad-hoc archive (kept 7 days) and says
+# "Notarization skipped"; phase 2 then finds no signed artifact and publishes nothing.
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Phase 2: the phase-1 run to publish (gh run list -R s3onghyun/token-yugong -w release.yml)'
+        type: string
+        default: ''
+      submission_id:
+        description: 'Phase 2, optional: notarization submission id (empty: the one in the phase-1 artifact)'
+        type: string
+        default: ''
+      tag:
+        description: 'Phase 1 again for an existing tag (e.g. v0.3.3). Not together with run_id'
+        type: string
+        default: ''
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  # ── Phase 1: build, sign, submit ────────────────────────────────────────────
   macos:
+    if: github.event_name == 'push' || inputs.run_id == ''
     runs-on: macos-15
+    timeout-minutes: 60
     env:
       # Keep the compiler and Testing.framework from the same full Xcode installation.
       DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
+      # Secrets cannot be used in if:, so pass only whether it is set (true/false, never the value)
+      HAS_SIGNING: ${{ secrets.APPLE_DEVELOPER_ID_P12 != '' }}
     steps:
+      # The input reaches the shell only as an environment variable and is format-checked
+      - name: Release tag
+        id: tag
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then tag="$GITHUB_REF_NAME"; else tag="$TAG_INPUT"; fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Phase 1 needs a tag vX.Y.Z (got '${tag}')" >&2; exit 1; }
+          { echo "tag=$tag"; echo "version=${tag#v}"; } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
+          persist-credentials: false
+      # The notarization script always comes from this workflow's commit: an older tag may predate it
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tools
+          sparse-checkout: scripts/notarize-app.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: Show selected Xcode
         run: xcodebuild -version
       - name: Check tag and version
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           test "$TAG" = "v$(tr -d '\r\n' < VERSION)"
       - name: Test
@@ -28,21 +79,96 @@ jobs:
           TOKENPET_PREFS: dev.yugongpet.release-ci
         run: ./test.sh
       - name: Build universal app and release archive
-        run: ./scripts/release-artifacts.sh
-      - name: Upload macOS release assets
+        run: |
+          ./scripts/release-artifacts.sh
+          lipo -archs build/TokenYugong.app/Contents/MacOS/TokenPet
+      - name: Sign with Developer ID and submit for notarization
+        if: env.HAS_SIGNING == 'true'
+        timeout-minutes: 30
+        env:
+          RELEASE_ROOT: ${{ github.workspace }}
+          VERSION: ${{ steps.tag.outputs.version }}
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: .release-tools/scripts/notarize-app.sh submit
+      - name: Upload the signed app for phase 2
+        if: env.HAS_SIGNING == 'true'
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
-          name: release-macos-assets
-          path: dist/*
+          name: token-yugong-signed-${{ steps.tag.outputs.version }}
+          path: dist/notary/
           if-no-files-found: error
+          retention-days: 90
+      - name: Phase 2 command
+        if: env.HAS_SIGNING == 'true'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          id="$(plutil -extract id raw -o - dist/notary/submission.json)"
+          sha="$(plutil -extract sha256 raw -o - dist/notary/submission.json)"
+          cmd="gh workflow run release.yml -R $GITHUB_REPOSITORY --ref $DEFAULT_BRANCH -f run_id=$GITHUB_RUN_ID"
+          echo "Phase 2 (after Apple accepts submission $id): $cmd"
+          {
+            echo "### Notarization submitted - nothing published yet"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Submission id | \`$id\` |"
+            echo "| Signed zip sha256 | \`$sha\` |"
+            echo "| Artifacts | \`token-yugong-signed-$VERSION\`, \`token-yugong-linux-beta-$VERSION\` |"
+            echo "| Phase-1 run id | \`$GITHUB_RUN_ID\` |"
+            echo
+            echo "Once this whole run has finished and Apple says Accepted (while it is in progress, phase 2 fails and changes nothing):"
+            echo
+            echo '```sh'
+            echo "$cmd"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # Forks and repos without the secrets: the old ad-hoc archive, kept briefly, never published
+      - name: Notarization skipped
+        if: env.HAS_SIGNING != 'true'
+        run: |
+          msg="Notarization skipped: APPLE_DEVELOPER_ID_P12 is not set. The ad-hoc archive is kept for 7 days; phase 2 will not publish it (docs/release.md)"
+          echo "::warning title=Notarization skipped::$msg"
+          echo "### $msg" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the ad-hoc archive
+        if: env.HAS_SIGNING != 'true'
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: token-yugong-adhoc-${{ steps.tag.outputs.version }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 7
 
   linux:
+    if: github.event_name == 'push' || inputs.run_id == ''
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
+      - name: Release tag
+        id: tag
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then tag="$GITHUB_REF_NAME"; else tag="$TAG_INPUT"; fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Phase 1 needs a tag vX.Y.Z (got '${tag}')" >&2; exit 1; }
+          { echo "tag=$tag"; echo "version=${tag#v}"; } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: refs/tags/${{ steps.tag.outputs.tag }}
+          persist-credentials: false
       - name: Check tag and version
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           test "$TAG" = "v$(tr -d '\r\n' < VERSION)"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -50,7 +176,9 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
       - name: Install Linux desktop dependencies
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - name: Build Linux beta bundles
@@ -60,44 +188,173 @@ jobs:
           npm run tauri --prefix desktop -- build --bundles appimage,deb
       - name: Stage Linux beta assets and checksums
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ steps.tag.outputs.version }}
         run: |
-          version="${VERSION#v}"
           mkdir release-assets
-          appimage="TokenYugong-${version}-linux-amd64-beta.AppImage"
-          deb="TokenYugong-${version}-linux-amd64-beta.deb"
+          appimage="TokenYugong-${VERSION}-linux-amd64-beta.AppImage"
+          deb="TokenYugong-${VERSION}-linux-amd64-beta.deb"
           cp desktop/target/release/bundle/appimage/*.AppImage "release-assets/$appimage"
           cp desktop/target/release/bundle/deb/*.deb "release-assets/$deb"
           (cd release-assets && sha256sum "$appimage" > "$appimage.sha256" && sha256sum "$deb" > "$deb.sha256")
       - name: Upload Linux beta release assets
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
-          name: release-linux-beta-assets
+          name: token-yugong-linux-beta-${{ steps.tag.outputs.version }}
           path: release-assets/*
           if-no-files-found: error
+          retention-days: 90
 
-  release:
-    needs: [macos, linux]
-    runs-on: ubuntu-24.04
+  # ── Phase 2: check notarization, staple ─────────────────────────────────────
+  notarized:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_id != ''
+    runs-on: macos-15
+    timeout-minutes: 20
+    concurrency:
+      group: release-phase2-${{ inputs.run_id }}
+    permissions:
+      contents: read
+      actions: read        # list and download the phase-1 run's artifacts
+      id-token: write      # build provenance signing (Sigstore OIDC)
+      attestations: write
+    outputs:
+      version: ${{ steps.phase1.outputs.version }}
+      commit: ${{ steps.submission.outputs.commit }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Download release assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: release-*-assets
+          persist-credentials: false
+      - name: Find the phase-1 artifacts
+        id: phase1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          SUBMISSION_INPUT: ${{ inputs.submission_id }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          fail() { echo "$*" >&2; exit 1; }
+          [[ -z "$TAG_INPUT" ]] || fail "Use tag (phase 1) or run_id (phase 2), not both"
+          [[ "$RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]] || fail "run_id must be a number"
+          [[ -z "$SUBMISSION_INPUT" || "$SUBMISSION_INPUT" =~ ^[0-9A-Fa-f]{8}-([0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}$ ]] \
+            || fail "submission_id must be a UUID"
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '[.path, .status, .conclusion] | join(" ")')"
+          [[ "$run" == ".github/workflows/release.yml completed success" ]] \
+            || fail "Run $RUN_ID must be a finished, successful release.yml run (it is: $run)"
+          names="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" --paginate \
+            --jq '.artifacts[] | select(.expired | not) | .name')"
+          signed="$(grep -E '^token-yugong-signed-[0-9]+\.[0-9]+\.[0-9]+$' <<< "$names" || true)"
+          [[ -n "$signed" && "$(wc -l <<< "$signed")" -eq 1 ]] \
+            || fail "Run $RUN_ID needs exactly one token-yugong-signed-X.Y.Z artifact (expired, or phase 1 ran without signing)"
+          version="${signed#token-yugong-signed-}"
+          grep -qx "token-yugong-linux-beta-$version" <<< "$names" \
+            || fail "Run $RUN_ID has no token-yugong-linux-beta-$version artifact"
+          { echo "signed=$signed"; echo "version=$version"; } >> "$GITHUB_OUTPUT"
+          echo "Phase-1 run $RUN_ID: $signed"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ steps.phase1.outputs.signed }}
+          path: dist/notary
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Read the submission
+        id: submission
+        env:
+          VERSION: ${{ steps.phase1.outputs.version }}
+        run: |
+          [[ "$(plutil -extract version raw -o - dist/notary/submission.json)" == "$VERSION" ]] \
+            || { echo "submission.json's version is not the artifact's" >&2; exit 1; }
+          commit="$(plutil -extract commit raw -o - dist/notary/submission.json)"
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || commit=""
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Staple when Apple has accepted
+        env:
+          SUBMISSION_INPUT: ${{ inputs.submission_id }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          rc=0
+          ./scripts/notarize-app.sh finish ${SUBMISSION_INPUT:+"$SUBMISSION_INPUT"} || rc=$?
+          if ((rc == 75)); then
+            msg="Apple notarization is still in progress. Nothing was published; run phase 2 again later with the same command"
+            echo "::error title=Notarization still in progress::$msg"
+            echo "### $msg" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$rc"
+      - name: Verify
+        env:
+          VERSION: ${{ steps.phase1.outputs.version }}
+        run: |
+          codesign --verify --deep --strict --verbose=2 build/TokenYugong.app
+          lipo -archs build/TokenYugong.app/Contents/MacOS/TokenPet
+          xcrun stapler validate build/TokenYugong.app
+          spctl --assess --type execute --verbose=2 build/TokenYugong.app
+          cd dist && shasum -a 256 -c "TokenYugong-$VERSION-macos-universal.zip.sha256"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/TokenYugong-${{ steps.phase1.outputs.version }}-macos-universal.zip
+      - uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: token-yugong-notarized-${{ steps.phase1.outputs.version }}
+          path: |
+            dist/TokenYugong-${{ steps.phase1.outputs.version }}-macos-universal.zip
+            dist/TokenYugong-${{ steps.phase1.outputs.version }}-macos-universal.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── Phase 2: GitHub Release (only this job can write; it holds no Apple secrets) ──
+  release:
+    needs: notarized
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write      # create the Release
+      actions: read        # download the phase-1 run's Linux artifact
+    env:
+      VERSION: ${{ needs.notarized.outputs.version }}
+      COMMIT: ${{ needs.notarized.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: refs/tags/v${{ needs.notarized.outputs.version }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: token-yugong-notarized-${{ needs.notarized.outputs.version }}
           path: release-assets
-          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: token-yugong-linux-beta-${{ needs.notarized.outputs.version }}
+          path: release-assets
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Check the assets
+        run: |
+          # The commit phase 1 built must be the commit the tag points at now
+          tagged="$(git rev-parse HEAD)"
+          [[ -n "$COMMIT" && "$tagged" == "$COMMIT" ]] \
+            || { echo "Tag v$VERSION is at $tagged, but phase 1 built ${COMMIT:-an unknown commit}" >&2; exit 1; }
+          test "$VERSION" = "$(tr -d '\r\n' < VERSION)"
+          cd release-assets
+          for f in "TokenYugong-$VERSION-macos-universal.zip" \
+                   "TokenYugong-$VERSION-linux-amd64-beta.AppImage" "TokenYugong-$VERSION-linux-amd64-beta.deb"; do
+            [[ -f "$f" && -f "$f.sha256" ]] || { echo "$f or its .sha256 is missing" >&2; exit 1; }
+            sha256sum -c "$f.sha256"
+          done
+          ls -l
       - name: Extract release notes
         run: |
-          version=$(tr -d '\r\n' < VERSION)
-          { sed "s/@VERSION@/$version/g" .github/release-header.md; ./scripts/changelog-notes.sh "$version"; } > release-notes.md
+          { sed "s/@VERSION@/$VERSION/g" .github/release-header.md; ./scripts/changelog-notes.sh "$VERSION"; } > release-notes.md
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-          VERSION: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" \
-            --title "Token Yugong $VERSION" \
+          gh release create "v$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Token Yugong v$VERSION" \
             --notes-file release-notes.md \
             release-assets/*
+          echo "### Published v$VERSION - next: bump the Homebrew cask (docs/release.md)" >> "$GITHUB_STEP_SUMMARY"

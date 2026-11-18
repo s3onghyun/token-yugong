@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3 (2026-11-18)
+
+### Changed
+- The macOS app is Developer ID signed, notarized by Apple and stapled; the first launch no longer needs
+  **Open Anyway** in System Settings. The in-app update and `brew upgrade` move to it as usual.
+- macOS 앱이 Developer ID로 서명되고 Apple 공증을 받아 티켓이 붙어(staple) 나옵니다. 처음 실행할 때
+  시스템 설정의 **그래도 열기**가 더는 필요 없습니다. 앱 안 업데이트와 `brew upgrade`도 평소처럼 됩니다.
+
 ## 0.3.2 (2026-11-17)
 
 ### Fixed

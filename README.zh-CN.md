@@ -20,7 +20,7 @@
 <sub>由应用自身的代码用演示数据绘制（<code>YugongSheet --hero</code>）。</sub></p>
 
 **安装**（macOS 13+，Apple 芯片或 Intel）：从 [Releases](https://github.com/s3onghyun/token-yugong/releases/latest) 下载 `TokenYugong-<version>-macos-universal.zip`，解压后把 `TokenYugong.app` 移到“应用程序”文件夹。也可以用 Homebrew：`brew install --cask s3onghyun/tap/token-yugong`。
-应用还没有经过公证，首次启动需要手动允许一次：见[首次启动](#首次启动)。
+应用使用 Developer ID 签名并经过 Apple 公证，可以像其他应用一样直接打开（见[首次启动](#首次启动)）。
 然后[连接 Claude Code](#连接-claude-code)（一段配置即可；Codex 无需设置）。
 
 ## 能看到什么
@@ -54,7 +54,7 @@
 brew install --cask s3onghyun/tap/token-yugong
 ```
 
-用 `brew upgrade --cask token-yugong` 更新。首次启动时同样需要批准一次（见[首次启动](#首次启动)）。
+用 `brew upgrade --cask token-yugong` 更新。
 
 Homebrew 7 起，其他 tap 里的 cask 要先信任（trust）才会加载。像上面那样用完整名称安装，会自动信任这一个 cask。想在安装前用 `brew info --cask s3onghyun/tap/token-yugong` 查看，请先运行 `brew trust --cask s3onghyun/tap/token-yugong`。
 
@@ -73,11 +73,18 @@ Homebrew 7 起，其他 tap 里的 cask 要先信任（trust）才会加载。�
 
 ### 首次启动
 
-应用只做了 ad-hoc 签名，还没有公证，所以 macOS 会询问一次：
+从 0.3.3 起，发布版使用 Developer ID 签名、经过 Apple 公证并附上了公证票据（staple），双击即可打开。macOS 最多会询问一次是否打开从互联网下载的应用：点 **打开**。
+
+<details>
+<summary>0.3.2 及更早版本（未公证）</summary>
+
+这些版本只做了 ad-hoc 签名，所以 macOS 会询问一次：
 
 1. 打开应用。macOS 提示无法验证它，点 **完成**（Done）。
 2. 打开 **系统设置 → 隐私与安全性**，向下滚动，点 Token Yugong 旁边的 **仍要打开**（Open Anyway），再用 Touch ID 或密码确认。
 3. 在 macOS 13–14 上，也可以按住 Control 点按应用，选择 **打开**。
+
+</details>
 
 想先看看代码？可以自己构建（见下文）。
 
@@ -87,7 +94,7 @@ Homebrew 7 起，其他 tap 里的 cask 要先信任（trust）才会加载。�
 
 ```sh
 git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
-./scripts/bundle.sh            # builds build/TokenYugong.app (ad-hoc signed, not notarized)
+./scripts/bundle.sh            # builds build/TokenYugong.app (ad-hoc signed; releases are notarized)
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 

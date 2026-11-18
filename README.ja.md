@@ -23,7 +23,7 @@
 **インストール**（macOS 13 以降、Apple silicon・Intel）：[Releases](https://github.com/s3onghyun/token-yugong/releases/latest) から
 `TokenYugong-<version>-macos-universal.zip` をダウンロードして展開し、`TokenYugong.app` をアプリケーションフォルダへ移動します。
 Homebrew でも入れられます：`brew install --cask s3onghyun/tap/token-yugong`。
-まだ公証を受けていないため、初回起動時に一度だけ許可が必要です。[初回起動](#初回起動) を参照してください。
+Developer ID で署名され Apple の公証を受けているので、ほかのアプリと同じように開けます（[初回起動](#初回起動)）。
 そのあと [Claude Code と接続](#claude-code-との接続) します（スニペット1つ。Codex は設定不要）。
 
 ## 表示されるもの
@@ -75,7 +75,7 @@ macOS 13 以降が必要です。
 brew install --cask s3onghyun/tap/token-yugong
 ```
 
-`brew upgrade --cask token-yugong` で更新します。初回起動時の許可はこの場合も一度必要です（[初回起動](#初回起動)）。
+`brew upgrade --cask token-yugong` で更新します。
 
 Homebrew 7 以降は、ほかの tap の cask を信頼（trust）するまで読み込みません。上のようにフルネームで
 インストールすると、この cask だけが自動で信頼されます。インストール前に `brew info --cask s3onghyun/tap/token-yugong`
@@ -98,12 +98,20 @@ Yugong Pet 0.2.0 から移行する場合は、それを終了して `YugongPet.
 
 ### 初回起動
 
-アプリは ad-hoc 署名済みですが、まだ公証を受けていないため、macOS が一度だけ確認してきます：
+0.3.3 以降のリリースは Developer ID で署名され、Apple の公証を受けてチケットがステープルされているので、
+ダブルクリックでそのまま開きます。インターネットからダウンロードしたアプリを開くか macOS が一度確認することはあります：**開く** をクリックしてください。
+
+<details>
+<summary>0.3.2 以前（公証なし）</summary>
+
+これらのビルドは ad-hoc 署名のみのため、macOS が一度だけ確認してきます：
 
 1. アプリを開きます。macOS が検証できないと表示するので、**完了** をクリックします。
 2. **システム設定 → プライバシーとセキュリティ** を開いて下へスクロールし、Token Yugong の横の
    **このまま開く** をクリックして、Touch ID かパスワードで確認します。
 3. macOS 13〜14 では、代わりに Control キーを押しながらアプリをクリックして **開く** を選んでも構いません。
+
+</details>
 
 先にコードを確認したい場合は、自分でビルドしてください（下記）。
 
@@ -113,7 +121,7 @@ Yugong Pet 0.2.0 から移行する場合は、それを終了して `YugongPet.
 
 ```sh
 git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
-./scripts/bundle.sh            # builds build/TokenYugong.app (ad-hoc signed, not notarized)
+./scripts/bundle.sh            # builds build/TokenYugong.app (ad-hoc signed; releases are notarized)
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 

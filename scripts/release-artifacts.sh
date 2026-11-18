@@ -1,5 +1,6 @@
 #!/bin/sh
-# Produce the notarization-free release archive and its SHA-256 sidecar.
+# Produce the ad-hoc signed archive and its SHA-256 sidecar (local builds, and release runs without the
+# signing secrets). Published releases are re-signed, notarized and stapled by scripts/notarize-app.sh.
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)

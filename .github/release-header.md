@@ -5,7 +5,7 @@
 ## Install
 1. Download `TokenYugong-@VERSION@-macos-universal.zip` below (and its `.sha256` if you want to verify: `shasum -a 256 -c TokenYugong-@VERSION@-macos-universal.zip.sha256`). macOS 13 or later, Apple silicon or Intel.
 2. Unzip and move `TokenYugong.app` to Applications.
-3. First launch: the app is not notarized yet. macOS 15+: open it once, then System Settings → Privacy & Security → **Open Anyway**. macOS 13-14: Control-click → Open.
+3. Open it. The app is signed with a Developer ID and notarized by Apple, so it opens without an **Open Anyway** step.
 
 Or with Homebrew: `brew install --cask s3onghyun/tap/token-yugong` (`brew upgrade --cask token-yugong` later).
 

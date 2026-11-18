@@ -1,6 +1,7 @@
 #!/bin/sh
 # Builds build/TokenYugong.app: release binary, pixel app icon, the status-line bridge, ad-hoc signature.
-# Not notarized. Nothing is installed; move the app wherever you like (e.g. /Applications).
+# Local builds stay ad-hoc signed; the release workflow re-signs this app with Developer ID and notarizes it
+# (scripts/notarize-app.sh, docs/release.md). Nothing is installed; move the app wherever you like (e.g. /Applications).
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 version=${VERSION:-$(tr -d '\r\n' < "$root/VERSION")}
