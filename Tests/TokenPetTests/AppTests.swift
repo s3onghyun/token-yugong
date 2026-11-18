@@ -162,9 +162,14 @@ import Testing
         #expect(copied.contains("rate_limits"))
     }
 
+    /// The folders the bridge looks in for its tools, whatever PATH it is given.
+    static let bridgeToolFolders = ["/usr/bin", "/bin", "/opt/homebrew/bin", "/usr/local/bin"]
+    static let noJq = !bridgeToolFolders.contains { FileManager.default.isExecutableFile(atPath: $0 + "/jq") }
+
     /// Macs before macOS 15 have no jq: the bridge falls back to plutil and saves the same thing.
-    /// The bridge looks for its tools in system folders only, so the test asks for the fallback.
-    @Test func bridgeWorksWithoutJq() throws {
+    /// The bridge looks for its tools in system folders only, so a test PATH cannot hide jq.
+    @Test(.enabled(if: SettingsAndSetup.noJq, "jq is installed in a folder the bridge always searches, so its plutil fallback cannot run here"))
+    func bridgeWorksWithoutJq() throws {
         let fm = FileManager.default
         let tmp = fm.temporaryDirectory.appendingPathComponent("tokenpet-nojq-\(UUID().uuidString)")
         let bin = tmp.appendingPathComponent("bin"), out = tmp.appendingPathComponent("out")
@@ -176,7 +181,7 @@ import Testing
         let script = try #require(StatusLineSetup.bundledBridge)
         func run(_ input: String) throws -> String {
             let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
-            p.environment = ["TOKENPET_DIR": out.path, "PATH": bin.path, "TOKENPET_BRIDGE_NO_JQ": "1"]
+            p.environment = ["TOKENPET_DIR": out.path, "PATH": bin.path]
             let i = Pipe(), o = Pipe(); p.standardInput = i; p.standardOutput = o
             try p.run(); i.fileHandleForWriting.write(Data(input.utf8)); try i.fileHandleForWriting.close(); p.waitUntilExit()
             return String(decoding: o.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)

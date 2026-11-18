@@ -17,8 +17,8 @@ dir="${TOKENPET_DIR:-$HOME/.claude/token-pet}"
 cfg="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
 cfg="${cfg:-$HOME/.claude.json}"
 input=$(cat)
-# jq when installed (built into macOS 15+), otherwise plutil (every macOS); TOKENPET_BRIDGE_NO_JQ=1 picks plutil (tests)
-if [ -z "${TOKENPET_BRIDGE_NO_JQ:-}" ] && command -v jq >/dev/null 2>&1; then
+# jq when installed (built into macOS 15+), otherwise plutil (every macOS)
+if command -v jq >/dev/null 2>&1; then
   rl=$(printf '%s' "$input" | jq -c '.rate_limits // empty' 2>/dev/null)
   pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
   week=$(printf '%s' "$rl" | jq -r '.seven_day.used_percentage // empty' 2>/dev/null)

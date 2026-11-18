@@ -138,7 +138,7 @@ enum ClaudeConnect {
         try h.close()
     }
 
-    /// Keeps the newest `keptBackups` settings.json backups (always `keeping`, the one just made) and removes the rest.
+    /// Keeps the newest `keptBackups` settings.json backups (always `keeping`, the one just made), all 0600, and removes the rest.
     static func pruneBackups(in dir: URL, keeping: URL) {
         let fm = FileManager.default, prefix = "settings.json.", suffix = ".bak"
         // "settings.json.<yyyyMMdd-HHmmss>[-<n>].bak" -> its order: the time, then n (no -n is 1)
@@ -154,6 +154,7 @@ enum ClaudeConnect {
         let older = names.filter { $0 != keeping.lastPathComponent }
             .compactMap { n in order(n).map { (n, $0) } }
             .sorted { $0.1 > $1.1 }   // newest first
+        for (name, _) in older.prefix(keptBackups - 1) { try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: dir.appendingPathComponent(name).path) }
         for (name, _) in older.dropFirst(keptBackups - 1) { try? fm.removeItem(at: dir.appendingPathComponent(name)) }
     }
 

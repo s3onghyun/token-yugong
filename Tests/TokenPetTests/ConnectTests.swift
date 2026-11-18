@@ -160,11 +160,16 @@ import Testing
         let h = try home(settings: "{\"env\": {\"ANTHROPIC_API_KEY\": \"sk-test\"}}\n")
         defer { try? fm.removeItem(at: h) }
         try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ClaudeConnect.settingsURL(home: h).path)
+        try fm.createDirectory(at: dir(h), withIntermediateDirectories: true)
+        let old = dir(h).appendingPathComponent("settings.json.20250101-000000.bak")   // written by 0.3.3 or earlier
+        try Data("{\"env\": {\"ANTHROPIC_API_KEY\": \"sk-old\"}}\n".utf8).write(to: old)
+        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: old.path)
         let c = try #require(try ClaudeConnect.connect(home: h, dir: dir(h)))
         let backup = try #require(try ClaudeConnect.apply(c, backupDir: dir(h)))
         #expect((try fm.attributesOfItem(atPath: backup.path))[.posixPermissions] as? Int == 0o600)
         #expect(throws: (any Error).self) { try ClaudeConnect.writePrivate(Data(), to: backup) }   // never over an existing file
         #expect(try String(contentsOf: backup, encoding: .utf8).contains("sk-test"))
+        #expect((try fm.attributesOfItem(atPath: old.path))[.posixPermissions] as? Int == 0o600)   // an older kept backup is made private
         var newest = backup
         for _ in 0..<4 {   // eight more backups, most within the same second
             let off = try #require(try ClaudeConnect.disconnect(home: h, dir: dir(h)))
