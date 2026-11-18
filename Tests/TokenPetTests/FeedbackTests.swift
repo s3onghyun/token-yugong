@@ -75,9 +75,18 @@ import Testing
     }
 
     @Test func emailChoiceFollowsTheContactConstant() {
-        #expect(Feedback.choices(email: "") == [.github])            // no address: GitHub only, plus the "later" note
+        #expect(Feedback.choices(email: "") == [.github])            // no address: GitHub only
         #expect(Feedback.choices(email: "  ") == [.github])
         #expect(Feedback.choices(email: "a@b.example") == [.github, .email("a@b.example")])
         #expect(Feedback.choices() == Feedback.choices(email: FeedbackContact.email))
+    }
+
+    @Test func shippedContactOffersEmailToTheMaintainer() throws {
+        #expect(Feedback.choices() == [.github, .email("s3onghyun.hong@gmail.com")])
+        let url = try #require(Feedback.mailURL(env, to: FeedbackContact.email))
+        #expect(url.absoluteString.hasPrefix("mailto:s3onghyun.hong@gmail.com?subject=Token%20Yugong%20Feedback%3A%20&body="))
+        let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        #expect(items.first { $0.name == "subject" }?.value == "Token Yugong Feedback: ")
+        #expect(items.first { $0.name == "body" }?.value == Feedback.body(env))
     }
 }

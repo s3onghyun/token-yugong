@@ -223,7 +223,7 @@ struct PopoverView: View {
         .font(.callout)
     }
 
-    /// "Send feedback…" next to Refresh and Quit: a GitHub issue (and email, once an address is set),
+    /// "Send feedback…" next to Refresh and Quit: a GitHub issue or an email,
     /// prefilled with version facts and opened in the browser or mail app. The app sends nothing.
     private var feedbackMenu: some View {
         Menu {
@@ -231,7 +231,6 @@ struct PopoverView: View {
             ForEach(Feedback.choices(), id: \.self) { c in
                 Button(Feedback.label(c)) { Feedback.open(c) }
             }
-            if Feedback.choices().count == 1 { Text(Feedback.emailLater) }
         } label: {
             Image(systemName: "bubble.left")
         }

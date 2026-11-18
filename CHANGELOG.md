@@ -4,11 +4,12 @@
 
 ### Added
 - **Send feedback…** (speech-bubble button in the popover, and the mini window's right-click menu)
-  opens a GitHub issue prefilled with the app version, macOS version and the AIs the family
-  watches. Nothing is sent until you submit it yourself; no paths, names or work content are included.
+  opens a GitHub issue, or an email to s3onghyun.hong@gmail.com, prefilled with the app version, macOS
+  version and the AIs the family watches. The app sends nothing itself: nothing goes out until you
+  submit it yourself, and no paths, names or work content are included.
 - **의견 보내기…**(팝오버의 말풍선 버튼, 작은 창 오른쪽 클릭 메뉴)를 누르면 앱 버전, macOS 버전, 가족이
-  보는 AI가 채워진 GitHub 이슈가 열립니다. 직접 제출하기 전에는 아무것도 전송되지 않으며, 경로·이름·
-  작업 내용은 들어가지 않습니다.
+  보는 AI가 채워진 GitHub 이슈나 s3onghyun.hong@gmail.com 앞 이메일이 열립니다. 앱이 직접 보내는 것은
+  없으며, 직접 제출하기 전에는 아무것도 전송되지 않고 경로·이름·작업 내용은 들어가지 않습니다.
 
 ## 0.3.3 (2026-11-18)
 

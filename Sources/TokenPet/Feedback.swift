@@ -1,14 +1,13 @@
 import AppKit
 
-// "Send feedback…": opens a prefilled GitHub issue (or, once an address is set, an email) in the
+// "Send feedback…": opens a prefilled GitHub issue or email in the
 // browser or mail app. The app itself sends nothing: no request, no telemetry. The prefill holds
 // version facts only (app, macOS, which AIs the family watches), never a path, a user or
 // host name, or anything from the user's work.
 
-/// The address "Send an email instead" writes to. Empty: that choice is hidden and the menu says an
-/// email option comes later. Setting it is the whole change needed to turn the email path on.
+/// The address "Send an email instead" writes to (intentionally public). Empty would hide that choice.
 enum FeedbackContact {
-    static let email = ""
+    static let email = "s3onghyun.hong@gmail.com"
 }
 
 enum Feedback {
@@ -106,12 +105,6 @@ enum Feedback {
             "ブラウザーかメールアプリが開きます。自分で送るまで何も送信されません。",
             "将打开浏览器或邮件应用；在你亲自发送之前不会发送任何内容。")
     }
-    static var emailLater: String {
-        L.t("An email option comes in a later version.",
-            "이메일로 보내기는 다음 버전에서 추가돼요.",
-            "メールで送る方法は今後のバージョンで追加されます。",
-            "邮件反馈将在以后的版本中提供。")
-    }
     static func label(_ c: Choice) -> String {
         switch c {
         case .github: return L.t("Open a GitHub issue", "GitHub 이슈 열기", "GitHub の Issue を開く", "在 GitHub 上提 Issue")
@@ -129,10 +122,6 @@ enum Feedback {
             let i = NSMenuItem(title: label(c), action: #selector(MenuTarget.run(_:)), keyEquivalent: "")
             i.target = MenuTarget.shared; i.representedObject = c
             m.addItem(i)
-        }
-        if choices().count == 1 {
-            let later = NSMenuItem(title: emailLater, action: nil, keyEquivalent: ""); later.isEnabled = false
-            m.addItem(later)
         }
         item.submenu = m
         return item

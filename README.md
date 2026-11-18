@@ -330,7 +330,7 @@ Character sheets: `swift run -c release YugongSheet <dir> [--scenes] [--family] 
 
 Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Send feedback from the menu: the speech-bubble button in the popover (or right-click the mini window) › **Send feedback…** opens a prefilled GitHub issue in your browser; the app sends nothing itself.
+Send feedback from the menu: the speech-bubble button in the popover (or right-click the mini window) › **Send feedback…** opens a prefilled GitHub issue in your browser, or a prefilled email to s3onghyun.hong@gmail.com; the app sends nothing itself.
 
 ## License
 
