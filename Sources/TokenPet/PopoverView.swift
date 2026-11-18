@@ -216,10 +216,28 @@ struct PopoverView: View {
                 .accessibilityLabel(showMore ? L.t("Less", "접기", "閉じる", "收起") : L.t("More", "더 보기", "もっと見る", "更多"))
                 .help(showMore ? L.t("Less", "접기", "閉じる", "收起")
                                : L.t("More: title, sources, account, speed", "더 보기: 칭호·출처·계정·속도", "もっと見る：称号・出どころ・アカウント・速さ", "更多：称号、来源、账号、速度"))
+            feedbackMenu
             Button(L.t("Refresh", "새로고침", "更新", "刷新")) { model.refresh() }.disabled(model.scanning)
             Button(L.t("Quit", "종료", "終了", "退出")) { NSApp.terminate(nil) }
         }
         .font(.callout)
+    }
+
+    /// "Send feedback…" next to Refresh and Quit: a GitHub issue or an email,
+    /// prefilled with version facts and opened in the browser or mail app. The app sends nothing.
+    private var feedbackMenu: some View {
+        Menu {
+            Text(Feedback.nothingSent)
+            ForEach(Feedback.choices(), id: \.self) { c in
+                Button(Feedback.label(c)) { Feedback.open(c) }
+            }
+        } label: {
+            Image(systemName: "bubble.left")
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .foregroundColor(.secondary)
+        .help(Feedback.menuTitle)
+        .accessibilityLabel(Feedback.menuTitle)
     }
 
     private var clockNow: Date { now ?? Date() }

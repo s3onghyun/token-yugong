@@ -193,6 +193,8 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 
 参与贡献：见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
+从菜单发送反馈：点击弹出窗口中的对话气泡按钮（或右键点击小窗口）›「**发送反馈…**」，会在浏览器中打开预填好的 GitHub Issue，或打开发往 s3onghyun.hong@gmail.com 的预填邮件；应用本身不会发送任何内容。
+
 ## 许可证
 
 - 应用代码（`Package.swift`、`Sources/`、`bridge/`、`scripts/`、`Tests/`）：MIT，见 [LICENSE](LICENSE)。

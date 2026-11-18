@@ -263,6 +263,8 @@ ffmpeg 명령은 [README.md](README.md#for-development)).
 
 기여 방법: [CONTRIBUTING.md](CONTRIBUTING.md).
 
+메뉴에서 의견 보내기: 팝오버의 말풍선 버튼(또는 작은 창 오른쪽 클릭) › **의견 보내기…**를 누르면 브라우저에 내용이 채워진 GitHub 이슈나 s3onghyun.hong@gmail.com 앞 이메일이 열려요. 앱이 직접 보내는 것은 없어요.
+
 ## 라이선스
 
 - 앱 코드(`Package.swift`, `Sources/`, `bridge/`, `scripts/`, `Tests/`): MIT, [LICENSE](LICENSE).
