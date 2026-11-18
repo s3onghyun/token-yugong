@@ -2,7 +2,7 @@ import AppKit
 
 // "Send feedback…": opens a prefilled GitHub issue (or, once an address is set, an email) in the
 // browser or mail app. The app itself sends nothing: no request, no telemetry. The prefill holds
-// version facts only (app, macOS, Mac model, which AIs the family watches), never a path, a user or
+// version facts only (app, macOS, which AIs the family watches), never a path, a user or
 // host name, or anything from the user's work.
 
 /// The address "Send an email instead" writes to. Empty: that choice is hidden and the menu says an
@@ -22,7 +22,6 @@ enum Feedback {
         var app: String
         var build: String
         var macOS: String
-        var model: String?
         var agents: [String]
     }
 
@@ -41,17 +40,7 @@ enum Feedback {
         return Environment(app: info?["CFBundleShortVersionString"] as? String ?? "dev",
                            build: info?["CFBundleVersion"] as? String ?? "dev",
                            macOS: "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)",
-                           model: hardwareModel(),
                            agents: agents(family))
-    }
-
-    /// "Mac14,2": the model identifier, not the Mac's name (which often holds the owner's name).
-    static func hardwareModel() -> String? {
-        var size = 0
-        guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else { return nil }
-        var buf = [CChar](repeating: 0, count: size)
-        guard sysctlbyname("hw.model", &buf, &size, nil, 0) == 0 else { return nil }
-        return String(decoding: buf.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     /// The watched AIs by product name, Grandpa's first.
@@ -67,7 +56,7 @@ enum Feedback {
         }
     }
 
-    /// Keeps letters, digits and ". , ( ) + -" (what versions and model ids use), at most 40 characters:
+    /// Keeps letters, digits and ". , ( ) + -" (what versions and product names use), at most 40 characters:
     /// a path, an address or a host name cannot pass through a field intact.
     static func clean(_ s: String) -> String {
         let ok = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,()+-")
@@ -79,7 +68,6 @@ enum Feedback {
         var lines = ["**What happened?**", "", "", "**What did you expect?**", "", "", "### Environment",
                      "- App: Token Yugong \(clean(env.app)) (build \(clean(env.build)))",
                      "- macOS: \(clean(env.macOS))"]
-        if let m = env.model.map(clean), !m.isEmpty { lines.append("- Mac: \(m)") }
         let agents = env.agents.map(clean).filter { !$0.isEmpty }
         if !agents.isEmpty { lines.append("- Agents: \(agents.joined(separator: ", "))") }
         lines += ["", "_Prefilled by the app's Send feedback menu. The app sent nothing; only what you submit here is sent._"]

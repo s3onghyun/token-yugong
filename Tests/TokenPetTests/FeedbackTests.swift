@@ -6,7 +6,7 @@ import Testing
 // stays short enough for GitHub, and the email choice follows the one contact constant.
 
 @Suite struct FeedbackPrefill {
-    let env = Feedback.Environment(app: "0.3.4", build: "0.3.4", macOS: "15.5.0", model: "Mac14,2",
+    let env = Feedback.Environment(app: "0.3.4", build: "0.3.4", macOS: "15.5.0",
                                    agents: ["Claude Code", "Codex"])
 
     @Test func bodyHasTheTemplateAndTheFacts() {
@@ -14,26 +14,25 @@ import Testing
         #expect(b.contains("**What happened?**") && b.contains("**What did you expect?**") && b.contains("### Environment"))
         #expect(b.contains("- App: Token Yugong 0.3.4 (build 0.3.4)"))
         #expect(b.contains("- macOS: 15.5.0"))
-        #expect(b.contains("- Mac: Mac14,2"))
         #expect(b.contains("- Agents: Claude Code, Codex"))
         #expect(b.utf8.count < Feedback.maxBody)
     }
 
     @Test func missingFactsLeaveTheirLineOut() {
-        let b = Feedback.body(Feedback.Environment(app: "dev", build: "dev", macOS: "14.0.0", model: nil, agents: []))
-        #expect(!b.contains("- Mac:") && !b.contains("- Agents:"))
+        let b = Feedback.body(Feedback.Environment(app: "dev", build: "dev", macOS: "14.0.0", agents: []))
+        #expect(!b.contains("- Agents:"))
     }
 
     @Test func nothingFromTheUsersMachineGetsIn() {
         // hostile values in every field: a path, an address, a host name, a URL, a newline
         let bad = Feedback.Environment(app: "/Users/joshua/token-yugong", build: "joshua@example-host.local",
-                                       macOS: "15.5\n- Repo: s3onghyun/secret", model: "https://evil/x?y=z",
-                                       agents: ["~/.claude/projects/acme", "branch: main/feature"])
+                                       macOS: "15.5\n- Repo: s3onghyun/secret",
+                                       agents: ["~/.claude/projects/acme", "branch: main/feature", "https://evil/x?y=z"])
         let b = Feedback.body(bad)
         for leak in ["/", "@", "~", ":/", "?", "=", "\n- Repo"] where b.components(separatedBy: "### Environment")[1].contains(leak) {
             Issue.record("environment block contains \(leak.debugDescription): \(b)")
         }
-        #expect(Feedback.body(bad).split(separator: "\n").filter { $0.hasPrefix("- ") }.count == 4)   // App, macOS, Mac, Agents: no line was injected
+        #expect(Feedback.body(bad).split(separator: "\n").filter { $0.hasPrefix("- ") }.count == 3)   // App, macOS, Agents: no line was injected
 
         // what this test machine really reports carries no user, home or host name
         let real = Feedback.body(Feedback.current(family: .standard))
@@ -55,7 +54,7 @@ import Testing
         #expect(s.hasPrefix("https://github.com/s3onghyun/token-yugong/issues/new?title=Feedback%3A%20&body="))
         #expect(!s.contains(" ") && !s.contains("\n") && !s.contains("+") && !s.contains("*"))
         #expect(s.contains("%0A") && s.contains("%2A%2AWhat%20happened%3F%2A%2A"))
-        #expect(s.contains("Mac14%2C2"))
+        #expect(s.contains("Claude%20Code%2C%20Codex"))
         let items = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
         #expect(items.map(\.name) == ["title", "body"])
         #expect(items.first { $0.name == "body" }?.value == Feedback.body(env))   // decodes back exactly
