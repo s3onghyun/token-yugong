@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.4 (2026-11-18)
 
 ### Added
 - **Send feedback…** (speech-bubble button in the popover, and the mini window's right-click menu)
