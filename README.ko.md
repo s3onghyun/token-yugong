@@ -21,7 +21,7 @@
 **설치** (macOS 13 이상, Apple silicon·Intel): [Releases](https://github.com/s3onghyun/token-yugong/releases/latest)에서
 `TokenYugong-<version>-macos-universal.zip`을 내려받아 풀고 `TokenYugong.app`을 응용 프로그램 폴더로 옮깁니다.
 Homebrew로도 됩니다: `brew install --cask s3onghyun/tap/token-yugong`.
-아직 공증 전이라 처음 한 번은 승인이 필요합니다: [처음 실행](#처음-실행) 참고.
+Developer ID로 서명되고 Apple 공증을 받아 다른 앱처럼 바로 열립니다([처음 실행](#처음-실행)).
 그다음 [Claude Code를 연결](#claude-code-연결)합니다(스니펫 하나, Codex는 설정 없음).
 
 ## 무엇을 보여 주나
@@ -72,7 +72,7 @@ macOS 13 이상이 필요합니다.
 brew install --cask s3onghyun/tap/token-yugong
 ```
 
-`brew upgrade --cask token-yugong`으로 업데이트합니다. 처음 실행 때 승인은 똑같이 한 번 필요합니다([처음 실행](#처음-실행)).
+`brew upgrade --cask token-yugong`으로 업데이트합니다.
 
 Homebrew 7부터는 다른 tap의 cask를 신뢰(trust)해야 읽습니다. 위처럼 전체 이름으로 설치하면 이 cask 하나를
 저절로 신뢰합니다. 설치 전에 `brew info --cask s3onghyun/tap/token-yugong`으로 먼저 보려면
@@ -95,12 +95,20 @@ Yugong Pet 0.2.0을 쓰고 있었다면 종료한 뒤 `YugongPet.app`을 지우�
 
 ### 처음 실행
 
-이 앱은 ad-hoc 서명 상태이며 아직 공증(notarization)되지 않아서 macOS가 한 번 묻습니다.
+0.3.3부터 릴리스는 Developer ID로 서명되고 Apple 공증(notarization)을 받아 티켓이 붙어(staple) 있어서
+더블클릭으로 바로 열립니다. macOS가 인터넷에서 받은 앱을 열지 한 번 물을 수는 있습니다: **열기**를 누르세요.
+
+<details>
+<summary>0.3.2 이하 (공증 전)</summary>
+
+이 버전들은 ad-hoc 서명만 되어 있어서 macOS가 한 번 묻습니다.
 
 1. 앱을 엽니다. macOS가 확인할 수 없다고 하면 **완료**를 누릅니다.
 2. **시스템 설정 → 개인정보 보호 및 보안**을 열고 아래로 내려 Token Yugong 옆의 **그래도 열기**를
    누른 뒤 Touch ID나 암호로 확인합니다.
 3. macOS 13-14에서는 대신 앱을 Control-클릭하고 **열기**를 골라도 됩니다.
+
+</details>
 
 코드를 먼저 보고 싶다면 직접 빌드하세요(아래).
 
@@ -110,7 +118,7 @@ Yugong Pet 0.2.0을 쓰고 있었다면 종료한 뒤 `YugongPet.app`을 지우�
 
 ```sh
 git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
-./scripts/bundle.sh            # build/TokenYugong.app 생성 (ad-hoc 서명, 공증 안 됨)
+./scripts/bundle.sh            # build/TokenYugong.app 생성 (ad-hoc 서명; 릴리스는 공증됨)
 open build/TokenYugong.app     # 먼저 /Applications로 옮겨도 됩니다
 ```
 

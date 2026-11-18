@@ -21,7 +21,7 @@ His carrier fills with your 5-hour limit, he naps when it runs out, and the moun
 **Install** (macOS 13+, Apple silicon or Intel): download `TokenYugong-<version>-macos-universal.zip` from
 [Releases](https://github.com/s3onghyun/token-yugong/releases/latest), unzip, move `TokenYugong.app` to Applications.
 Or with Homebrew: `brew install --cask s3onghyun/tap/token-yugong`.
-It is not notarized yet, so the first launch needs one approval: see [First launch](#first-launch).
+It is signed with a Developer ID and notarized by Apple, so it opens like any other app ([First launch](#first-launch)).
 Then [connect Claude Code](#connect-claude-code) (one snippet; Codex needs nothing).
 
 ## What it shows
@@ -121,7 +121,7 @@ npm run tauri --prefix desktop -- build
 brew install --cask s3onghyun/tap/token-yugong
 ```
 
-`brew upgrade --cask token-yugong` updates it. The first launch still needs one approval ([First launch](#first-launch)).
+`brew upgrade --cask token-yugong` updates it.
 
 Homebrew 7 and later load casks from other taps only once you trust them. Installing by the full
 name, as above, trusts this one cask by itself. To look at it first with
@@ -144,12 +144,20 @@ carry over (same settings domain). If *Open at login* was on, turn it off and on
 
 ### First launch
 
-The app is ad-hoc signed but not notarized yet, so macOS asks once:
+Releases from 0.3.3 on are signed with a Developer ID, notarized by Apple and stapled, so the app opens
+with a double-click. At most, macOS asks once whether to open an app downloaded from the internet: click **Open**.
+
+<details>
+<summary>0.3.2 and older (not notarized)</summary>
+
+Those builds are only ad-hoc signed, so macOS asks once:
 
 1. Open the app. macOS says it cannot verify it; click **Done**.
 2. Open **System Settings → Privacy & Security**, scroll down, click **Open Anyway** next to
    Token Yugong, and confirm with Touch ID or your password.
 3. On macOS 13-14 you can instead Control-click the app and choose **Open**.
+
+</details>
 
 Prefer to check the code first? Build it yourself (below).
 
@@ -159,7 +167,7 @@ For a local build, install the Swift toolchain (Xcode or the Command Line Tools)
 
 ```sh
 git clone https://github.com/s3onghyun/token-yugong.git && cd token-yugong
-./scripts/bundle.sh            # builds build/TokenYugong.app (ad-hoc signed, not notarized)
+./scripts/bundle.sh            # builds build/TokenYugong.app (ad-hoc signed; releases are notarized)
 open build/TokenYugong.app     # or move it to /Applications first
 ```
 
