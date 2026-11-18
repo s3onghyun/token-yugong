@@ -98,7 +98,7 @@ enum Limits {
     static func bridge(_ data: Data, fileDate: Date) -> Reading? {
         guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rl = o["rate_limits"] as? [String: Any] else { return nil }
-        let at = (o["captured_at"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) } ?? fileDate
+        let at = epoch(o["captured_at"]) ?? fileDate
         let account = (o["account"] as? String).flatMap { a in
             (4...64).contains(a.count) && a.allSatisfy(\.isHexDigit) ? a.lowercased() : nil
         }
@@ -154,8 +154,21 @@ enum Limits {
 
     static func meter(_ any: Any?, _ key: String) -> Meter? {
         guard let w = any as? [String: Any], let p = (w[key] as? NSNumber)?.doubleValue, p.isFinite, p >= 0 else { return nil }
-        return Meter(pct: min(p, 100), resetsAt: (w["resets_at"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue) })
+        return Meter(pct: min(p, 100), resetsAt: epoch(w["resets_at"]))
     }
+
+    /// The last instant `epoch` accepts: 2100-01-01T00:00:00Z.
+    static let latestEpoch: TimeInterval = 4_102_444_800
+
+    /// Epoch seconds from a local file (limits.json, a Claude Code log) as a date; nil unless finite and
+    /// within 1970…2100, so an absurd value is ignored instead of travelling on to a whole-number conversion.
+    static func epoch(_ any: Any?) -> Date? {
+        guard let s = (any as? NSNumber)?.doubleValue, s.isFinite, (0...latestEpoch).contains(s) else { return nil }
+        return Date(timeIntervalSince1970: s)
+    }
+
+    /// A whole number of seconds or minutes to show or print: clamped first, so it never traps.
+    static func whole(_ x: Double) -> Int { x.isFinite ? Int(min(max(x, -1e15), 1e15)) : 0 }
 
     /// Claude Code logs the rejected request when a limit is used up (`apiError: usage_limit_reached`).
     /// The status line never shows it: its numbers come from the last *successful* response, so they stop at 99.
@@ -169,11 +182,11 @@ enum Limits {
     static func hit(_ o: [String: Any]) -> Hit? {
         guard o["apiError"] as? String == "usage_limit_reached",
               let info = (o["apiErrorParams"] as? [String: Any])?["rate_limit_info"] as? [String: Any],
-              let reset = (info["resetsAt"] as? NSNumber)?.doubleValue,
+              let reset = epoch(info["resetsAt"]),
               let time = (o["timestamp"] as? String).flatMap(iso.date(from:)) else { return nil }
         switch info["rateLimitType"] as? String {
-        case "five_hour": return Hit(time: time, week: false, resetsAt: Date(timeIntervalSince1970: reset))
-        case "seven_day": return Hit(time: time, week: true, resetsAt: Date(timeIntervalSince1970: reset))
+        case "five_hour": return Hit(time: time, week: false, resetsAt: reset)
+        case "seven_day": return Hit(time: time, week: true, resetsAt: reset)
         default: return nil
         }
     }

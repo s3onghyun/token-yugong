@@ -1,4 +1,5 @@
 import AppKit
+import Security
 
 /// Brief visual confirmation after putting a command on the pasteboard. Kept separate from the
 /// view so every copy affordance uses the same short, non-persistent acknowledgement.
@@ -114,11 +115,24 @@ enum Update {
         return v == version
     }
 
-    struct Refused: Error { let message: String }
+    struct Refused: Error, Equatable { let message: String }
+
+    /// The team that signed this very app (its Developer ID); nil for ad-hoc and `swift run` builds.
+    static let signingTeam: String? = {
+        var me: SecCode?
+        guard SecCodeCopySelf([], &me) == errSecSuccess, let me else { return nil }
+        var code: SecStaticCode?
+        guard SecCodeCopyStaticCode(me, [], &code) == errSecSuccess, let code else { return nil }
+        var info: CFDictionary?
+        guard SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess else { return nil }
+        return (info as? [String: Any])?[kSecCodeInfoTeamIdentifier as String] as? String
+    }()
 
     /// Checks the downloaded zip and puts its app where `app` is. Throws, leaving `app` as it was, unless
     /// the zip is small, unzips to TokenYugong.app, is `version` of app `id`, and its signature verifies.
-    static func install(zip: URL, version: SemVer, id: String?, over app: URL) throws {
+    /// With a `team` (this app is Developer ID signed) the new app must be signed by that same team and
+    /// pass Gatekeeper (notarized); without one (an ad-hoc build) a valid signature is enough.
+    static func install(zip: URL, version: SemVer, id: String?, team: String?, over app: URL) throws {
         let fm = FileManager.default
         let size = (try? fm.attributesOfItem(atPath: zip.path)[.size] as? Int) ?? nil
         guard let size, size <= maxArchive else { throw Refused(message: "archive size \(size ?? -1)") }
@@ -130,6 +144,13 @@ enum Update {
         let info = NSDictionary(contentsOf: new.appendingPathComponent("Contents/Info.plist")) as? [String: Any]
         guard acceptable(info: info, id: id, version: version) else { throw Refused(message: "not \(id ?? "?") \(version)") }
         guard run("/usr/bin/codesign", "--verify", "--deep", "--strict", new.path) else { throw Refused(message: "signature") }
+        if let team {
+            guard team.range(of: "^[A-Z0-9]{10}$", options: .regularExpression) != nil,
+                  run("/usr/bin/codesign", "--verify", "--deep", "--strict",
+                      "-R=anchor apple generic and certificate leaf[subject.OU] = \"\(team)\"", new.path)
+            else { throw Refused(message: "team") }
+            guard run("/usr/sbin/spctl", "--assess", "--type", "execute", new.path) else { throw Refused(message: "notarization") }
+        }
         _ = try fm.replaceItemAt(app, withItemAt: new)
     }
 
@@ -183,7 +204,7 @@ extension UsageModel {
         Update.session.downloadTask(with: req) { file, resp, _ in
             var failure: String?
             if let file, (resp as? HTTPURLResponse)?.statusCode == 200 {
-                do { try Update.install(zip: file, version: v, id: id, over: app) }
+                do { try Update.install(zip: file, version: v, id: id, team: Update.signingTeam, over: app) }
                 catch { failure = "\(error)" }
             } else { failure = "download" }
             DispatchQueue.main.async { [weak self] in

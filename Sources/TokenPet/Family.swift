@@ -198,6 +198,8 @@ final class BudgetClient {
     }
     private(set) var state: [Provider: State] = [:]
     private var asked: [Provider: Date] = [:]
+    /// Its own session: no shared cookies, no disk cache of the answers, like the update check.
+    private static let session = URLSession(configuration: .ephemeral)
     static let every: TimeInterval = 15 * 60
 
     func refresh(_ providers: [Provider], now: Date = Date(), done: @escaping () -> Void) {
@@ -215,7 +217,7 @@ final class BudgetClient {
         func get(_ url: URL, _ then: @escaping (Data?, Int) -> Void) {
             var req = URLRequest(url: url, timeoutInterval: 20)
             req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-            URLSession.shared.dataTask(with: req) { d, r, _ in then(d, (r as? HTTPURLResponse)?.statusCode ?? 0) }.resume()
+            BudgetClient.session.dataTask(with: req) { d, r, _ in then(d, (r as? HTTPURLResponse)?.statusCode ?? 0) }.resume()
         }
         func failed(_ code: Int) -> State {
             State(problem: code == 401 || code == 403 ? .rejected : .noAnswer(code), at: now)

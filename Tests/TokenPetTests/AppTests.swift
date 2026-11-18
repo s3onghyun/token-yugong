@@ -162,8 +162,14 @@ import Testing
         #expect(copied.contains("rate_limits"))
     }
 
+    /// The folders the bridge looks in for its tools, whatever PATH it is given.
+    static let bridgeToolFolders = ["/usr/bin", "/bin", "/opt/homebrew/bin", "/usr/local/bin"]
+    static let noJq = !bridgeToolFolders.contains { FileManager.default.isExecutableFile(atPath: $0 + "/jq") }
+
     /// Macs before macOS 15 have no jq: the bridge falls back to plutil and saves the same thing.
-    @Test func bridgeWorksWithoutJq() throws {
+    /// The bridge looks for its tools in system folders only, so a test PATH cannot hide jq.
+    @Test(.enabled(if: SettingsAndSetup.noJq, "jq is installed in a folder the bridge always searches, so its plutil fallback cannot run here"))
+    func bridgeWorksWithoutJq() throws {
         let fm = FileManager.default
         let tmp = fm.temporaryDirectory.appendingPathComponent("tokenpet-nojq-\(UUID().uuidString)")
         let bin = tmp.appendingPathComponent("bin"), out = tmp.appendingPathComponent("out")

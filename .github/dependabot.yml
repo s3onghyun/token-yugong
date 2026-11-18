@@ -1,0 +1,7 @@
+version: 2
+updates:
+  # The workflows pin every action by commit SHA; this proposes the new SHA when an action releases.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

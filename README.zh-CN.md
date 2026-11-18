@@ -114,7 +114,7 @@ Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.
 /Applications/TokenYugong.app/Contents/MacOS/TokenPet setup --undo     # 撤销
 ```
 
-两种方式都会把桥接脚本复制到 `~/.claude/token-pet/`，并且只改 `~/.claude/settings.json` 里的 `statusLine` 键：其余字节保持不变，备份放在 `~/.claude/token-pet/settings.json.<时间>.bak`，再运行一次不会有任何改动，符号链接仍是符号链接。已有的状态栏会保留：它变成 `sh ~/.claude/token-pet/statusline-bridge.sh --chain '<原来的命令>'`，收到同样的输入，显示的仍是它原来的输出；`--undo` 会还原原来的命令。这台 Mac 上没有 Claude Code（没有 `~/.claude`）时，它会直接告诉你，什么也不写。
+两种方式都会把桥接脚本复制到 `~/.claude/token-pet/`，并且只改 `~/.claude/settings.json` 里的 `statusLine` 键：其余字节保持不变，备份放在 `~/.claude/token-pet/settings.json.<时间>.bak`（只有你自己能读，只保留最新的三个），再运行一次不会有任何改动，符号链接仍是符号链接。已有的状态栏会保留：它变成 `sh ~/.claude/token-pet/statusline-bridge.sh --chain '<原来的命令>'`，收到同样的输入，显示的仍是它原来的输出；`--undo` 会还原原来的命令。这台 Mac 上没有 Claude Code（没有 `~/.claude`）时，它会直接告诉你，什么也不写。
 
 想手动设置？**复制代码片段** 会复制桥接脚本，并把下面这段放进剪贴板，粘贴到 `~/.claude/settings.json` 的最外层对象中：
 
@@ -154,7 +154,7 @@ macOS 会悄悄隐藏放不下的菜单栏图标，或把它们藏到摄像头�
 
 ## 更新
 
-应用每天向 GitHub 查询一次最新版本：向 `api.github.com/repos/s3onghyun/token-yugong/releases/latest` 发一个 HTTPS GET，只带 `User-Agent: TokenYugong/<version>`、`Accept` 和固定的 `Accept-Language: en`，不带 cookie，也不使用缓存。不会发送任何关于你或你的用量的信息，也没有遥测。有新版本时，弹出面板会显示一行，带有 **更新**、**发布页面** 和 **跳过此版本**，同一个版本只通知你一次。在你点击 **更新** 之前不会下载任何东西；点击后，应用从 `github.com/s3onghyun/token-yugong/releases/download/v<version>/` 获取该版本的 ZIP，解压到临时文件夹，确认它是同一 bundle ID 的 Token Yugong、正好是该版本且签名有效（`codesign --verify`），然后替换当前运行位置的应用并重新打开。任何一步失败，当前应用都保持不变。如果是用 Homebrew 安装的，则改为显示 `brew upgrade --cask s3onghyun/tap/token-yugong` 和复制按钮，让 Homebrew 的记录保持一致；如果应用所在位置无法替换（没有写入权限的文件夹），请从发布页面下载，再按[安装](#安装)一节替换应用。设置 › *检查更新（每天一次）* 可以关闭此功能；*立即检查* 会马上查询。
+应用每天向 GitHub 查询一次最新版本：向 `api.github.com/repos/s3onghyun/token-yugong/releases/latest` 发一个 HTTPS GET，只带 `User-Agent: TokenYugong/<version>`、`Accept` 和固定的 `Accept-Language: en`，不带 cookie，也不使用缓存。不会发送任何关于你或你的用量的信息，也没有遥测。有新版本时，弹出面板会显示一行，带有 **更新**、**发布页面** 和 **跳过此版本**，同一个版本只通知你一次。在你点击 **更新** 之前不会下载任何东西；点击后，应用从 `github.com/s3onghyun/token-yugong/releases/download/v<version>/` 获取该版本的 ZIP，解压到临时文件夹，确认它是同一 bundle ID 的 Token Yugong、正好是该版本、带有与当前应用同一 Developer ID 团队的有效签名（`codesign --verify`）并已公证（`spctl --assess`）（自己构建的 ad-hoc 签名应用只检查签名），然后替换当前运行位置的应用并重新打开。任何一步失败，当前应用都保持不变。如果是用 Homebrew 安装的，则改为显示 `brew upgrade --cask s3onghyun/tap/token-yugong` 和复制按钮，让 Homebrew 的记录保持一致；如果应用所在位置无法替换（没有写入权限的文件夹），请从发布页面下载，再按[安装](#安装)一节替换应用。设置 › *检查更新（每天一次）* 可以关闭此功能；*立即检查* 会马上查询。
 
 ## 隐私
 

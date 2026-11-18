@@ -11,6 +11,29 @@
   보는 AI가 채워진 GitHub 이슈나 s3onghyun.hong@gmail.com 앞 이메일이 열립니다. 앱이 직접 보내는 것은
   없으며, 직접 제출하기 전에는 아무것도 전송되지 않고 경로·이름·작업 내용은 들어가지 않습니다.
 
+### Security
+- **Update** only installs an app signed by the same Developer ID team as the running one and notarized by
+  Apple; a build you made yourself (ad-hoc signed) checks the signature as before.
+- The `settings.json` backups in `~/.claude/token-pet/` are readable by you only, and only the newest three
+  are kept.
+- The status-line bridge runs `jq`, `date` and its other tools from the system and Homebrew folders only (a
+  chained status line still gets Claude Code's `PATH`), and removes its per-session files after 30 days.
+- An out-of-range time in `limits.json` or a Claude Code log is ignored instead of closing the app or
+  `TokenPet status`.
+- OpenAI and DeepSeek spend checks use a private session with no shared cookies or cache.
+- Release builds attest the Linux AppImage and `.deb` too; CI pins every action by commit and does not
+  keep the checkout token.
+- **업데이트**는 지금 앱과 같은 Developer ID 팀이 서명하고 Apple 공증을 받은 앱만 설치합니다. 직접 빌드한
+  앱(ad-hoc 서명)은 전처럼 서명만 확인합니다.
+- `~/.claude/token-pet/`의 `settings.json` 백업은 나만 읽을 수 있고, 최근 세 개만 남깁니다.
+- 상태줄 브리지는 `jq`, `date` 등 도구를 시스템·Homebrew 폴더에서만 찾고(이어 붙인 상태줄은 Claude Code의
+  `PATH`를 그대로 받습니다), 세션별 파일은 30일이 지나면 지웁니다.
+- `limits.json`이나 Claude Code 기록의 범위를 벗어난 시각은 무시하고, 앱이나 `TokenPet status`가 꺼지지
+  않습니다.
+- OpenAI·DeepSeek 지출 확인은 쿠키·캐시를 공유하지 않는 별도 세션을 씁니다.
+- 릴리스는 Linux AppImage와 `.deb`에도 빌드 출처 증명을 붙이고, CI는 모든 액션을 커밋으로 고정하며
+  체크아웃 토큰을 남기지 않습니다.
+
 ## 0.3.3 (2026-11-18)
 
 ### Changed

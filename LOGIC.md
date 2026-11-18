@@ -280,7 +280,7 @@ window is closed, minimized or fully covered (occlusion), so its 8 fps timeline 
 (ClaudeConnect): only that member's text changes, inserted before the first member with the file's own
 spacing, so `setup --undo` cuts it back out byte for byte. The new file must parse and every other
 top-level key must be equal, or nothing is written. The old file goes to `settings.json.<time>.bak`
-next to `limits.json`; a symlink is written through; the permissions stay. An existing command `X`
+next to `limits.json` (created 0600, never over an existing file; the newest three are kept); a symlink is written through; the permissions stay. An existing command `X`
 becomes `<bridge> --chain 'X'` (the bridge pipes its input to `sh -c X` and shows its output and exit
 status); undo unquotes `X` back. A command that mentions the bridge in another form is the user's own
 chain: left alone. No `~/.claude` = Claude Code is not set up: an error, nothing made. A command `X`

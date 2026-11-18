@@ -121,12 +121,16 @@ import Testing
         }
         let current = try makeApp("installed", version: "0.2.2", sign: true)
 
-        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("old", version: "0.2.1", sign: true)), version: v("0.2.3"), id: id, over: current) }
-        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("unsigned", version: "0.2.3", sign: false)), version: v("0.2.3"), id: id, over: current) }
-        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("other", version: "0.2.3", sign: true)), version: v("0.2.3"), id: "dev.other", over: current) }
+        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("old", version: "0.2.1", sign: true)), version: v("0.2.3"), id: id, team: nil, over: current) }
+        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("unsigned", version: "0.2.3", sign: false)), version: v("0.2.3"), id: id, team: nil, over: current) }
+        #expect(throws: Update.Refused.self) { try Update.install(zip: zip(try makeApp("other", version: "0.2.3", sign: true)), version: v("0.2.3"), id: "dev.other", team: nil, over: current) }
+        // a Developer ID copy (a team) refuses an app its team did not sign, even at the right version and id
+        #expect(throws: Update.Refused(message: "team")) { try Update.install(zip: zip(try makeApp("adhoc", version: "0.2.3", sign: true)), version: v("0.2.3"), id: id, team: "ABCDE12345", over: current) }
+        #expect(throws: Update.Refused(message: "team")) { try Update.install(zip: zip(try makeApp("odd", version: "0.2.3", sign: true)), version: v("0.2.3"), id: id, team: "x\" or true", over: current) }
         #expect(installed(current) == "0.2.2")
 
-        try Update.install(zip: zip(try makeApp("new", version: "0.2.3", sign: true)), version: v("0.2.3"), id: id, over: current)
+        // an ad-hoc copy (no team) takes a valid signature, as before
+        try Update.install(zip: zip(try makeApp("new", version: "0.2.3", sign: true)), version: v("0.2.3"), id: id, team: nil, over: current)
         #expect(installed(current) == "0.2.3")
         #expect(Update.run("/usr/bin/codesign", "--verify", "--deep", "--strict", current.path))
     }

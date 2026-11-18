@@ -47,11 +47,11 @@ enum CLI {
         let conn = claudeHere ? ClaudeConnect.state(home: home, dir: dir).rawValue : "no_claude"
         let r = UsageModel.readBridge(bridge)
         func meter(_ m: Meter?) -> [String: Any]? {
-            m.map { ["used_percentage": $0.pct, "resets_at": n($0.resetsAt.map { Int($0.timeIntervalSince1970) })] }
+            m.map { ["used_percentage": $0.pct, "resets_at": n($0.resetsAt.map { Limits.whole($0.timeIntervalSince1970) })] }
         }
         if json {
             let reading: [String: Any]? = r.map {
-                ["captured_at": Int($0.at.timeIntervalSince1970), "age_seconds": Int(now.timeIntervalSince($0.at)),
+                ["captured_at": Limits.whole($0.at.timeIntervalSince1970), "age_seconds": Limits.whole(now.timeIntervalSince($0.at)),
                  "five_hour": n(meter($0.five)), "seven_day": n(meter($0.week))]
             }
             return Result(out: encode(["claude": ["connection": conn, "settings": ClaudeConnect.settingsURL(home: home).path,
@@ -63,7 +63,7 @@ enum CLI {
             "no_claude": "not set up on this Mac (no ~/.claude)",
         ][conn, default: conn] + "\n"
         if let r {
-            s += "last reading: \(Fmt.clock(r.at)) (\(Int(now.timeIntervalSince(r.at)) / 60) min ago)\n"
+            s += "last reading: \(Fmt.clock(r.at)) (\(Limits.whole(now.timeIntervalSince(r.at)) / 60) min ago)\n"
             if let f = r.five { s += "5h: \(Fmt.pct(f.pct))" + (f.resetsAt.map { " resets \(Fmt.clock($0))" } ?? "") + "\n" }
             if let w = r.week { s += "week: \(Fmt.pct(w.pct))" + (w.resetsAt.map { " resets \(Fmt.clock($0))" } ?? "") + "\n" }
         } else {

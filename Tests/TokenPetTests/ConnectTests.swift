@@ -155,6 +155,36 @@ import Testing
         #expect((try fm.attributesOfItem(atPath: real.path))[.posixPermissions] as? Int == 0o600)
     }
 
+    /// settings.json can hold API keys: its backups are the owner's only, and only the newest few stay.
+    @Test func backupsArePrivateAndFew() throws {
+        let h = try home(settings: "{\"env\": {\"ANTHROPIC_API_KEY\": \"sk-test\"}}\n")
+        defer { try? fm.removeItem(at: h) }
+        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: ClaudeConnect.settingsURL(home: h).path)
+        try fm.createDirectory(at: dir(h), withIntermediateDirectories: true)
+        let old = dir(h).appendingPathComponent("settings.json.20250101-000000.bak")   // written by 0.3.3 or earlier
+        try Data("{\"env\": {\"ANTHROPIC_API_KEY\": \"sk-old\"}}\n".utf8).write(to: old)
+        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: old.path)
+        let c = try #require(try ClaudeConnect.connect(home: h, dir: dir(h)))
+        let backup = try #require(try ClaudeConnect.apply(c, backupDir: dir(h)))
+        #expect((try fm.attributesOfItem(atPath: backup.path))[.posixPermissions] as? Int == 0o600)
+        #expect(throws: (any Error).self) { try ClaudeConnect.writePrivate(Data(), to: backup) }   // never over an existing file
+        #expect(try String(contentsOf: backup, encoding: .utf8).contains("sk-test"))
+        #expect((try fm.attributesOfItem(atPath: old.path))[.posixPermissions] as? Int == 0o600)   // an older kept backup is made private
+        var newest = backup
+        for _ in 0..<4 {   // eight more backups, most within the same second
+            let off = try #require(try ClaudeConnect.disconnect(home: h, dir: dir(h)))
+            _ = try ClaudeConnect.apply(off, backupDir: dir(h))
+            let on = try #require(try ClaudeConnect.connect(home: h, dir: dir(h)))
+            newest = try #require(try ClaudeConnect.apply(on, backupDir: dir(h)))
+        }
+        let backups = try fm.contentsOfDirectory(atPath: dir(h).path).filter { $0.hasSuffix(".bak") }
+        #expect(backups.count == ClaudeConnect.keptBackups)
+        #expect(backups.contains(newest.lastPathComponent))
+        for b in backups {
+            #expect((try fm.attributesOfItem(atPath: dir(h).appendingPathComponent(b).path))[.posixPermissions] as? Int == 0o600)
+        }
+    }
+
     @Test func shellQuotingRoundTrips() {
         for s in ["", "a", "it's", "'''", #"a "b" $c `d` \e"#, "line\nbreak"] {
             #expect(ClaudeConnect.unwrap(base + " --chain " + ClaudeConnect.shq(s), base: base) == s)
@@ -182,6 +212,72 @@ import Testing
         #expect(p.terminationStatus == 3)
         let saved = try Data(contentsOf: dir(h).appendingPathComponent("limits.json"))
         #expect(Limits.bridge(saved, fileDate: Date())?.five?.pct == 42)
+    }
+
+    /// The bridge finds its own tools in system folders only; the chained line keeps the caller's PATH.
+    /// Session files a month old are removed.
+    @Test func theBridgeIgnoresToolsPlantedOnThePath() throws {
+        let h = try home()
+        defer { try? fm.removeItem(at: h) }
+        let script = try #require(StatusLineSetup.bundledBridge)
+        let plant = h.appendingPathComponent("plant"), marker = h.appendingPathComponent("planted-ran")
+        try fm.createDirectory(at: plant, withIntermediateDirectories: true)
+        for tool in ["jq", "date", "mkdir", "mv", "sh", "plutil"] {
+            try Data("#!/bin/sh\n: > '\(marker.path)'\nexit 1\n".utf8).write(to: plant.appendingPathComponent(tool))
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: plant.appendingPathComponent(tool).path)
+        }
+        try Data(#"{"oauthAccount":{"accountUuid":"00000000-0000-0000-0000-000000000001"}}"#.utf8).write(to: h.appendingPathComponent(".claude.json"))
+        let sessions = dir(h).appendingPathComponent("sessions"), stale = sessions.appendingPathComponent("0123456789abcdef01234567")
+        try fm.createDirectory(at: sessions, withIntermediateDirectories: true)
+        try Data("old\nold\n".utf8).write(to: stale)
+        try fm.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -40 * 86_400)], ofItemAtPath: stale.path)
+
+        let callerPath = plant.path + ":/usr/bin:/bin"
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = [script.path, "--chain", #"printf '%s' "$PATH""#]
+        p.environment = ["HOME": h.path, "TOKENPET_DIR": dir(h).path, "PATH": callerPath]
+        let i = Pipe(), o = Pipe()
+        p.standardInput = i; p.standardOutput = o
+        try p.run()
+        let input = #"{"session_id":"s-1","rate_limits":{"five_hour":{"used_percentage":42,"resets_at":1793620000}}}"#
+        i.fileHandleForWriting.write(Data(input.utf8)); try i.fileHandleForWriting.close()
+        p.waitUntilExit()
+        #expect(String(decoding: o.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self) == callerPath)
+        #expect(p.terminationStatus == 0)
+        #expect(!fm.fileExists(atPath: marker.path))
+        let saved = try Data(contentsOf: dir(h).appendingPathComponent("limits.json"))
+        #expect(Limits.bridge(saved, fileDate: Date())?.five?.pct == 42)
+        let left = try fm.contentsOfDirectory(atPath: sessions.path)
+        #expect(left.count == 1 && !left.contains(stale.lastPathComponent))   // this session's file stays, the stale one is gone
+    }
+
+    /// Absurd epoch values in limits.json are ignored instead of crashing `status`.
+    @Test func absurdTimesAreIgnored() throws {
+        let file = Date(timeIntervalSince1970: 1_793_600_000)
+        let data = Data(#"{"captured_at":1e300,"rate_limits":{"five_hour":{"used_percentage":1,"resets_at":1e300}}}"#.utf8)
+        let r = try #require(Limits.bridge(data, fileDate: file))
+        #expect(r.at == file && r.five?.resetsAt == nil && r.five?.pct == 1)
+        for bad in ["-1", "1e300", "-1e300", "4102444801"] { #expect(Limits.epoch(Double(bad).map { NSNumber(value: $0) }) == nil) }
+        #expect(Limits.epoch(NSNumber(value: 1_793_620_000)) == Date(timeIntervalSince1970: 1_793_620_000))
+        #expect(Limits.whole(.infinity) == 0 && Limits.whole(1e300) == 1_000_000_000_000_000 && Limits.whole(-1e300) == -1_000_000_000_000_000)
+        let far = Date(timeIntervalSince1970: 1e300)   // the menu bar and popover clamp too, whatever the date
+        #expect(Fmt.left(far, now: file).hasSuffix("h") && Fmt.until(far, now: file) != Fmt.until(file, now: file))
+        #expect(Fmt.ago(far, now: file) == Fmt.ago(file, now: file) && Fmt.left(Date(timeIntervalSince1970: -1e300), now: file) == "0m")
+
+        let h = try home()
+        defer { try? fm.removeItem(at: h) }
+        let limits = dir(h).appendingPathComponent("limits.json")
+        try fm.createDirectory(at: dir(h), withIntermediateDirectories: true)
+        try data.write(to: limits)
+        for args in [["status", "--json"], ["status"]] {
+            let st = try #require(CLI.run(args, home: h, bridge: limits))
+            #expect(st.code == 0)
+        }
+        let st = try #require(CLI.run(["status", "--json"], home: h, bridge: limits))
+        let o = try #require(try JSONSerialization.jsonObject(with: Data(st.out.utf8)) as? [String: Any])
+        let reading = try #require((o["claude"] as? [String: Any])?["reading"] as? [String: Any])
+        #expect((reading["five_hour"] as? [String: Any])?["resets_at"] is NSNull)
     }
 
     @Test func theCommandLine() throws {
