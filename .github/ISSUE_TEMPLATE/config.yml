@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/s3onghyun/token-yugong/discussions
+    about: Ask a question or share an idea in Discussions.
+  - name: Security vulnerability
+    url: https://github.com/s3onghyun/token-yugong/blob/main/SECURITY.md
+    about: Please report privately as described in SECURITY.md, not in a public issue.
