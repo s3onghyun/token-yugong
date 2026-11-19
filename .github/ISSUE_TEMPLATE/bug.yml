@@ -15,11 +15,18 @@ body:
       description: Settings shows it under the update check, e.g. Token Yugong 0.2.1.
     validations:
       required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Which app?
+      options: [macOS app, Linux beta (AppImage or .deb), Windows beta (CI build)]
+    validations:
+      required: true
   - type: input
     id: macos
     attributes:
-      label: macOS version and Mac model
-      placeholder: macOS 15.5, MacBook Air M2
+      label: OS version and machine
+      placeholder: macOS 15.5, MacBook Air M2 (or Ubuntu 24.04, Windows 11)
     validations:
       required: true
   - type: checkboxes

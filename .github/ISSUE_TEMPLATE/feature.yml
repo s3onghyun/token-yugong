@@ -1,0 +1,15 @@
+name: Feature request
+description: An idea for Token Yugong.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea (optional)
+      description: The app stays local-only, so ideas that need network requests or analytics need a good reason.
