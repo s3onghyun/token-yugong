@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.5 (2026-11-20)
+
+### Fixed
+- When the newest Claude status-line reading leaves out the 5-hour window, Grandpa no longer keeps
+  an earlier 5-hour value (such as 100%) next to the newer weekly number; each reading replaces the
+  previous one for that account, and an older reading read later never overwrites a newer one. The
+  account picker shows how long ago each reading was taken.
+- 가장 최근 Claude 상태 줄 읽기에 5시간 창이 없으면, 새 주간 사용량 옆에 예전 5시간 값(예: 100%)을 더는
+  붙들지 않습니다. 계정마다 새 읽기가 이전 읽기를 통째로 대신하고, 나중에 읽힌 더 오래된 읽기는 새
+  읽기를 덮어쓰지 않습니다. 계정 목록에는 각 읽기가 얼마 전에 읽혔는지 보여 줍니다.
+
 ## 0.3.4 (2026-11-18)
 
 ### Added
