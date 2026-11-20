@@ -2,35 +2,58 @@ import Foundation
 import Testing
 @testable import TokenPet
 
-@Suite struct ClaudeAccountTests {
-    @Test func masksTheSignedInEmail() {
-        #expect(ClaudeAccount.mask("joshua@infograb.io") == "jo***@infograb.io")
-        #expect(ClaudeAccount.mask("a@example.com") == "a***@example.com")
-        #expect(ClaudeAccount.mask("not-an-email") == nil)
-    }
-
-    @Test func decodesAndHashesTheSignedInAccount() {
-        let account = ClaudeAccount.decode(Data(#"{"oauthAccount":{"accountUuid":"account-1","emailAddress":"joshua@infograb.io"}}"#.utf8))
-        #expect(account.maskedEmail == "jo***@infograb.io")
-        #expect(account.id == "07e998012c11")  // matches bridge/statusline-bridge.sh's SHA-256 prefix
-    }
-
-    @Test func comparesOnlyKnownAccountIdentities() {
-        let account = ClaudeAccount.decode(Data(#"{"oauthAccount":{"accountUuid":"account-1"}}"#.utf8))
-        #expect(!account.differs(from: account.id))
-        #expect(account.differs(from: "another-account"))
-        #expect(!account.differs(from: nil))
-        #expect(!ClaudeAccount().differs(from: "another-account"))
-    }
-}
-
 @Suite struct AccountReadingsTests {
     let now = Date(timeIntervalSince1970: 1_793_700_000)
-    let alpha = "aaaa11112222", beta = "bbbb33334444", gamma = "cccc55556666"
+    let alpha = "aaaa11112222", beta = "bbbb33334444"
 
     func reading(_ key: String?, five: Double, week: Double, at: TimeInterval = 0) -> Reading {
         Reading(five: Meter(pct: five, resetsAt: now + 5 * hour),
                 week: Meter(pct: week, resetsAt: now + 7 * day), at: now + at, account: key)
+    }
+
+    private struct LegacyPreference: Codable {
+        let reading: Reading?
+        let id: String?
+    }
+
+    @Test func syntheticSnapshotGoldenReplacesInsteadOfMergingWindows() {
+        var accounts = AccountReadings()
+        let bothWindows = reading(alpha, five: 100, week: 39, at: 60)
+        let weeklyOnly = Reading(five: nil, week: Meter(pct: 55, resetsAt: now + 7 * day), at: now + 90, account: alpha)
+
+        func golden(_ value: Reading?) -> String {
+            let snapshot = Logic.evaluate(main: value, now: now + 90)
+            let five = snapshot.five.map { String(Int($0.pct)) } ?? "unknown"
+            let week = snapshot.week.map { String(Int($0.pct)) } ?? "unknown"
+            let headline = snapshot.headline.map { String(Int($0.pct)) } ?? "unknown"
+            return "5h=\(five) week=\(week) headline=\(headline)"
+        }
+
+        accounts.takeClaude(bothWindows)
+        let before = golden(accounts.selectedClaude)
+        accounts.takeClaude(weeklyOnly)
+        let after = golden(accounts.selectedClaude)
+
+        #expect(before == "5h=100 week=39 headline=100")
+        #expect(after == "5h=unknown week=55 headline=55")
+    }
+
+    @Test func legacyPreferenceMigratesOnceToTheKeyedStore() throws {
+        let suite = "TokenPetTests.one-time-account-migration"
+        let d = UserDefaults(suiteName: suite)!
+        d.removePersistentDomain(forName: suite)
+        let legacy = LegacyPreference(reading: reading(alpha, five: 24, week: 31), id: alpha)
+        d.set(try JSONEncoder().encode(legacy), forKey: "claude.account")
+
+        let migrated = AccountReadings.load(d)
+
+        #expect(migrated.selected == .claude(alpha))
+        #expect(migrated.selectedClaude?.five?.pct == 24)
+        #expect(d.data(forKey: "claude.account") == nil)
+        #expect(d.data(forKey: "claude.readings") != nil)
+        let reloaded = AccountReadings.load(d)
+        #expect(reloaded == migrated)
+        d.removePersistentDomain(forName: suite)
     }
 
     @Test func readingsStayIndependentAndSelectionChangesTheDisplayImmediately() {
@@ -45,33 +68,6 @@ import Testing
         #expect(BarText.percent.text(Logic.evaluate(main: accounts.selectedClaude, now: now), cutscene: false, now: now) == "72%")
         accounts.select(.claude(alpha))
         #expect(BarText.percent.text(Logic.evaluate(main: accounts.selectedClaude, now: now), cutscene: false, now: now) == "24%")
-    }
-
-    @Test func aLoginChangeResetsAnEarlierPickerChoice() {
-        var accounts = AccountReadings()
-        accounts.syncLogin(alpha)
-        accounts.takeClaude(reading(alpha, five: 24, week: 31))
-        accounts.takeClaude(reading(beta, five: 72, week: 48, at: 60))
-        accounts.select(.claude(alpha))
-
-        accounts.syncLogin(beta)
-
-        #expect(accounts.selected == .claude(beta))
-        #expect(accounts.selectedClaude?.week?.pct == 48)
-    }
-
-    @Test func pickerChoiceAfterLoginSticksUntilTheNextLoginChange() {
-        var accounts = AccountReadings()
-        accounts.takeClaude(reading(alpha, five: 24, week: 31))
-        accounts.takeClaude(reading(beta, five: 72, week: 48, at: 60))
-        accounts.syncLogin(beta)
-        accounts.select(.claude(alpha))
-
-        accounts.syncLogin(beta)
-        #expect(accounts.selected == .claude(alpha))
-
-        accounts.syncLogin(gamma)
-        #expect(accounts.selected == .claude(gamma))
     }
 
     @Test func theNewerCaptureOfTheSameWindowWins() {

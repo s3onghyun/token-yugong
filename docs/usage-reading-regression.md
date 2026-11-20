@@ -47,3 +47,14 @@ the stale `5h 100%` with `W 55%`; after, it shows only `W 55%` and `현재 · 3�
 For each `AccountKey`, retain only the latest complete `Reading` snapshot (`captured_at` order).
 Its windows are displayed exactly as reported. A missing window is unknown; it is never
 estimated from an older snapshot or another account.
+
+`AccountReadingsTests.syntheticSnapshotGoldenReplacesInsteadOfMergingWindows` keeps the
+anonymous text form of this before/after fixture under `swift test`:
+
+| Synthetic capture | Golden output |
+| --- | --- |
+| two windows: 5-hour 100%, weekly 39% | `5h=100 week=39 headline=100` |
+| newer weekly-only: weekly 55% | `5h=unknown week=55 headline=55` |
+
+The same suite also proves that the old single-reading preference is rewritten once into the
+keyed store, then the legacy preference is removed. No real account id or reading is used.
