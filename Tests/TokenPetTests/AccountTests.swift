@@ -92,6 +92,25 @@ import Testing
         #expect(accounts.selectedClaude?.week?.pct == 1)
     }
 
+    @Test func latestSnapshotDoesNotInventAMissingWindow() {
+        // Synthetic form of the 2026-11-20 regression: one account first reports both
+        // windows, then its newer bridge snapshot reports only its weekly limit.  The menu
+        // must show that 5-hour is unknown, never an older 100% value combined with the week.
+        var accounts = AccountReadings()
+        accounts.takeClaude(reading(alpha, five: 100, week: 39, at: 60))
+        let weeklyOnly = Reading(five: nil,
+                                 week: Meter(pct: 55, resetsAt: now + 7 * day),
+                                 at: now + 90,
+                                 account: alpha)
+
+        accounts.takeClaude(weeklyOnly)
+
+        #expect(accounts.selectedClaude == weeklyOnly)
+        #expect(accounts.selectedClaude?.five == nil)
+        #expect(accounts.selectedClaude?.week?.pct == 55)
+        #expect(Logic.evaluate(main: accounts.selectedClaude, now: now + 90).daily != nil)
+    }
+
     @Test func anOlderCaptureArrivingLaterDoesNotOverwriteANewerOne() {
         var accounts = AccountReadings()
         accounts.takeClaude(reading(alpha, five: 30, week: 50, at: 60))

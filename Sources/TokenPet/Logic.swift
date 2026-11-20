@@ -296,9 +296,14 @@ struct AccountReadings: Equatable, Codable {
         }
     }
 
+    /// A bridge report is one complete snapshot for its key.  Do not retain a window from an
+    /// earlier report when the latest report omitted it: omitted means the source did not tell
+    /// us, not that the old number is still true.  `captured_at` makes an out-of-order file
+    /// notification harmless while equal timestamps deliberately favour the later report.
     mutating func takeClaude(_ reading: Reading) {
         let key = AccountKey.claude(reading.account)
-        store[key] = Self.merge(store[key], reading)
+        if let current = store[key], current.at > reading.at { return }
+        store[key] = reading
         if selected == nil && key.isClaude { selected = key }
     }
 
@@ -338,20 +343,6 @@ struct AccountReadings: Equatable, Codable {
         }
     }
 
-    /// Two current sessions of the same account can redraw different windows. Keep a still-live
-    /// window the newer capture omits; a reset makes an omitted window empty. Within a window the
-    /// newer capture wins, even when it is lower: a limit can be reset before its `resets_at`.
-    static func merge(_ old: Reading?, _ incoming: Reading) -> Reading {
-        guard let old else { return incoming }
-        let oldReading = old, incomingReading = incoming
-        func window(_ old: Meter?, _ incoming: Meter?) -> Meter? {
-            guard let old else { return incoming }
-            guard let oldReset = old.resetsAt, oldReset > incomingReading.at else { return incoming ?? Meter(pct: 0, resetsAt: nil) }
-            guard let incoming else { return old }
-            return incomingReading.at >= oldReading.at ? incoming : old
-        }
-        return Reading(five: window(old.five, incoming.five), week: window(old.week, incoming.week), at: max(old.at, incoming.at), month: incoming.month, account: incoming.account)
-    }
 }
 
 struct AccountRow: Identifiable, Equatable {

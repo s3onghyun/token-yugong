@@ -71,14 +71,19 @@ if args.contains("--scan-report") {
     let now = Date()
     let ko = L.pseudo ? "-pseudo" : L.lang == .en ? "" : "-\(L.lang.rawValue)"
     if args.contains("--render-accounts") {
-        // Synthetic hashes and percentages only: never render a requester's local account data.
+        // Synthetic account keys and numbers only: never render a requester's local account data.
+        // Alpha's later weekly-only snapshot makes the fixture visibly cover a missing 5-hour
+        // window; the row must not retain Alpha's earlier 100% 5-hour value.
         model.setFixtureAccounts([
-            Reading(five: Meter(pct: 24, resetsAt: now.addingTimeInterval(2 * 3600)),
+            Reading(five: Meter(pct: 100, resetsAt: now.addingTimeInterval(2 * 3600)),
                     week: Meter(pct: 36, resetsAt: now.addingTimeInterval(4 * 86400)),
-                    at: now.addingTimeInterval(-3 * 60), account: "1111aaaabbbb"),
+                    at: now.addingTimeInterval(-5 * 60), account: "1111aaaabbbb"),
             Reading(five: Meter(pct: 67, resetsAt: now.addingTimeInterval(3 * 3600)),
                     week: Meter(pct: 58, resetsAt: now.addingTimeInterval(5 * 86400)),
                     at: now.addingTimeInterval(-18 * 60), account: "2222ccccdddd"),
+            Reading(five: nil,
+                    week: Meter(pct: 55, resetsAt: now.addingTimeInterval(4 * 86400)),
+                    at: now.addingTimeInterval(-3 * 60), account: "1111aaaabbbb"),
         ])
         model.setDemo(.steady)
         let renderer = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now)

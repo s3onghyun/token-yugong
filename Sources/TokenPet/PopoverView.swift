@@ -383,8 +383,11 @@ struct PopoverView: View {
     }
 
     private func accountReadTime(_ row: AccountRow) -> String {
-        let current = row.selected ? L.t("Current", "현재", "現在", "当前") : L.t("Last read", "마지막 읽기", "最終読み取り", "最后读取")
-        return "\(current) · \(Fmt.clock(row.reading.at, now: clockNow))"
+        let age = Fmt.ago(row.reading.at, now: clockNow)
+        if row.selected {
+            return L.t("Current · read \(age)", "현재 · \(age) 읽음", "現在・\(age) に読み取り", "当前 · \(age)读取")
+        }
+        return L.t("Last read \(age)", "마지막 읽기 · \(age) 읽음", "最終読み取り \(age)", "最后读取 \(age)")
     }
 
     private func accountMeters(_ reading: Reading) -> String {
