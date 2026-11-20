@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.6 (2026-11-20)
+
+### Changed
+- A Claude Code login change no longer switches Grandpa's account by itself. The first account
+  that reports a reading is selected; after that the account you choose in the picker stays
+  selected, including across a restart. An account choice saved by an older version is carried
+  over once.
+- Claude Code에서 로그인이 바뀌어도 할아버지가 저절로 계정을 바꾸지 않습니다. 처음 읽기를 보낸 계정이
+  선택되고, 그다음에는 계정 목록에서 고른 계정이 다시 시작한 뒤에도 그대로 유지됩니다.
+  예전 버전이 저장한 계정 선택은 한 번 옮겨 옵니다.
+
 ## 0.3.5 (2026-11-20)
 
 ### Fixed
