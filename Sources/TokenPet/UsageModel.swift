@@ -1,6 +1,5 @@
 import Foundation
 import ServiceManagement
-import CryptoKit
 import TokenPetAssets
 
 /// One settings domain however the app is started (`swift run` or the .app bundle), so the
@@ -9,47 +8,6 @@ import TokenPetAssets
 enum Prefs {
     static let domain = ProcessInfo.processInfo.environment["TOKENPET_PREFS"] ?? "TokenPet"
     static let store = UserDefaults(suiteName: domain) ?? .standard
-}
-
-/// The local Claude Code login. Its email is only held in memory for the popover and is masked
-/// before it reaches the view.
-struct ClaudeAccount: Equatable {
-    var id: String?
-    var email: String?
-
-    static var configURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
-    }
-
-    static func read(from url: URL = configURL) -> ClaudeAccount {
-        guard let data = try? Data(contentsOf: url) else { return ClaudeAccount() }
-        return decode(data)
-    }
-
-    static func decode(_ data: Data) -> ClaudeAccount {
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let oauth = root["oauthAccount"] as? [String: Any] else { return ClaudeAccount() }
-        let uuid = oauth["accountUuid"] as? String
-        let email = (oauth["emailAddress"] as? String) ?? (oauth["email"] as? String)
-        return ClaudeAccount(id: uuid.map(hash), email: email)
-    }
-
-    static func mask(_ email: String?) -> String? {
-        guard let email, let at = email.firstIndex(of: "@"), at != email.startIndex else { return nil }
-        return "\(String(email[..<at]).prefix(2))***\(email[at...])"
-    }
-
-    var maskedEmail: String? { Self.mask(email) }
-
-    /// An absent account identity is not evidence of a switch (older bridge payloads omit it).
-    func differs(from shownID: String?) -> Bool {
-        guard let id, let shownID else { return false }
-        return id != shownID
-    }
-
-    private static func hash(_ value: String) -> String {
-        String(SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined().prefix(12))
-    }
 }
 
 /// What the app read from the bridge and made of it, one line per new reading, for telling later which
@@ -227,13 +185,22 @@ extension AccountReadings {
         if let data = d.data(forKey: "claude.readings") {
             if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["legacy"] != nil,
                let old = try? JSONDecoder().decode(LegacyReadingState.self, from: data) {
-                return AccountReadings(migrating: old.store ?? ReadingStore(), selected: nil,
-                                       reading: old.legacy?.reading, account: old.legacy?.id)
+                let migrated = AccountReadings(migrating: old.store ?? ReadingStore(), selected: nil,
+                                               reading: old.legacy?.reading, account: old.legacy?.id)
+                migrated.save(d)
+                d.removeObject(forKey: "claude.account")
+                return migrated
             }
-            if let current = try? JSONDecoder().decode(AccountReadings.self, from: data) { return current }
+            if var current = try? JSONDecoder().decode(AccountReadings.self, from: data) {
+                if current.migrateLegacyKeys() { current.save(d) }
+                return current
+            }
         }
         if let data = d.data(forKey: "claude.account"), let old = try? JSONDecoder().decode(LegacyAccountState.self, from: data) {
-            return AccountReadings(migrating: ReadingStore(), selected: nil, reading: old.reading, account: old.id)
+            let migrated = AccountReadings(migrating: ReadingStore(), selected: nil, reading: old.reading, account: old.id)
+            migrated.save(d)
+            d.removeObject(forKey: "claude.account")
+            return migrated
         }
         return AccountReadings()
     }
@@ -305,7 +272,7 @@ final class UsageModel: ObservableObject {
     /// but coalesce bursts so a streamed response does not turn into repeated full scans.
     private func watchUsageFiles() {
         let paths = [bridgeURL.deletingLastPathComponent(), scanner.root, codexReader.root, geminiReader.root,
-                     planUsageURL.deletingLastPathComponent(), ClaudeAccount.configURL]
+                     planUsageURL.deletingLastPathComponent()]
         fileWatchers = paths.compactMap { path in
             FileChangeWatcher(path: path) { [weak self] in
                 DispatchQueue.main.async { self?.refreshAfterFileChange() }
@@ -338,7 +305,6 @@ final class UsageModel: ObservableObject {
             let b = Self.readBridge(bridgeURL)
             let plan = Self.readPlanUsage(planUsageURL)
             DispatchQueue.main.async { [self] in
-                syncLoggedInClaude()
                 take(Limits.supplement(b, with: plan, now: Date()))
                 scanning = false
                 mountain.absorb(allEvents)
@@ -358,7 +324,6 @@ final class UsageModel: ObservableObject {
             let b = Self.readBridge(bridgeURL)
             let plan = Self.readPlanUsage(planUsageURL)
             DispatchQueue.main.async { [self] in
-                syncLoggedInClaude()
                 take(Limits.supplement(b, with: plan, now: Date()))
                 scanning = false
                 mountain.absorb(allEvents)
@@ -382,8 +347,6 @@ final class UsageModel: ObservableObject {
                                          hitAccount: nil, selected: accountReadings.selected,
                                          lastAnswer: scanner.events.last?.time, now: Date())
         case .codex:
-            accountReadings.takeCodex(codexReader.reading)
-            accountReadings.save()
             return accountReadings.codex
         case .gemini, .deepseek: return nil
         case .openai: return budgets.state[.openai].flatMap { st in st.spent.flatMap { Budget.reading(spent: $0, budget: openAIBudget, at: st.at) } }
@@ -395,7 +358,6 @@ final class UsageModel: ObservableObject {
         scanner.scan()
         codexReader.scan()
         geminiReader.scan()
-        syncLoggedInClaude()
         take(Limits.supplement(Self.readBridge(bridgeURL), with: Self.readPlanUsage(planUsageURL), now: Date()))
         mountain.absorb(allEvents)
         recompute()
@@ -441,24 +403,20 @@ final class UsageModel: ObservableObject {
     /// Opens the big scene in a window of its own (SceneWindow).
     var openWindow: (() -> Void)?
 
-    /// A bridge reading belongs only to its stable bridge key. Selection is explicit and saved;
-    /// there is no weekly-reset or signed-in-account inference here.
+    /// Every scanner feeds the same persisted keyed store before display selection. A Claude
+    /// snapshot belongs only to its bridge key; a Codex snapshot has one local key. There is no
+    /// weekly-reset or account-selection inference in either update.
     private func take(_ b: Reading?) {
-        guard let b else { return }
-        accountReadings.takeClaude(b)
-        accountReadings.save()
-        if b != lastLogged {
+        var changed = accountReadings.takeCodex(codexReader.reading)
+        if let b { changed = accountReadings.takeClaude(b) || changed }
+        if changed { accountReadings.save() }
+        if let b, b != lastLogged {
             lastLogged = b
             ReadingLog.append(ReadingLog.line(read: b, decision: "stored", shown: accountReadings.selectedClaude,
                                                selected: accountReadings.selected))
         }
     }
 
-    private func syncLoggedInClaude() {
-        let before = accountReadings.selected
-        accountReadings.syncLogin(ClaudeAccount.read().id)
-        if accountReadings.selected != before { accountReadings.save() }
-    }
     private var lastLogged: Reading?
     var accountRows: [AccountRow] { accountReadings.rows() }
     var selectedClaudeAccount: AccountKey? { accountReadings.selected }

@@ -262,32 +262,30 @@ struct ReadingStore: Equatable, Codable {
         nicknames.removeValue(forKey: key.value)
     }
 
-    mutating func migrateLegacyUnknownKey() {
-        guard let reading = values.removeValue(forKey: "claude:untagged") else { return }
+    @discardableResult mutating func migrateLegacyUnknownKey() -> Bool {
+        guard let reading = values.removeValue(forKey: "claude:untagged") else { return false }
         values[AccountKey.unknownClaude.value] = reading
         if let nickname = nicknames.removeValue(forKey: "claude:untagged") {
             nicknames[AccountKey.unknownClaude.value] = nickname
         }
+        return true
     }
 }
 
-/// The account picker follows the currently logged-in Claude account. A user choice stays put
-/// until the next login change. An unknown bridge reading is a separate row and never becomes
-/// selection evidence.
+/// The account picker keeps the user's selected key. Until one is chosen, the first identified
+/// bridge reading becomes the initial selection. An unknown bridge reading is a separate row
+/// and never becomes selection evidence.
 struct AccountReadings: Equatable, Codable {
     static let staleAfter: TimeInterval = 30 * 86400
 
     private var store = ReadingStore()
     private(set) var selected: AccountKey?
-    /// The last account observed in ~/.claude.json. A different login is stronger evidence than
-    /// an older picker choice, but the picker remains in charge until the next login change.
-    private var loggedIn: String?
 
     init() {}
 
     init(migrating store: ReadingStore, selected: AccountKey?, reading: Reading?, account: String?) {
         self.store = store
-        self.store.migrateLegacyUnknownKey()
+        _ = self.store.migrateLegacyUnknownKey()
         if let selected, selected.isClaude, self.store[selected] != nil { self.selected = selected }
         else if let reading {
             let key = AccountKey.claude(account)
@@ -300,22 +298,21 @@ struct AccountReadings: Equatable, Codable {
     /// earlier report when the latest report omitted it: omitted means the source did not tell
     /// us, not that the old number is still true.  `captured_at` makes an out-of-order file
     /// notification harmless while equal timestamps deliberately favour the later report.
-    mutating func takeClaude(_ reading: Reading) {
+    @discardableResult mutating func takeClaude(_ reading: Reading) -> Bool {
         let key = AccountKey.claude(reading.account)
-        if let current = store[key], current.at > reading.at { return }
+        if let current = store[key], current.at > reading.at { return false }
+        let wasSelected = selected
+        let changed = store[key] != reading
         store[key] = reading
         if selected == nil && key.isClaude { selected = key }
+        return changed || selected != wasSelected
     }
 
-    /// One account rule: a newly observed Claude login selects that account. An explicit picker
-    /// choice made afterwards stays put because the same login is a no-op.
-    mutating func syncLogin(_ account: String?) {
-        guard let account, account != loggedIn else { return }
-        loggedIn = account
-        selected = .claude(account)
+    @discardableResult mutating func takeCodex(_ reading: Reading?) -> Bool {
+        guard store[.local] != reading else { return false }
+        store[.local] = reading
+        return true
     }
-
-    mutating func takeCodex(_ reading: Reading?) { store[.local] = reading }
 
     mutating func select(_ key: AccountKey) {
         guard key.isClaude, store[key] != nil else { return }
@@ -334,6 +331,15 @@ struct AccountReadings: Equatable, Codable {
     var codex: Reading? { store[.local] }
 
     func nickname(for key: AccountKey) -> String? { store.nickname(for: key) }
+
+    /// A pre-keyed build called its untagged Claude row `claude:untagged`. Move that row once
+    /// to the explicit unconfirmed key and make sure it can never remain the selected account.
+    @discardableResult mutating func migrateLegacyKeys() -> Bool {
+        let migrated = store.migrateLegacyUnknownKey()
+        guard migrated else { return false }
+        if selected?.value == "claude:untagged" { selected = nil }
+        return true
+    }
 
     func rows(now: Date = Date()) -> [AccountRow] {
         store.keys.compactMap { key in
