@@ -294,7 +294,7 @@ Token Yugong reads files on your Mac and keeps everything there. No account, no 
 
 | What it reads | Why |
 |---|---|
-| `~/.claude/token-pet/limits.json` | Claude Code's official limits, written by the status-line bridge (used %, reset time; no prompts, paths or session ids). To tell Claude accounts apart, the bridge reads `oauthAccount.accountUuid` from `~/.claude.json` and writes only a 12-character SHA-256 hash of it |
+| `~/.claude/token-pet/limits.json` | Claude Code's official limits, written by the status-line bridge (used %, reset time; no prompts, paths or session ids). To tell Claude accounts apart, the bridge reads the account that owns the session (the `session-owner` record in that session's transcript; `oauthAccount.accountUuid` in `~/.claude.json` if there is none) and writes only a 12-character SHA-256 hash of it |
 | Claude Code session logs (`~/.claude/projects`) | token counts for Grandpa's pace and the mountain, and the `usage_limit_reached` refusal so a full limit shows 100% |
 | `~/.codex/sessions` | Codex's own limits and token counts |
 | `~/.gemini/tmp` | Gemini CLI token counts |

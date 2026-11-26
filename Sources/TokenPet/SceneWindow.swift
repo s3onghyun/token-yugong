@@ -47,6 +47,16 @@ struct SceneWindowView: View {
     }
 }
 
+/// The menu-bar popover's content: animated only while the popover is open.
+struct PopoverHost: View {
+    @ObservedObject var model: UsageModel
+    @ObservedObject var vis: SceneVisibility
+
+    var body: some View {
+        PopoverView(model: model, fixedT: vis.shown ? nil : model.phase(at: Date.timeIntervalSinceReferenceDate))
+    }
+}
+
 /// The big scene in a window of its own: resizable (the content scales, keeping its proportions),
 /// draggable, Esc or the close button hides it. Size, place, level and opacity are remembered.
 final class SceneWindow: NSPanel, NSWindowDelegate, NSMenuDelegate {
