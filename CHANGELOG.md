@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.9 (2026-11-26)
 
 ### Fixed
 - Claude's limits now come from Claude Code itself: the app runs the unmodified `claude -p /usage` once per
