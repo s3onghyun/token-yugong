@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Claude's limits now come from Claude Code itself: the app runs the unmodified `claude -p /usage` once per
+  profile (the default `~/.claude`, plus any `CLAUDE_CONFIG_DIR` folder you add in Settings › Accounts) and
+  reads only its structured rows. A status line names no account, so every release up to 0.3.8 had to guess
+  which account a number belonged to, and each guess broke somewhere. 0.3.8's guess was the weekly reset time,
+  which two accounts (for example two Max x20 plans) can share. Each profile's answer is that profile's login,
+  so two accounts can no longer mix in one row, whatever their reset times. The app never reads a token and
+  never calls an Anthropic endpoint itself.
+- Asks are rare: once at start, when you open the popover (at most once per 5 minutes per profile), and every
+  30 minutes ± 5 in the background (Settings › *Ask Claude Code every 30 minutes* turns that off). Activity never
+  triggers one. When Claude Code answers without fresh limits (rate limited, signed out), that profile waits
+  1 hour, then 2, 4 … up to a day, and the background refresh skips it until the popover is opened.
+- Output the app cannot read shows "don't know", never an older number. Between asks the popover shows the
+  last answer with its age.
+
+### Changed
+- The status-line bridge only prints the session's own percentage and writes no file. Connecting it is
+  optional. `TokenPet status` prints the app's last `/usage` answer.
+- Rows saved by 0.3.8 and older (keyed by a weekly reset or an account hash) are dropped once; rows are now
+  named by the profile's signed-in email or your nickname.
+- Removed: reading Claude Desktop's plan history and Claude Code's `usage_limit_reached` log lines (both were
+  stand-ins for what `/usage` now reports).
+
+### 수정
+- Claude 한도를 이제 Claude Code 자신에게서 받습니다. 앱이 수정하지 않은 `claude -p /usage`를 프로필마다 한 번씩
+  실행하고(기본 `~/.claude`, 그리고 설정 › 계정에서 추가한 `CLAUDE_CONFIG_DIR` 폴더) 그 구조화된 행만 읽습니다.
+  상태줄에는 계정이 적혀 있지 않아 0.3.8까지는 숫자가 어느 계정의 것인지 추측해야 했고, 추측은 모두 어딘가에서
+  깨졌습니다. 0.3.8은 주간 리셋 시각으로 추측했는데, 두 계정(예: Max x20 두 개)이 같은 시각일 수 있습니다. 프로필의
+  답은 그 프로필 로그인의 것이라, 리셋 시각이 같아도 두 계정이 한 행에 섞이지 않습니다. 앱은 토큰을 읽지 않고
+  Anthropic 엔드포인트를 직접 부르지도 않습니다.
+- 드물게 묻습니다. 앱을 켤 때 한 번, 팝오버를 열 때(프로필마다 5분에 한 번까지), 백그라운드로 30분 ±5분마다
+  (설정 › *30분마다 Claude Code에 묻기*로 끔). 사용 활동으로는 묻지 않습니다. Claude Code가 새 한도 없이 답하면
+  (rate limit, 로그아웃) 그 프로필은 1시간, 다음엔 2·4시간 … 최대 하루 쉬고, 팝오버를 열 때까지 백그라운드에서
+  묻지 않습니다.
+- 읽지 못한 출력은 예전 숫자가 아니라 "모름"으로 보입니다. 묻는 사이에는 마지막 답을 그 나이와 함께 보여 줍니다.
+
 ## 0.3.8 (2026-11-26)
 
 ### Fixed

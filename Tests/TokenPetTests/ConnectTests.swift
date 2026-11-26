@@ -193,7 +193,7 @@ import Testing
         #expect(ClaudeConnect.unwrap(base, base: base) == nil)
     }
 
-    /// The bridge with `--chain`: saves the limits, then the user's own line gets the same JSON and is what shows.
+    /// The bridge with `--chain`: the user's own line gets the same JSON and is what shows; nothing is saved.
     @Test func theBridgeRunsTheChainedLine() throws {
         let h = try home()
         defer { try? fm.removeItem(at: h) }
@@ -210,12 +210,33 @@ import Testing
         p.waitUntilExit()
         #expect(String(decoding: o.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self) == "mine:" + input)
         #expect(p.terminationStatus == 3)
-        let saved = try Data(contentsOf: dir(h).appendingPathComponent("limits.json"))
-        #expect(Limits.bridge(saved, fileDate: Date())?.five?.pct == 42)
+        #expect(!fm.fileExists(atPath: dir(h).path))
+    }
+
+    /// Without a chained line the bridge shows this session's own percentage, and writes no file.
+    @Test func theBridgeOnlyPrints() throws {
+        let h = try home()
+        defer { try? fm.removeItem(at: h) }
+        let script = try #require(StatusLineSetup.bundledBridge)
+        for (path, input, shown) in [("/usr/bin:/bin", #"{"session_id":"s","rate_limits":{"five_hour":{"used_percentage":41.6,"resets_at":1793620000}}}"#, "🐾 5h 42%"),
+                                     ("/nowhere", #"{"rate_limits":{"seven_day":{"used_percentage":7,"resets_at":1793620000}}}"#, "🐾 week 7%"),
+                                     ("/usr/bin:/bin", #"{"model":{}}"#, "")] {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = [script.path]
+            p.environment = ["HOME": h.path, "TOKENPET_DIR": dir(h).path, "PATH": path]
+            let i = Pipe(), o = Pipe()
+            p.standardInput = i; p.standardOutput = o
+            try p.run()
+            i.fileHandleForWriting.write(Data(input.utf8)); try i.fileHandleForWriting.close()
+            p.waitUntilExit()
+            #expect(String(decoding: o.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self) == shown)
+            #expect(p.terminationStatus == 0)
+        }
+        #expect(!fm.fileExists(atPath: dir(h).path))
     }
 
     /// The bridge finds its own tools in system folders only; the chained line keeps the caller's PATH.
-    /// Session files a month old are removed.
     @Test func theBridgeIgnoresToolsPlantedOnThePath() throws {
         let h = try home()
         defer { try? fm.removeItem(at: h) }
@@ -226,11 +247,6 @@ import Testing
             try Data("#!/bin/sh\n: > '\(marker.path)'\nexit 1\n".utf8).write(to: plant.appendingPathComponent(tool))
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: plant.appendingPathComponent(tool).path)
         }
-        let sessions = dir(h).appendingPathComponent("sessions"), stale = sessions.appendingPathComponent("0123456789abcdef01234567")
-        try fm.createDirectory(at: sessions, withIntermediateDirectories: true)
-        try Data("old\nold\n".utf8).write(to: stale)
-        try fm.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -40 * 86_400)], ofItemAtPath: stale.path)
-
         let callerPath = plant.path + ":/usr/bin:/bin"
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -245,18 +261,11 @@ import Testing
         #expect(String(decoding: o.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self) == callerPath)
         #expect(p.terminationStatus == 0)
         #expect(!fm.fileExists(atPath: marker.path))
-        let saved = try Data(contentsOf: dir(h).appendingPathComponent("limits.json"))
-        #expect(Limits.bridge(saved, fileDate: Date())?.five?.pct == 42)
-        let left = try fm.contentsOfDirectory(atPath: sessions.path)
-        #expect(left.count == 1 && !left.contains(stale.lastPathComponent))   // this session's file stays, the stale one is gone
     }
 
-    /// Absurd epoch values in limits.json are ignored instead of crashing `status`.
+    /// Absurd epoch values are ignored, and a window without a reset time prints as null in `status`.
     @Test func absurdTimesAreIgnored() throws {
         let file = Date(timeIntervalSince1970: 1_793_600_000)
-        let data = Data(#"{"captured_at":1e300,"rate_limits":{"five_hour":{"used_percentage":1,"resets_at":1e300}}}"#.utf8)
-        let r = try #require(Limits.bridge(data, fileDate: file))
-        #expect(r.at == file && r.five?.resetsAt == nil && r.five?.pct == 1)
         for bad in ["-1", "1e300", "-1e300", "4102444801"] { #expect(Limits.epoch(Double(bad).map { NSNumber(value: $0) }) == nil) }
         #expect(Limits.epoch(NSNumber(value: 1_793_620_000)) == Date(timeIntervalSince1970: 1_793_620_000))
         #expect(Limits.whole(.infinity) == 0 && Limits.whole(1e300) == 1_000_000_000_000_000 && Limits.whole(-1e300) == -1_000_000_000_000_000)
@@ -267,13 +276,15 @@ import Testing
         let h = try home()
         defer { try? fm.removeItem(at: h) }
         let limits = dir(h).appendingPathComponent("limits.json")
-        try fm.createDirectory(at: dir(h), withIntermediateDirectories: true)
-        try data.write(to: limits)
+        let prefs = try #require(UserDefaults(suiteName: "tokenpet-test-\(UUID().uuidString)"))
+        var accounts = ClaudeAccounts()
+        accounts.take(.limits(Reading(five: Meter(pct: 1, resetsAt: nil), week: nil, at: file)), login: "a@example.com", for: .claudeDefault, now: file)
+        accounts.save(prefs)
         for args in [["status", "--json"], ["status"]] {
-            let st = try #require(CLI.run(args, home: h, bridge: limits))
+            let st = try #require(CLI.run(args, home: h, bridge: limits, prefs: prefs))
             #expect(st.code == 0)
         }
-        let st = try #require(CLI.run(["status", "--json"], home: h, bridge: limits))
+        let st = try #require(CLI.run(["status", "--json"], home: h, bridge: limits, prefs: prefs))
         let o = try #require(try JSONSerialization.jsonObject(with: Data(st.out.utf8)) as? [String: Any])
         let reading = try #require((o["claude"] as? [String: Any])?["reading"] as? [String: Any])
         #expect((reading["five_hour"] as? [String: Any])?["resets_at"] is NSNull)
@@ -283,7 +294,8 @@ import Testing
         let h = try home(settings: "{\"model\": \"opus\"}\n")
         defer { try? fm.removeItem(at: h) }
         let limits = dir(h).appendingPathComponent("limits.json")
-        func run(_ a: String...) throws -> CLI.Result { try #require(CLI.run(a, home: h, bridge: limits)) }
+        let prefs = try #require(UserDefaults(suiteName: "tokenpet-test-\(UUID().uuidString)"))
+        func run(_ a: String...) throws -> CLI.Result { try #require(CLI.run(a, home: h, bridge: limits, prefs: prefs)) }
         #expect(CLI.run(["--scan-report"], home: h, bridge: limits) == nil)   // not ours: the app starts
 
         #expect(try run("status", "--json").out.contains(#""connection":"not_connected""#))
@@ -294,11 +306,16 @@ import Testing
         #expect(fm.fileExists(atPath: dir(h).appendingPathComponent("statusline-bridge.sh").path))
         #expect(try run("setup", "--json").out.contains(#""result":"already_connected""#))
 
-        try Data(#"{"captured_at":1793600000,"rate_limits":{"five_hour":{"used_percentage":42,"resets_at":1793620000}}}"#.utf8).write(to: limits)
+        #expect(try run("status", "--json").out.contains(#""reading":null"#))
+        var accounts = ClaudeAccounts()
+        let at = Date(timeIntervalSince1970: 1_793_600_000)
+        accounts.take(.limits(Reading(five: Meter(pct: 42, resetsAt: Date(timeIntervalSince1970: 1_793_620_000)), week: nil, at: at)),
+                      login: "a@example.com", for: .claudeDefault, now: at)
+        accounts.save(prefs)
         let st = try run("status", "--json")
         let o = try #require(try JSONSerialization.jsonObject(with: Data(st.out.utf8)) as? [String: Any])
         let c = try #require(o["claude"] as? [String: Any]), r = try #require(c["reading"] as? [String: Any])
-        #expect(c["connection"] as? String == "connected")
+        #expect(c["connection"] as? String == "connected" && c["profile"] as? String == "default")
         #expect(r["captured_at"] as? Int == 1_793_600_000)
         #expect((r["five_hour"] as? [String: Any])?["used_percentage"] as? Double == 42)
         #expect(r["seven_day"] is NSNull)

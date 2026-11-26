@@ -92,45 +92,6 @@ enum Limits {
     static let fiveLength: TimeInterval = 5 * 3600
     static let weekLength: TimeInterval = 7 * 86400
 
-    /// The file bridge/statusline-bridge.sh writes: {"captured_at": epoch, "rate_limits": {five_hour, seven_day}}.
-    /// nil = nothing usable (missing, corrupt, partial, or no window at all). An older bridge's
-    /// "account" hash is ignored: it was a guess (see `AccountKey.claude`).
-    static func bridge(_ data: Data, fileDate: Date) -> Reading? {
-        guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let rl = o["rate_limits"] as? [String: Any] else { return nil }
-        let at = epoch(o["captured_at"]) ?? fileDate
-        let r = Reading(five: meter(rl["five_hour"], "used_percentage"), week: meter(rl["seven_day"], "used_percentage"), at: at)
-        return r.five == nil && r.week == nil ? nil : r
-    }
-
-    /// Claude Desktop's local plan history records the same Max usage with compact names:
-    /// `samples[].t` is milliseconds since epoch and `samples[].u.fh` is the 5-hour percentage.
-    /// It deliberately does not supply a reset time.  Select the newest sample first: an omitted or
-    /// null `fh` means the current source did not report the window, not that an older value is current.
-    static func planUsageHistory(_ data: Data) -> Reading? {
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let samples = root["samples"] as? [[String: Any]],
-              let newest = samples.compactMap({ sample -> (Date, [String: Any])? in
-                  guard let ms = (sample["t"] as? NSNumber)?.doubleValue, ms.isFinite, ms > 0,
-                        let usage = sample["u"] as? [String: Any] else { return nil }
-                  return (Date(timeIntervalSince1970: ms / 1_000), usage)
-              }).max(by: { $0.0 < $1.0 }),
-              let pct = (newest.1["fh"] as? NSNumber)?.doubleValue, pct.isFinite, pct >= 0 else { return nil }
-        return Reading(five: Meter(pct: min(pct, 100), resetsAt: nil, resetUnavailable: true), week: nil, at: newest.0)
-    }
-
-    /// A status-line response remains the authority for the account and weekly reset.  Claude
-    /// Desktop can fill only its missing five-hour percentage, and only when both local sources
-    /// describe the same fresh moment.  This avoids reviving a stale `fh` after the API omits it.
-    static func supplement(_ bridge: Reading?, with planHistory: Reading?, now: Date,
-                           maximumSkew: TimeInterval = 5 * 60, maximumAge: TimeInterval = 10 * 60) -> Reading? {
-        guard var bridge, bridge.five == nil, let history = planHistory, let five = history.five,
-              abs(history.at.timeIntervalSince(bridge.at)) <= maximumSkew,
-              now.timeIntervalSince(history.at) <= maximumAge else { return bridge }
-        bridge.five = five
-        return bridge
-    }
-
     /// One Codex rollout line whose payload carries `rate_limits` (primary/secondary windows).
     /// Only the two known window lengths are used: 300 min = 5-hour, 10080 min = weekly.
     static func codex(_ line: Data) -> Reading? {
@@ -167,216 +128,116 @@ enum Limits {
     /// A whole number of seconds or minutes to show or print: clamped first, so it never traps.
     static func whole(_ x: Double) -> Int { x.isFinite ? Int(min(max(x, -1e15), 1e15)) : 0 }
 
-    /// Claude Code logs the rejected request when a limit is used up (`apiError: usage_limit_reached`).
-    /// The status line never shows it: its numbers come from the last *successful* response, so they stop at 99.
-    struct Hit: Equatable {
-        var time: Date
-        var week: Bool          // seven_day; else five_hour
-        var resetsAt: Date
-    }
-
-    /// One Claude Code log line, decoded. nil unless it is a 5-hour or weekly limit rejection.
-    static func hit(_ o: [String: Any]) -> Hit? {
-        guard o["apiError"] as? String == "usage_limit_reached",
-              let info = (o["apiErrorParams"] as? [String: Any])?["rate_limit_info"] as? [String: Any],
-              let reset = epoch(info["resetsAt"]),
-              let time = (o["timestamp"] as? String).flatMap(iso.date(from:)) else { return nil }
-        switch info["rateLimitType"] as? String {
-        case "five_hour": return Hit(time: time, week: false, resetsAt: reset)
-        case "seven_day": return Hit(time: time, week: true, resetsAt: reset)
-        default: return nil
-        }
-    }
-
-    /// The status-line reading with the logged limit hits on top: a hit fills its window to 100% until
-    /// it resets, unless Claude answered again after it (another account, extra usage) or the reading
-    /// already shows a later window. Hits that reset more than `Logic.morningFor` ago are over.
-    static func apply(_ hits: [Hit], to reading: Reading?, lastAnswer: Date?, now: Date) -> Reading? {
-        var r = reading
-        for h in hits where h.resetsAt > now.addingTimeInterval(-Logic.morningFor) && (lastAnswer.map { $0 <= h.time } ?? true) {
-            var x = r ?? Reading(five: nil, week: nil, at: h.time)
-            let old = h.week ? x.week : x.five
-            if let o = old?.resetsAt, o > h.resetsAt.addingTimeInterval(60) { continue }   // a newer window
-            if let rd = reading {
-                // A reading after the refusal that shows another window is newer evidence.
-                let shown = h.week ? rd.week : rd.five
-                let other = shown?.resetsAt.map { abs($0.timeIntervalSince(h.resetsAt)) > 60 && rd.at > h.time } ?? false
-                if other { continue }
-            }
-            let full = Meter(pct: 100, resetsAt: h.resetsAt)
-            if h.week { x.week = full } else { x.five = full }
-            x.at = max(x.at, h.time)
-            r = x
-        }
-        return r
-    }
-
     static let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
     }()
 }
 
-/// Which account a reading belongs to. Codex has one local reader. A Claude reading names no
-/// account and no local file says which account answered (LOGIC.md "Accounts"), so a Claude
-/// account is known by its own data: the moment in the week its weekly limit resets. Each window
-/// keeps its reset time, and the next one is exactly a week later, so the key stays the same.
+/// Which reader a row belongs to: Codex's one local reader, or a Claude Code profile (LOGIC.md "Accounts").
+/// A profile holds one login and is asked on its own, so its readings are never another account's.
 struct AccountKey: Hashable, Codable {
     let value: String
 
     static let local = AccountKey(value: "local")
-    /// A reading without a weekly reset time is useful to inspect, but is never picked for Grandpa.
-    static let unknownClaude = AccountKey(value: "claude:unknown")
+    static let claudeDefault = AccountKey(value: "claude:default")
+    static func claude(dir: String?) -> AccountKey { dir.map { AccountKey(value: "claude:dir:" + $0) } ?? claudeDefault }
 
-    static func claude(weekResets reset: Date?) -> AccountKey {
-        guard let reset else { return unknownClaude }
-        let minute = Int((reset.timeIntervalSince1970 / 60).rounded())
-        return AccountKey(value: "claude:week@\(minute % (7 * 24 * 60))")
-    }
-
-    static func claude(_ reading: Reading) -> AccountKey { claude(weekResets: reading.week?.resetsAt) }
-
-    var isUnknownClaude: Bool { self == .unknownClaude }
-    var isClaude: Bool { value.hasPrefix("claude:") && !isUnknownClaude }
+    var isClaude: Bool { value.hasPrefix("claude:") }
+    /// The CLAUDE_CONFIG_DIR folder; nil for the default profile (~/.claude) and for Codex.
+    var dir: String? { value.hasPrefix("claude:dir:") ? String(value.dropFirst("claude:dir:".count)) : nil }
 }
 
-/// Readings and the user's optional labels, all local. A key with no reading does not exist:
-/// accounts are learned from local CLI output, never registered by the user.
-struct ReadingStore: Equatable, Codable {
-    private var values: [String: Reading] = [:]
+/// What one profile said the last time it was asked.
+struct ClaudeAnswer: Equatable, Codable {
+    /// nil = the last answer could not be read: don't know (never an older number).
+    var reading: Reading?
+    /// The profile's signed-in email when it answered; names the row.
+    var login: String?
+    var at: Date
+}
+
+/// The Claude profiles (the default one and the CLAUDE_CONFIG_DIR folders the user added), their last answers,
+/// when each may be asked again, the one Grandpa watches, and the user's nicknames. All local.
+struct ClaudeAccounts: Equatable, Codable {
+    private(set) var dirs: [String] = []
+    private(set) var selected = AccountKey.claudeDefault
+    private var answers: [String: ClaudeAnswer] = [:]
+    private var asks: [String: ClaudeAsk] = [:]
     private var nicknames: [String: String] = [:]
 
-    subscript(_ key: AccountKey) -> Reading? {
-        get { values[key.value] }
-        set { values[key.value] = newValue }
+    var keys: [AccountKey] { [.claudeDefault] + dirs.map { AccountKey.claude(dir: $0) } }
+
+    /// Adds a CLAUDE_CONFIG_DIR folder. nil when it is empty, already there, or the default ~/.claude.
+    @discardableResult mutating func add(dir: String, home: URL) -> AccountKey? {
+        guard dir.hasPrefix("/") else { return nil }   // a relative path would be the app's own folder
+        let d = URL(fileURLWithPath: dir).standardizedFileURL.path
+        guard d != "/", d != home.appendingPathComponent(".claude").standardizedFileURL.path,
+              !dirs.contains(d) else { return nil }
+        dirs.append(d)
+        return .claude(dir: d)
     }
 
-    var keys: [AccountKey] { values.keys.map(AccountKey.init(value:)).sorted { $0.value < $1.value } }
+    /// Removes an added profile with everything about it. The default profile stays.
+    mutating func remove(_ key: AccountKey) {
+        guard let d = key.dir else { return }
+        dirs.removeAll { $0 == d }
+        answers.removeValue(forKey: key.value); asks.removeValue(forKey: key.value); nicknames.removeValue(forKey: key.value)
+        if selected == key { selected = .claudeDefault }
+    }
+
+    mutating func select(_ key: AccountKey) { if keys.contains(key) { selected = key } }
+
+    func ask(_ key: AccountKey) -> ClaudeAsk { asks[key.value] ?? ClaudeAsk() }
+    func answer(_ key: AccountKey) -> ClaudeAnswer? { answers[key.value] }
+    var selectedReading: Reading? { answers[selected.value]?.reading }
+
+    /// Opening the popover lets the background refresh ask a stopped profile again (once its hold is over).
+    mutating func popoverOpened() { for k in asks.keys { asks[k]?.stopped = false } }
+
+    /// One answer for one profile. Fresh rows replace the reading. An unreadable answer means don't know.
+    /// No fresh rows (rate limited, signed out) keeps the last reading with its age, but only while the
+    /// profile is still signed in to the account that gave it: a number is never shown under another login.
+    mutating func take(_ answer: ClaudeUsage.Answer, login: String?, for key: AccountKey, now: Date) {
+        guard keys.contains(key) else { return }
+        var ask = self.ask(key)
+        ask.record(answer, now: now)
+        asks[key.value] = ask
+        let old = answers[key.value]
+        switch answer {
+        case .limits(let r): answers[key.value] = ClaudeAnswer(reading: r, login: login, at: now)
+        case .unreadable: answers[key.value] = ClaudeAnswer(reading: nil, login: login, at: now)
+        case .noLimits:
+            let same = old.map { $0.login == login } ?? false
+            answers[key.value] = ClaudeAnswer(reading: same ? old?.reading : nil, login: login, at: old.map { same ? $0.at : now } ?? now)
+        }
+    }
 
     func nickname(for key: AccountKey) -> String? { nicknames[key.value] }
 
     mutating func setNickname(_ nickname: String, for key: AccountKey) {
         let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { nicknames.removeValue(forKey: key.value) }
-        else { nicknames[key.value] = trimmed }
+        if trimmed.isEmpty { nicknames.removeValue(forKey: key.value) } else { nicknames[key.value] = trimmed }
     }
 
-    mutating func remove(_ key: AccountKey) {
-        values.removeValue(forKey: key.value)
-        nicknames.removeValue(forKey: key.value)
+    func rows(codex: Reading?) -> [AccountRow] {
+        keys.map { key in
+            let a = answers[key.value]
+            return AccountRow(key: key, reading: a?.reading, login: a?.login, answeredAt: a?.at, nickname: nicknames[key.value],
+                              selected: selected == key, heldUntil: self.ask(key).heldUntil)
+        } + (codex.map { [AccountRow(key: .local, reading: $0, login: nil, answeredAt: $0.at, nickname: nicknames[AccountKey.local.value],
+                                     selected: false, heldUntil: nil)] } ?? [])
     }
-
-    /// Key every Claude row by its own reading. Older releases keyed rows by a guessed account
-    /// hash (or `claude:untagged`), so one row could hold another account's numbers. Returns
-    /// old key → new key for the rows that moved; when two rows meet, the newer reading stays.
-    mutating func rekeyClaudeRows() -> [String: AccountKey] {
-        var moved: [String: AccountKey] = [:]
-        for (old, reading) in values where old.hasPrefix("claude:") && AccountKey.claude(reading).value != old {
-            moved[old] = AccountKey.claude(reading)
-        }
-        let readings = moved.keys.map { ($0, values.removeValue(forKey: $0)!) }.sorted { $0.1.at < $1.1.at }
-        for (old, reading) in readings {
-            let key = moved[old]!.value
-            if values[key].map({ $0.at <= reading.at }) ?? true { values[key] = reading }
-            if let nickname = nicknames.removeValue(forKey: old), nicknames[key] == nil { nicknames[key] = nickname }
-        }
-        return moved
-    }
-}
-
-/// The account picker keeps the user's selected key. Until one is chosen, the first identified
-/// bridge reading becomes the initial selection. An unknown bridge reading is a separate row
-/// and never becomes selection evidence.
-struct AccountReadings: Equatable, Codable {
-    static let staleAfter: TimeInterval = 30 * 86400
-
-    private var store = ReadingStore()
-    private(set) var selected: AccountKey?
-
-    init() {}
-
-    init(migrating store: ReadingStore, reading: Reading?) {
-        self.store = store
-        _ = self.store.rekeyClaudeRows()
-        if let reading {
-            let key = AccountKey.claude(reading)
-            self.store[key] = reading
-            if key.isClaude { self.selected = key }
-        }
-    }
-
-    /// A bridge report is one complete snapshot for its key.  Do not retain a window from an
-    /// earlier report when the latest report omitted it: omitted means the source did not tell
-    /// us, not that the old number is still true.  `captured_at` makes an out-of-order file
-    /// notification harmless while equal timestamps deliberately favour the later report.
-    @discardableResult mutating func takeClaude(_ reading: Reading) -> Bool {
-        let key = AccountKey.claude(reading)
-        if let current = store[key], current.at > reading.at { return false }
-        let wasSelected = selected
-        let changed = store[key] != reading
-        store[key] = reading
-        if selected == nil && key.isClaude { selected = key }
-        return changed || selected != wasSelected
-    }
-
-    @discardableResult mutating func takeCodex(_ reading: Reading?) -> Bool {
-        guard store[.local] != reading else { return false }
-        store[.local] = reading
-        return true
-    }
-
-    mutating func select(_ key: AccountKey) {
-        guard key.isClaude, store[key] != nil else { return }
-        selected = key
-    }
-
-    mutating func setNickname(_ nickname: String, for key: AccountKey) { store.setNickname(nickname, for: key) }
-
-    mutating func remove(_ key: AccountKey) {
-        store.remove(key)
-        if selected == key { selected = nil }
-    }
-
-    var selectedClaude: Reading? { selected.flatMap { store[$0] } }
-    var unknownClaude: Reading? { store[.unknownClaude] }
-    var codex: Reading? { store[.local] }
-
-    func nickname(for key: AccountKey) -> String? { store.nickname(for: key) }
-
-    /// Rows saved by 0.3.7 and older move to their reading's key; the selection follows its row.
-    @discardableResult mutating func migrateLegacyKeys() -> Bool {
-        let moved = store.rekeyClaudeRows()
-        guard !moved.isEmpty else { return false }
-        if let old = selected?.value, let key = moved[old] { selected = key.isClaude ? key : nil }
-        return true
-    }
-
-    func rows(now: Date = Date()) -> [AccountRow] {
-        store.keys.compactMap { key in
-            guard let reading = store[key] else { return nil }
-            return AccountRow(key: key, reading: reading, nickname: store.nickname(for: key), selected: selected == key,
-                              stale: now.timeIntervalSince(reading.at) >= Self.staleAfter)
-        }
-    }
-
 }
 
 struct AccountRow: Identifiable, Equatable {
     let key: AccountKey
-    let reading: Reading
+    let reading: Reading?
+    let login: String?
+    let answeredAt: Date?
     let nickname: String?
     let selected: Bool
-    let stale: Bool
+    let heldUntil: Date?
     var id: String { key.value }
-}
-
-/// A Claude rejection log has no account hash. Never turn it into a limit for whichever account
-/// happens to be selected; a later reader that provides a key can opt into this boundary.
-enum ClaudeLimitHits {
-    static func apply(_ hits: [Limits.Hit], to reading: Reading?, hitAccount: AccountKey?, selected: AccountKey?,
-                      lastAnswer: Date?, now: Date) -> Reading? {
-        guard hitAccount != nil, hitAccount == selected else { return reading }
-        return Limits.apply(hits, to: reading, lastAnswer: lastAnswer, now: now)
-    }
 }
 
 /// Weekly-only accounts: the week (counted back from its reset) is 7 equal days, and by the end

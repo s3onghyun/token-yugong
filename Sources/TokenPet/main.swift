@@ -40,7 +40,7 @@ if args.contains("--scan-report") {
     let s = model.snap, sc = model.scanner
     func t(_ d: Date?) -> String { d.map { Fmt.clock($0) } ?? "-" }
     print(String(format: "scanned %.1f MB in %.2fs; %d usage events", Double(sc.bytesRead) / 1e6, sc.lastScanSeconds, sc.events.count))
-    print("claude: " + (s.known ? "official, captured \(t(s.captured))" : "don't know (no usable status-line reading)"))
+    print("claude: " + (s.known ? "official, captured \(t(s.captured))" : "don't know (no /usage answer saved yet)"))
     if let f = s.five { print("5h: \(Fmt.pct(f.pct)) resets \(t(f.resetsAt))") }
     if let w = s.week { print("week: \(Fmt.pct(w.pct)) resets \(t(w.resetsAt))") }
     if let d = s.daily { print(String(format: "no 5-hour window: today's share %.0f%%, day %@ - %@", d.fill * 100, t(d.dayStart), t(d.dayEnd))) }
@@ -71,19 +71,16 @@ if args.contains("--scan-report") {
     let now = Date()
     let ko = L.pseudo ? "-pseudo" : L.lang == .en ? "" : "-\(L.lang.rawValue)"
     if args.contains("--render-accounts") {
-        // Synthetic account keys and numbers only: never render a requester's local account data.
-        // Alpha's later weekly-only snapshot makes the fixture visibly cover a missing 5-hour
-        // window; the row must not retain Alpha's earlier 100% 5-hour value.
+        // Invented profiles, logins and numbers only: never render a requester's local account data. The two
+        // profiles share one weekly reset and still keep their own numbers.
+        let week = now.addingTimeInterval(4 * 86400)
         model.setFixtureAccounts([
-            Reading(five: Meter(pct: 100, resetsAt: now.addingTimeInterval(2 * 3600)),
-                    week: Meter(pct: 36, resetsAt: now.addingTimeInterval(4 * 86400)),
-                    at: now.addingTimeInterval(-5 * 60)),
-            Reading(five: Meter(pct: 67, resetsAt: now.addingTimeInterval(3 * 3600)),
-                    week: Meter(pct: 58, resetsAt: now.addingTimeInterval(5 * 86400)),
-                    at: now.addingTimeInterval(-18 * 60)),
-            Reading(five: nil,
-                    week: Meter(pct: 55, resetsAt: now.addingTimeInterval(4 * 86400)),
-                    at: now.addingTimeInterval(-3 * 60)),
+            (dir: nil, login: "alpha@example.com",
+             reading: Reading(five: Meter(pct: 100, resetsAt: now.addingTimeInterval(2 * 3600)), week: Meter(pct: 36, resetsAt: week),
+                              at: now.addingTimeInterval(-5 * 60))),
+            (dir: "/Users/example/.claude-work", login: "beta@example.com",
+             reading: Reading(five: Meter(pct: 67, resetsAt: now.addingTimeInterval(3 * 3600)), week: Meter(pct: 58, resetsAt: week),
+                              at: now.addingTimeInterval(-18 * 60))),
         ])
         model.setDemo(.steady)
         let renderer = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now)
@@ -245,6 +242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let vis = SceneVisibility()
         NotificationCenter.default.addObserver(forName: NSPopover.willShowNotification, object: popover, queue: .main) { _ in
             vis.shown = true
+            model.popoverOpened()
         }
         NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
             vis.shown = false

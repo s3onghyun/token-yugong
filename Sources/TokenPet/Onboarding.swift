@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import TokenPetAssets
 
-/// Connecting Claude Code's status line to the pet: the bridge script next to limits.json, and the
-/// settings.json snippet. ClaudeConnect writes that snippet in for you, after you see the change.
+/// Grandpa's paw in Claude Code's status line (optional; the app reads `/usage`, not status lines): the bridge
+/// script and the settings.json snippet. ClaudeConnect writes that snippet in for you, after you see the change.
 enum StatusLineSetup {
     /// The bridge script shipped in the .app, or the one in the source tree under `swift run`.
     static var bundledBridge: URL? {
@@ -12,7 +12,7 @@ enum StatusLineSetup {
         return FileManager.default.fileExists(atPath: src.path) ? src : nil
     }
 
-    /// The command for settings.json. `dir` is where limits.json lives (the bridge writes there).
+    /// The command for settings.json. `dir` is the folder the bridge script is installed in.
     static func command(dir: URL, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> String {
         let defaultDir = home.appendingPathComponent(".claude/token-pet").standardized.path
         if dir.standardized.path == defaultDir { return "sh ~/.claude/token-pet/statusline-bridge.sh" }
@@ -26,9 +26,8 @@ enum StatusLineSetup {
         return "\"statusLine\": {\n  \"type\": \"command\",\n  \"command\": \"\(c)\"\n}"
     }
 
-    /// A bridge installed earlier in `dir` that differs from this app's is replaced, so an update reaches
-    /// it (this version writes the current account hash and ignores unchanged pre-login redraws). Nothing happens where none was installed;
-    /// settings.json is not touched.
+    /// A bridge installed earlier in `dir` that differs from this app's is replaced, so an update reaches it
+    /// (this version writes no files at all). Nothing happens where none was installed; settings.json is not touched.
     static func refreshInstalled(in dir: URL) {
         let dest = dir.appendingPathComponent("statusline-bridge.sh")
         guard let src = bundledBridge, let have = try? Data(contentsOf: dest), have != (try? Data(contentsOf: src)) else { return }
@@ -141,10 +140,15 @@ struct OnboardingView: View {
     private var connect: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(L.t("Connect Claude Code", "Claude Code 연결", "Claude Code と接続", "连接 Claude Code")).font(.title2.bold())
-            Text(L.t("Claude Code tells its status line your official limits. “Connect” adds this to ~/.claude/settings.json after showing you the change, with a backup; or paste it into the top level yourself:",
-                     "Claude Code는 상태줄에 공식 한도를 알려 줘요. ‘연결하기’를 누르면 바뀔 내용을 보여 준 뒤 백업하고 ~/.claude/settings.json에 넣어요. 직접 맨 바깥 객체에 붙여 넣어도 돼요:",
-                     "Claude Code はステータスラインに公式のリミットを渡します。「接続」を押すと、変更内容を見せてからバックアップを取り ~/.claude/settings.json に追加します。自分で一番外側のオブジェクトに貼ってもかまいません：",
-                     "Claude Code 会把你的官方额度告诉它的状态栏。点“连接”会先给你看改动，备份后再加到 ~/.claude/settings.json；也可以自己粘贴到最外层对象中："))
+            Text(L.t("Grandpa asks Claude Code itself: he runs its /usage command (no AI request, no cost) when the app starts, when you open his window, and every 30 minutes. Claude Code only has to be installed and signed in.",
+                     "할아버지는 Claude Code에 직접 물어요. 앱을 켤 때, 창을 열 때, 30분마다 /usage 명령을 실행해요 (AI 요청도 비용도 없어요). Claude Code가 설치되어 로그인돼 있기만 하면 돼요.",
+                     "おじいさんは Claude Code に直接尋ねます。アプリ起動時、ウィンドウを開いたとき、30分ごとに /usage コマンドを実行します（AI へのリクエストも費用もありません）。Claude Code がインストールされ、ログインしていれば十分です。",
+                     "爷爷直接询问 Claude Code：应用启动、打开窗口时以及每 30 分钟运行一次它的 /usage 命令（不发 AI 请求，不花钱）。只要装好并登录 Claude Code 即可。"))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(L.t("Optional: his paw in Claude Code's status line too. “Connect” adds this to ~/.claude/settings.json after showing you the change, with a backup; or paste it into the top level yourself:",
+                     "선택: Claude Code 상태줄에도 발자국을 띄울 수 있어요. ‘연결하기’를 누르면 바뀔 내용을 보여 준 뒤 백업하고 ~/.claude/settings.json에 넣어요. 직접 맨 바깥 객체에 붙여 넣어도 돼요:",
+                     "任意：Claude Code のステータスラインにも足あとを出せます。「接続」を押すと、変更内容を見せてからバックアップを取り ~/.claude/settings.json に追加します。自分で一番外側のオブジェクトに貼ってもかまいません：",
+                     "可选：也在 Claude Code 状态栏里显示他的爪印。点“连接”会先给你看改动，备份后再加到 ~/.claude/settings.json；也可以自己粘贴到最外层对象中："))
                 .fixedSize(horizontal: false, vertical: true)
             Text(snippet)
                 .font(.system(size: 11, design: .monospaced))
@@ -173,20 +177,20 @@ struct OnboardingView: View {
                 Spacer()
                 status
             }
-            Text(L.t("Copying also puts the small bridge script in \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")). It keeps only the rate_limits numbers: no prompts, no paths, no network.",
-                     "복사하면 작은 브리지 스크립트도 \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))에 넣어요. 한도 숫자(rate_limits)만 저장하고 프롬프트·경로는 남기지 않으며 네트워크도 쓰지 않아요.",
-                     "コピーすると小さなブリッジスクリプトも \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")) に置きます。保存するのは rate_limits の数値だけで、プロンプトやパスは残さず、ネットワークも使いません。",
-                     "复制时也会把一个小小的桥接脚本放到 \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))。它只保存 rate_limits 数值：不存提示词、不存路径、不联网。"))
+            Text(L.t("Copying also puts the small bridge script in \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")). It only prints this session's percentage: it saves nothing and uses no network.",
+                     "복사하면 작은 브리지 스크립트도 \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))에 넣어요. 이 세션의 %만 보여 주고 아무것도 저장하지 않으며 네트워크도 쓰지 않아요.",
+                     "コピーすると小さなブリッジスクリプトも \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")) に置きます。このセッションの % を表示するだけで、何も保存せず、ネットワークも使いません。",
+                     "复制时也会把一个小小的桥接脚本放到 \(dir.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~"))。它只显示本会话的百分比：不保存任何东西，也不联网。"))
                 .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
             Text(connectNote ?? L.t("Already have a status line? “Connect” keeps it: the bridge passes it the same input and shows what it prints. “Undo” puts it back as it was.",
                      "이미 상태줄을 쓰고 있어도 ‘연결하기’는 그대로 살려 둬요. 브리지가 같은 입력을 넘기고 그 출력을 보여 줘요. ‘되돌리기’를 누르면 원래대로 돌아가요.",
                      "すでにステータスラインがあっても「接続」はそのまま残します。ブリッジが同じ入力を渡し、その出力を表示します。「元に戻す」で元どおりになります。",
                      "已经有状态栏了？“连接”会保留它：桥接脚本把同样的输入交给它，并显示它的输出。“撤销”会把它恢复原样。"))
                 .font(.caption).foregroundColor(connectNote == nil ? .secondary : .primary).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-            Text(L.t("The numbers arrive after Claude Code's next reply. Until then Grandpa honestly says he doesn't know.",
-                     "숫자는 Claude Code가 다음에 답할 때 들어와요. 그 전까지 할아버지는 솔직하게 모른다고 해요.",
-                     "数値は Claude Code が次に返答したときに届きます。それまでおじいさんは正直に「わからない」と言います。",
-                     "数字会在 Claude Code 下次回复后到来。在那之前，爷爷会老实地说不知道。"))
+            Text(L.t("Without an answer from Claude Code (not installed, signed out), Grandpa honestly says he doesn't know.",
+                     "Claude Code가 답하지 않으면 (설치 안 됨, 로그아웃) 할아버지는 솔직하게 모른다고 해요.",
+                     "Claude Code から答えがなければ（未インストール、ログアウト）、おじいさんは正直に「わからない」と言います。",
+                     "没有 Claude Code 的回答（未安装、已退出登录）时，爷爷会老实地说不知道。"))
                 .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .onAppear { linked = ClaudeConnect.state(home: home, dir: dir) }
@@ -233,18 +237,18 @@ struct OnboardingView: View {
 
     @ViewBuilder private var status: some View {
         if model.snap.known && !model.snap.demo {
-            Label(L.t("Connected",
-                      "연결됨",
-                      "接続済み",
-                      "已连接") + (model.snap.captured.map { " · \(Fmt.clock($0))" } ?? ""), systemImage: "checkmark.circle.fill")
+            Label(L.t("Claude Code answered",
+                      "Claude Code가 답했어요",
+                      "Claude Code が答えました",
+                      "Claude Code 已回答") + (model.snap.captured.map { " · \(Fmt.clock($0))" } ?? ""), systemImage: "checkmark.circle.fill")
                 .foregroundColor(.green).font(.callout)
         } else {
             HStack(spacing: 6) {
-                Text(L.t("Waiting for the first reading",
-                         "첫 값을 기다리는 중",
-                         "最初の値を待っています",
-                         "正在等待第一个读数")).font(.callout).foregroundColor(.secondary)
-                Button(L.t("Check", "확인", "確認", "检查")) { model.refresh() }.disabled(model.scanning)
+                Text(L.t("Waiting for Claude Code's answer",
+                         "Claude Code의 답을 기다리는 중",
+                         "Claude Code の答えを待っています",
+                         "正在等待 Claude Code 的回答")).font(.callout).foregroundColor(.secondary)
+                Button(L.t("Ask", "묻기", "尋ねる", "询问")) { model.askClaude(.popover) }.disabled(model.claudeAsking)
             }
         }
     }

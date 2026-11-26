@@ -177,14 +177,53 @@ shows, **Connect** for the Claude Code status line (below), and where Settings a
 
 Or run without a bundle: `swift run -c release TokenPet` (no notifications or open-at-login there).
 
-## Connect Claude Code
+## Claude's limits: Yugong asks Claude Code
 
-Claude Code hands its status-line command your official limits (`rate_limits.five_hour` and
-`rate_limits.seven_day`: used %, reset time). The bridge script saves only that object to
-`~/.claude/token-pet/limits.json`; no prompts, paths or session ids, no network.
-The status line only reports successful responses, so it stops at 99% when a limit runs out; the
-app also reads the refusal Claude Code writes to its own session log (`usage_limit_reached`, with
-the window and reset time) to show 100% and let Grandpa rest.
+Yugong asks the unmodified Claude Code for your limits. It is the same `/usage` you can type yourself:
+
+```sh
+claude -p /usage --no-session-persistence --setting-sources project --strict-mcp-config --output-format stream-json --verbose
+```
+
+It reads only the structured rows Claude Code prints (`usage_report.rate_limits.limits[]`: the 5-hour
+`session` row and the `weekly_all` row, each with its used % and reset time), never the human-readable text. The
+command makes no AI request and costs nothing (`total_cost_usd: 0`). It keeps no session, loads no user settings,
+hooks or MCP servers, and runs in an empty folder of its own (`~/Library/Application Support/TokenPet/claude-usage`).
+One ask takes about 2 seconds of CPU. Yugong never reads your Claude login token and never calls an Anthropic
+endpoint itself. Anthropic's terms allow signing in to the unmodified Claude Code with your own subscription; they
+do not allow other tools to collect or pass on your Claude credentials.
+
+**Why not the status line.** Claude Code's status line gets the limits of a session's last response, but
+no account name and no time. With two accounts (a `/login` while older sessions keep running, or two Max
+plans), one menu-bar row showed both accounts' numbers in turn (0.2.x to 0.3.8). Every guess at the
+account broke under some condition, 0.3.8's weekly reset time too, because two accounts can share it. The
+answer from one profile belongs to that profile's login, so there is nothing left to guess.
+
+**How often.** Asks are kept rare on purpose: the account is yours, and a tool that keeps poking can look like abuse.
+
+| When | Yugong asks |
+|---|---|
+| The app starts | once per profile |
+| You open the popover | each profile it has not asked in the last 5 minutes |
+| In the background | every 30 minutes, give or take 5 (random, so asks never line up on the clock). Settings › *Ask Claude Code every 30 minutes* turns it off |
+| You type, a session answers, Claude Code is busy | never |
+| Claude Code answers without fresh rows (rate limited 429/403, signed out, an API key), or with output this version cannot read | that profile is left alone for 1 hour, then 2, 4 … up to a day; the background refresh skips it until you open the popover again |
+
+Between asks the popover shows the last answer with its age ("asked 12 min ago"), so a number can be up to
+about half an hour old; opening the popover asks again. Output Yugong cannot read means "don't know", never an
+older number.
+
+**Several accounts.** A profile holds one login. The default profile is `~/.claude`. If you keep another
+account in its own `CLAUDE_CONFIG_DIR` folder (for example `~/.claude-work`), add that folder in Settings ›
+Accounts › *Add a Claude Code profile folder*. Each profile is a row of its own, named by its signed-in email
+(from that profile's `.claude.json`) unless you give it a nickname; pick the row Grandpa watches. After a
+`/login` inside a profile, its next answer is the new account's, under the new name. Accounts that share one
+profile can only be seen one at a time: the one signed in.
+
+## Claude Code's status line (optional)
+
+The app does not need it. **Connect** puts Grandpa's paw in Claude Code's status line (`🐾 5h 42%`, that
+session's own number): the bridge script prints it from the JSON Claude Code pipes in and writes nothing.
 
 **One click:** press **Connect** in the guide (or Settings › How it works). The app shows the
 `statusLine` before and after, and only writes when you say so. **One command** (also for agents):
@@ -214,10 +253,10 @@ top-level object of `~/.claude/settings.json`:
 
 (by hand, with a status line already there: `"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<your command>'"`).
 
-**Command line.** `TokenPet status [--json]` says whether Claude Code is connected and prints the last
-limits it reported; `TokenPet setup [--undo] [--dry-run] [--json]` is the setup above. With `--json`
+**Command line.** `TokenPet status [--json]` says whether the status line is connected and prints the last
+`/usage` answer the app saved for the profile Grandpa watches (it does not ask Claude Code itself); `TokenPet setup [--undo] [--dry-run] [--json]` is the setup above. With `--json`
 the output is one JSON object with stable keys (`result`, `before`, `after`, `backup`; `claude.connection`,
-`claude.reading.five_hour.used_percentage`, ...); errors go to stderr in plain words, exit 1, and as
+`claude.profile`, `claude.reading.five_hour.used_percentage`, ...); errors go to stderr in plain words, exit 1, and as
 `{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`.
 
 The bridge uses `jq` when present (built into macOS 15+) and `plutil` otherwise.
@@ -294,18 +333,20 @@ Token Yugong reads files on your Mac and keeps everything there. No account, no 
 
 | What it reads | Why |
 |---|---|
-| `~/.claude/token-pet/limits.json` | Claude Code's official limits, written by the status-line bridge (used %, reset time; no prompts, paths, session or account ids). The app tells Claude accounts apart by when each one's weekly limit resets |
-| Claude Code session logs (`~/.claude/projects`) | token counts for Grandpa's pace and the mountain, and the `usage_limit_reached` refusal so a full limit shows 100% |
+| `claude -p /usage`, run per profile ([above](#claudes-limits-yugong-asks-claude-code)) | Claude's official limits: 5-hour and weekly used %, reset times |
+| each profile's `.claude.json` (only `oauthAccount.emailAddress`) | the name of that profile's row |
+| Claude Code session logs (`~/.claude/projects`) | token counts for Grandpa's pace and the mountain |
 | `~/.codex/sessions` | Codex's own limits and token counts |
 | `~/.gemini/tmp` | Gemini CLI token counts |
 
-- **Network:** only the once-a-day update check (one GET to the GitHub releases API, can be turned
+- **Network:** Yugong itself never contacts Anthropic; the `claude` it runs for `/usage` does, as Claude Code
+  always does (and may answer from its own recent copy without asking). Besides that, only the once-a-day update check (one GET to the GitHub releases API, can be turned
   off), the release ZIP when you click **Update**, and, only if you paste a key, OpenAI's costs API or DeepSeek's balance API every 15 minutes.
 - **Keys** live in your login Keychain, nowhere else.
 - **Settings and history** (the mountain, titles) stay in the `TokenPet` UserDefaults domain on this
-  Mac; `defaults delete TokenPet` erases them. What the app read from the bridge (percentages,
-  reset times) is logged to `~/Library/Application Support/TokenPet/claude-readings.log`
-  (at most two files of 512 KB), so a wrong account can be traced; delete it any time.
+  Mac; `defaults delete TokenPet` erases them. Every `/usage` answer (the profile, percentages,
+  reset times; no email) is logged to `~/Library/Application Support/TokenPet/claude-readings.log`
+  (at most two files of 512 KB), so a wrong number can be traced; delete it any time.
 - The app edits `~/.claude/settings.json` only when you press **Connect** (after showing the change) or run
   `TokenPet setup`, and then only its `statusLine`, with a backup; `TokenPet setup --undo` reverses it.
 

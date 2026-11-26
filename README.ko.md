@@ -129,14 +129,50 @@ Claude Code 상태줄을 잇는 **연결하기**(아래), 설정이 어디 있�
 번들 없이 `swift run -c release TokenPet`으로도 돌릴 수 있습니다(이때는 알림과 로그인 시
 열기가 없습니다).
 
-## Claude Code 연결
+## Claude 한도: 우공이 Claude Code에 묻습니다
 
-Claude Code는 상태줄 명령에 공식 한도(`rate_limits.five_hour`, `rate_limits.seven_day`: 사용
-%, 리셋 시각)를 넘겨 줍니다. 브리지 스크립트는 그 객체만 `~/.claude/token-pet/limits.json`에
-저장합니다. 프롬프트·경로·세션 ID는 남기지 않고 네트워크도 쓰지 않습니다.
-상태줄은 성공한 응답만 알려 주기 때문에 한도를 다 쓰면 99%에서 멈춥니다. 그래서 앱은 Claude
-Code가 자기 세션 기록에 남기는 거절(`usage_limit_reached`, 구간과 리셋 시각 포함)도 읽어서 100%로
-보여 주고 할아버지를 쉬게 합니다.
+우공은 수정하지 않은 Claude Code에 한도를 묻습니다. 직접 입력할 수 있는 그 `/usage`입니다:
+
+```sh
+claude -p /usage --no-session-persistence --setting-sources project --strict-mcp-config --output-format stream-json --verbose
+```
+
+Claude Code가 함께 내보내는 구조화된 행(`usage_report.rate_limits.limits[]`: 5시간 `session` 행과
+`weekly_all` 행, 각각 사용 %와 리셋 시각)만 읽고, 사람이 읽는 문구는 해석하지 않습니다. 이 명령은 AI 요청을
+하지 않아 비용이 없습니다(`total_cost_usd: 0`). 세션을 남기지 않고, 사용자 설정·hook·MCP 서버를 불러오지 않으며,
+우공 전용 빈 폴더(`~/Library/Application Support/TokenPet/claude-usage`)에서 실행합니다. 한 번 묻는 데 CPU 약
+2초가 듭니다. 우공은 Claude 로그인 토큰을 읽지 않고 Anthropic 엔드포인트를 직접 부르지도 않습니다. Anthropic
+약관은 수정하지 않은 Claude Code에 본인 구독으로 로그인하는 것은 허용하지만, 다른 도구가 Claude 자격 증명을
+모으거나 중계하는 것은 허용하지 않습니다.
+
+**왜 상태줄을 쓰지 않나.** Claude Code 상태줄은 세션의 마지막 응답 한도를 받지만, 계정 이름도 시각도 없습니다.
+계정이 둘이면(예전 세션이 계속 도는 동안 `/login`, 또는 Max 요금제 두 개) 메뉴바 한 행에 두 계정 숫자가 번갈아
+나왔습니다(0.2.x ~ 0.3.8). 계정을 추측하는 방법은 모두 어떤 조건에서 깨졌고, 0.3.8의 주간 리셋 시각도 두 계정이
+같을 수 있어 마찬가지였습니다. 한 프로필의 답은 그 프로필 로그인의 것이라 더 추측할 것이 없습니다.
+
+**얼마나 자주.** 일부러 드물게 묻습니다. 계정은 사용자의 것이고, 계속 찌르는 도구는 남용처럼 보일 수 있습니다.
+
+| 언제 | 우공이 묻는 것 |
+|---|---|
+| 앱을 켤 때 | 프로필마다 한 번 |
+| 팝오버를 열 때 | 최근 5분 안에 묻지 않은 프로필 |
+| 백그라운드 | 30분마다, ±5분(무작위라 시각이 겹치지 않음). 설정 › *30분마다 Claude Code에 묻기*로 끕니다 |
+| 입력할 때, 세션이 답할 때, Claude Code가 바쁠 때 | 묻지 않음 |
+| Claude Code가 새 행 없이 답하거나(429/403 rate limit, 로그아웃, API 키) 이 버전이 읽지 못하는 출력을 낼 때 | 그 프로필은 1시간, 다음엔 2·4시간 … 최대 하루 쉽니다. 팝오버를 다시 열 때까지 백그라운드 새로고침도 건너뜁니다 |
+
+묻는 사이에는 팝오버가 마지막 답을 그 나이와 함께 보여 줍니다("12분 전 물어봄"). 그래서 숫자는 최대 30분쯤
+지난 것일 수 있고, 팝오버를 열면 다시 묻습니다. 우공이 읽지 못한 출력은 "모름"이지, 예전 숫자가 아닙니다.
+
+**계정이 여러 개일 때.** 프로필 하나에는 로그인 하나가 있습니다. 기본 프로필은 `~/.claude`입니다. 다른 계정을
+따로 `CLAUDE_CONFIG_DIR` 폴더(예: `~/.claude-work`)에 두고 쓴다면 설정 › 계정 › *Claude Code 프로필 폴더 추가*로
+그 폴더를 넣으세요. 프로필마다 자기 행이 있고, 별명이 없으면 로그인한 이메일(그 프로필의 `.claude.json`)로
+이름이 붙습니다. 할아버지가 볼 행을 고르세요. 한 프로필 안에서 `/login`하면 다음 답부터 새 계정의 것이고 새
+이름으로 나옵니다. 한 프로필을 함께 쓰는 계정들은 한 번에 하나, 로그인된 계정만 보입니다.
+
+## Claude Code 상태줄 (선택)
+
+앱에는 필요 없습니다. **연결하기**는 Claude Code 상태줄에 할아버지 발자국(`🐾 5h 42%`, 그 세션의 숫자)을 띄웁니다.
+브리지 스크립트는 Claude Code가 넘겨 주는 JSON에서 그 숫자를 출력할 뿐 아무것도 저장하지 않습니다.
 
 **클릭 한 번:** 안내(또는 설정 › 사용법과 Claude Code 연결)에서 **연결하기**를 누르세요. 바뀔
 `statusLine`을 먼저 보여 주고, 확인해야 씁니다. **명령 한 줄**(에이전트도 이걸 씁니다):
@@ -165,7 +201,7 @@ Code가 자기 세션 기록에 남기는 거절(`usage_limit_reached`, 구간�
 
 (직접 하면서 상태줄이 이미 있다면: `"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<원래 명령>'"`)
 
-**명령줄.** `TokenPet status [--json]`은 Claude Code 연결 여부와 마지막으로 받은 한도를 보여 주고,
+**명령줄.** `TokenPet status [--json]`은 상태줄 연결 여부와, 앱이 할아버지가 보는 프로필에 대해 저장한 마지막 `/usage` 답을 보여 주고(Claude Code에 직접 묻지는 않음),
 `TokenPet setup [--undo] [--dry-run] [--json]`은 위의 연결입니다. `--json`이면 키가 고정된 JSON 객체
 하나를 출력합니다(`result`, `before`, `after`, `backup`; `claude.connection`,
 `claude.reading.five_hour.used_percentage` 등). 오류는 stderr에 쉬운 말로, 종료 코드 1, 그리고
@@ -234,18 +270,20 @@ Token Yugong은 이 Mac의 파일을 읽고, 모든 것을 이 Mac에만 둡니�
 
 | 읽는 것 | 이유 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | 상태줄 브리지가 적는 Claude Code 공식 한도(사용 %, 리셋 시각. 프롬프트·경로·세션·계정 id 없음). 앱은 계정마다 주간 한도가 리셋되는 시점으로 Claude 계정을 구분합니다 |
-| Claude Code 세션 로그(`~/.claude/projects`) | 할아버지의 속도와 산에 쓰는 토큰 수, 그리고 한도가 찼을 때 100%를 보여 주는 `usage_limit_reached` 거절 기록 |
+| 프로필마다 실행하는 `claude -p /usage`([위](#claude-한도-우공이-claude-code에-묻습니다)) | Claude 공식 한도: 5시간·주간 사용 %, 리셋 시각 |
+| 각 프로필의 `.claude.json`(`oauthAccount.emailAddress`만) | 그 프로필 행의 이름 |
+| Claude Code 세션 로그(`~/.claude/projects`) | 할아버지의 속도와 산에 쓰는 토큰 수 |
 | `~/.codex/sessions` | Codex 자신의 한도와 토큰 수 |
 | `~/.gemini/tmp` | Gemini CLI 토큰 수 |
 
-- **네트워크:** 하루 한 번 새 버전 확인(GitHub releases API에 GET 하나, 끌 수 있음), **업데이트**를 누를 때의 릴리스 ZIP, 키를 넣은
+- **네트워크:** 우공 자신은 Anthropic에 연결하지 않습니다. `/usage`를 위해 실행하는 `claude`가 평소의 Claude Code처럼
+  연결합니다(최근에 받아 둔 값이 있으면 묻지 않고 그것으로 답하기도 합니다). 그 밖에는 하루 한 번 새 버전 확인(GitHub releases API에 GET 하나, 끌 수 있음), **업데이트**를 누를 때의 릴리스 ZIP, 키를 넣은
   경우에만 15분마다 OpenAI 비용 API 또는 DeepSeek 잔액 API.
 - **키**는 로그인 키체인에만 저장합니다.
 - **설정과 기록**(산, 칭호)은 이 Mac의 UserDefaults 도메인 `TokenPet`에만 있고,
-  `defaults delete TokenPet`으로 지웁니다. 앱이 브리지에서 읽은 값(%, 리셋 시각)은
+  `defaults delete TokenPet`으로 지웁니다. `/usage` 답마다(프로필, %, 리셋 시각. 이메일 없음)
   `~/Library/Application Support/TokenPet/claude-readings.log`(512 KB 파일 최대 두 개)에 남겨
-  계정이 엇갈렸을 때 따라가 볼 수 있습니다. 언제든 지워도 됩니다.
+  숫자가 이상할 때 따라가 볼 수 있습니다. 언제든 지워도 됩니다.
 - 앱은 **연결하기**를 눌렀을 때(바뀔 내용을 보여 준 뒤)나 `TokenPet setup`을 실행했을 때만
   `~/.claude/settings.json`을 고치고, 그때도 `statusLine`만 백업과 함께 바꿉니다. `TokenPet setup --undo`로 되돌립니다.
 

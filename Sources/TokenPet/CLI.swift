@@ -2,17 +2,17 @@ import Foundation
 
 /// The command line for people and agents (README "Command line"). Stable `--json` output, plain-language
 /// errors on stderr, exit 1 on an error:
-///   TokenPet status [--json]                 is Claude Code connected, and the last limits it reported
+///   TokenPet status [--json]                 is the status line connected, and the app's last /usage answer
 ///   TokenPet setup [--dry-run] [--json]      connect Claude Code's status line (ClaudeConnect)
 ///   TokenPet setup --undo [--dry-run] [--json]
 enum CLI {
     struct Result: Equatable { var code: Int32 = 0; var out = ""; var err = "" }
 
     /// nil when `args` (without the program name) is not a CLI command: the app starts as usual.
-    static func run(_ args: [String], home: URL, bridge: URL, now: Date = Date()) -> Result? {
+    static func run(_ args: [String], home: URL, bridge: URL, prefs: UserDefaults = Prefs.store, now: Date = Date()) -> Result? {
         guard let cmd = args.first, ["status", "setup"].contains(cmd) else { return nil }
         let asJSON = args.contains("--json"), dir = bridge.deletingLastPathComponent()
-        if cmd == "status" { return status(home: home, bridge: bridge, dir: dir, json: asJSON, now: now) }
+        if cmd == "status" { return status(home: home, dir: dir, prefs: prefs, json: asJSON, now: now) }
         let undo = args.contains("--undo"), dry = args.contains("--dry-run")
         do {
             let change = undo ? try ClaudeConnect.disconnect(home: home, dir: dir) : try ClaudeConnect.connect(home: home, dir: dir)
@@ -33,7 +33,6 @@ enum CLI {
             s += "statusLine before:\n\(change.before ?? "(none)")\nstatusLine after:\n\(change.after ?? "(none)")\n"
             s += "Every other setting is unchanged.\n"
             if let backup { s += "Backup: \(backup.path)\n" + (undo ? "" : "Undo: TokenPet setup --undo\n") }
-            if !dry && !undo { s += "The numbers arrive after Claude Code's next reply.\n" }
             return Result(out: s)
         } catch let p as ClaudeConnect.Problem {
             return failure(p.code, p.message, json: asJSON)
@@ -42,10 +41,12 @@ enum CLI {
         }
     }
 
-    private static func status(home: URL, bridge: URL, dir: URL, json: Bool, now: Date) -> Result {
+    /// The answer the app saved for the profile Grandpa watches; `status` itself never asks Claude Code.
+    private static func status(home: URL, dir: URL, prefs: UserDefaults, json: Bool, now: Date) -> Result {
         let claudeHere = FileManager.default.fileExists(atPath: home.appendingPathComponent(".claude").path)
         let conn = claudeHere ? ClaudeConnect.state(home: home, dir: dir).rawValue : "no_claude"
-        let r = UsageModel.readBridge(bridge)
+        let accounts = ClaudeAccounts.load(prefs)
+        let r = accounts.selectedReading
         func meter(_ m: Meter?) -> [String: Any]? {
             m.map { ["used_percentage": $0.pct, "resets_at": n($0.resetsAt.map { Limits.whole($0.timeIntervalSince1970) })] }
         }
@@ -55,19 +56,19 @@ enum CLI {
                  "five_hour": n(meter($0.five)), "seven_day": n(meter($0.week))]
             }
             return Result(out: encode(["claude": ["connection": conn, "settings": ClaudeConnect.settingsURL(home: home).path,
-                                                  "limits_file": bridge.path, "reading": n(reading)]]))
+                                                  "profile": accounts.selected.dir ?? "default", "reading": n(reading)]]))
         }
-        var s = "Claude Code: " + [
+        var s = "Claude Code status line: " + [
             "connected": "connected", "chained": "connected (your own status line runs after the bridge)",
             "manual": "connected by hand", "not_connected": "not connected - run: TokenPet setup",
             "no_claude": "not set up on this Mac (no ~/.claude)",
         ][conn, default: conn] + "\n"
         if let r {
-            s += "last reading: \(Fmt.clock(r.at)) (\(Limits.whole(now.timeIntervalSince(r.at)) / 60) min ago)\n"
+            s += "last /usage answer: \(Fmt.clock(r.at)) (\(Limits.whole(now.timeIntervalSince(r.at)) / 60) min ago)\n"
             if let f = r.five { s += "5h: \(Fmt.pct(f.pct))" + (f.resetsAt.map { " resets \(Fmt.clock($0))" } ?? "") + "\n" }
             if let w = r.week { s += "week: \(Fmt.pct(w.pct))" + (w.resetsAt.map { " resets \(Fmt.clock($0))" } ?? "") + "\n" }
         } else {
-            s += "no reading yet (it comes after Claude Code's next reply)\n"
+            s += "no /usage answer yet (the app asks Claude Code when it starts, when its window opens, and every 30 minutes)\n"
         }
         return Result(out: s)
     }

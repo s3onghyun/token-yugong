@@ -188,13 +188,9 @@ import Testing
         }
         let line = try run(#"{"session_id":"secret","model":null,"rate_limits":{"five_hour":{"used_percentage":42.5,"resets_at":1793620000},"seven_day":{"used_percentage":19,"resets_at":1794164400}}}"#)
         #expect(line == "🐾 5h 42%")
-        let saved = try String(contentsOf: out.appendingPathComponent("limits.json"), encoding: .utf8)
-        #expect(!saved.contains("secret"))
-        let r = try #require(Limits.bridge(Data(saved.utf8), fileDate: Date()))
-        #expect(r.five == Meter(pct: 42.5, resetsAt: Date(timeIntervalSince1970: 1_793_620_000)))
-        #expect(r.week == Meter(pct: 19, resetsAt: reset))
-        _ = try run(#"{"session_id":"s"}"#)
-        #expect(try String(contentsOf: out.appendingPathComponent("limits.json"), encoding: .utf8) == saved)   // kept
+        #expect(try run(#"{"rate_limits":{"seven_day":{"used_percentage":19,"resets_at":1794164400}}}"#) == "🐾 week 19%")
+        #expect(try run(#"{"session_id":"s"}"#) == "")   // plutil's missing-key note never reaches the status line
+        #expect(!fm.fileExists(atPath: out.path))        // nothing saved
     }
 }
 
