@@ -240,10 +240,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         item.button?.action = #selector(toggleFromBar)
         installStatusLayers()
         popover.behavior = .transient
+        // A closed NSPopover keeps its view alive and SwiftUI keeps the scene's 8 fps timeline
+        // running, so the scene is a still picture unless the popover is open.
+        let vis = SceneVisibility()
+        NotificationCenter.default.addObserver(forName: NSPopover.willShowNotification, object: popover, queue: .main) { _ in
+            vis.shown = true
+        }
         NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
+            vis.shown = false
             self?.anchorPanel?.orderOut(nil)
         }
-        let host = NSHostingController(rootView: PopoverView(model: model))
+        let host = NSHostingController(rootView: PopoverHost(model: model, vis: vis))
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
         model.openGuide = { [weak self] in self?.popover.performClose(nil); self?.showGuide() }

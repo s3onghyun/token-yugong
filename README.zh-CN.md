@@ -162,7 +162,7 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 
 | 读取的内容 | 用途 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | Claude Code 的官方额度，由状态栏桥接脚本写入（已用百分比、重置时间；不含提示词、路径或会话 ID）。为区分 Claude 账号，桥接脚本读取 `~/.claude.json` 中的 `oauthAccount.accountUuid`，只写入它的 12 位 SHA-256 哈希 |
+| `~/.claude/token-pet/limits.json` | Claude Code 的官方额度，由状态栏桥接脚本写入（已用百分比、重置时间；不含提示词、路径或会话 ID）。为区分 Claude 账号，桥接脚本读取使用该会话的账号（该会话记录中的 `session-owner` 条目；没有时用 `~/.claude.json` 中的 `oauthAccount.accountUuid`），只写入它的 12 位 SHA-256 哈希 |
 | Claude Code 会话日志（`~/.claude/projects`） | 用于爷爷挖土速度和大山的 token 数，以及 `usage_limit_reached` 拒绝记录，让用完的额度显示为 100% |
 | `~/.codex/sessions` | Codex 自己的额度和 token 数 |
 | `~/.gemini/tmp` | Gemini CLI 的 token 数 |

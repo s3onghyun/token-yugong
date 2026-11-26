@@ -4,9 +4,12 @@
 # documented `rate_limits` object (5-hour / 7-day used_percentage + resets_at) in
 # $TOKENPET_DIR/limits.json. No prompts, paths, session ids, or credentials are stored,
 # and nothing goes over the network. To tell Claude accounts apart, it adds a short SHA-256 hash of
-# the signed-in account's id (oauthAccount.accountUuid in .claude.json); the id itself is never stored.
-# Each write uses that current hash. After /login, an old session can redraw the exact limits it had
-# before the switch; that unchanged redraw is ignored instead of being labelled as the new account.
+# the account that owns this session: the newest `session-owner` record Claude Code writes into the
+# session's transcript. Sessions begun before a /login keep using their own account, so the global
+# login (oauthAccount.accountUuid in .claude.json) is only the fallback for a Claude Code that writes
+# no such record. The id itself is never stored. With that fallback, an old session can redraw the
+# exact limits it had before a /login; that unchanged redraw is ignored instead of being labelled as
+# the new account.
 # Only SHA-256 hashes of session ids, account ids and rate-limit payloads are kept in $TOKENPET_DIR/sessions/.
 # `--chain '<command>'` keeps a status line you already had: it gets the same JSON and its output is shown.
 # Our own tools come only from system and Homebrew folders, not from whatever PATH Claude Code passes in;
@@ -23,6 +26,7 @@ if command -v jq >/dev/null 2>&1; then
   pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
   week=$(printf '%s' "$rl" | jq -r '.seven_day.used_percentage // empty' 2>/dev/null)
   sid=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
+  transcript=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
   uuid=$(jq -r '.oauthAccount.accountUuid // empty' "$cfg" 2>/dev/null)
 else
   # plutil's handling of stdin (`-`) differs between supported macOS releases.
@@ -31,8 +35,9 @@ else
   limits_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-limits.XXXXXX") || exit 0
   pct_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-pct.XXXXXX") || exit 0
   sid_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-session.XXXXXX") || exit 0
-  /bin/chmod 600 "$input_file" "$limits_file" "$pct_file" "$sid_file"
-  trap '/bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file"' 0 1 2 15
+  transcript_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-transcript.XXXXXX") || exit 0
+  /bin/chmod 600 "$input_file" "$limits_file" "$pct_file" "$sid_file" "$transcript_file"
+  trap '/bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file" "$transcript_file"' 0 1 2 15
   printf '%s' "$input" > "$input_file"
   plutil -extract rate_limits json -o "$limits_file" "$input_file" 2>/dev/null
   rl=$(/bin/cat "$limits_file")
@@ -43,9 +48,18 @@ else
   # do not let an optional session_id leak into a chained status line.
   case "$input" in *'"session_id"'*) plutil -extract session_id raw -o "$sid_file" "$input_file" 2>/dev/null ;; esac
   sid=$(/bin/cat "$sid_file")
+  case "$input" in *'"transcript_path"'*) plutil -extract transcript_path raw -o "$transcript_file" "$input_file" 2>/dev/null ;; esac
+  transcript=$(/bin/cat "$transcript_file")
   uuid=$(plutil -extract oauthAccount.accountUuid raw -o - "$cfg" 2>/dev/null)
-  /bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file"
+  /bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file" "$transcript_file"
   trap - 0 1 2 15
+fi
+# The session's own account, read backwards from the transcript's end (Claude Code repeats the
+# record every turn, so the last 1000 lines hold it; a transcript can be hundreds of MB).
+if [ -n "$transcript" ] && [ -f "$transcript" ]; then
+  owner=$(/usr/bin/tail -r "$transcript" 2>/dev/null | /usr/bin/head -n 1000 | /usr/bin/grep -m1 '"type":"session-owner"' |
+    /usr/bin/sed -n 's/.*"accountUuid":"\([0-9A-Za-z-]*\)".*/\1/p')
+  [ -n "$owner" ] && uuid=$owner
 fi
 account=""
 [ -n "$uuid" ] && account=$(printf '%s' "$uuid" | /usr/bin/shasum -a 256 | /usr/bin/cut -c1-12)

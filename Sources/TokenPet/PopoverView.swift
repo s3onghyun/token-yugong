@@ -512,7 +512,6 @@ struct PopoverView: View {
                 if let t = fixedT {
                     sceneImage(s, t: t)
                 } else {
-                    // SwiftUI pauses this while the popover is closed, so it costs nothing then.
                     TimelineView(.animation(minimumInterval: 1.0 / 8)) { ctx in
                         sceneImage(s, t: model.phase(at: ctx.date.timeIntervalSinceReferenceDate))
                     }

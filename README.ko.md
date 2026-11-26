@@ -234,7 +234,7 @@ Token Yugong은 이 Mac의 파일을 읽고, 모든 것을 이 Mac에만 둡니�
 
 | 읽는 것 | 이유 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | 상태줄 브리지가 적는 Claude Code 공식 한도(사용 %, 리셋 시각. 프롬프트·경로·세션 id 없음). Claude 계정을 구분하려고 브리지가 `~/.claude.json`의 `oauthAccount.accountUuid`를 읽어 SHA-256 해시 12자만 적습니다 |
+| `~/.claude/token-pet/limits.json` | 상태줄 브리지가 적는 Claude Code 공식 한도(사용 %, 리셋 시각. 프롬프트·경로·세션 id 없음). Claude 계정을 구분하려고 브리지가 그 세션을 쓰는 계정(세션 대화 기록의 `session-owner` 레코드, 없으면 `~/.claude.json`의 `oauthAccount.accountUuid`)을 읽어 SHA-256 해시 12자만 적습니다 |
 | Claude Code 세션 로그(`~/.claude/projects`) | 할아버지의 속도와 산에 쓰는 토큰 수, 그리고 한도가 찼을 때 100%를 보여 주는 `usage_limit_reached` 거절 기록 |
 | `~/.codex/sessions` | Codex 자신의 한도와 토큰 수 |
 | `~/.gemini/tmp` | Gemini CLI 토큰 수 |

@@ -67,10 +67,13 @@ default). A used-up **weekly** limit is a long rest: a full moon instead of the 
 
 ### Accounts
 
-The bridge names every Claude reading with a 12-character SHA-256 hash of the account currently in
-`~/.claude.json` when it writes. After `/login`, a session whose `rate_limits` are unchanged from
-before the switch is an old redraw and is ignored; a changed response or a session begun after the
-login is stored under the current hash. Raw account and session ids are never saved.
+The bridge names every Claude reading with a 12-character SHA-256 hash of the account that owns the
+session: the newest `session-owner` record Claude Code writes into the session's transcript. A
+session begun before a `/login` keeps answering as its own account, so the login in
+`~/.claude.json` is only the fallback for a Claude Code that writes no such record. With that
+fallback, after `/login` a session whose `rate_limits` are unchanged from before the switch is an
+old redraw and is ignored; a changed response or a session begun after the login is stored under
+the current hash. Raw account and session ids are never saved.
 
 Each keyed Claude reading replaces only the reading under the same key. The first identified
 Claude reading becomes the initial selection; after that the picker keeps the row the user
@@ -82,7 +85,7 @@ flow.
 |---|---|
 | A reading has an identified Claude hash | Store and update only `claude:<hash>`; it never changes another key's reading |
 | Two readings under one key report the same window | The newer capture wins, even when it is lower: a limit can be reset before its reset time. An older capture read later changes nothing |
-| `/login` while sessions remain open | Ignore each unchanged pre-login redraw; the first fresh response is stored under the new hash |
+| `/login` while sessions remain open | Each session's readings stay under the account that owns it (its transcript's `session-owner`); without that record, ignore each unchanged pre-login redraw and store the first fresh response under the new hash |
 | A reading has no account hash | Store it as `claude:unknown`, shown as "확인되지 않은 Claude 읽기"; it is never selected automatically |
 | A user chooses a row | Save that key and show its 5-hour/weekly limits immediately |
 | A Claude rejection log has no account key | Do not apply it to the selected row; show "한도 거절을 계정에 귀속할 수 없음" |

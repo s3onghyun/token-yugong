@@ -240,7 +240,7 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
 
 | 読むもの | 理由 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | ステータスラインのブリッジが書き込む Claude Code の公式リミット（使用率 %、リセット時刻。プロンプト、パス、セッション ID は含まない）。Claude アカウントを見分けるため、ブリッジは `~/.claude.json` の `oauthAccount.accountUuid` を読み、その SHA-256 ハッシュ 12 文字だけを書きます |
+| `~/.claude/token-pet/limits.json` | ステータスラインのブリッジが書き込む Claude Code の公式リミット（使用率 %、リセット時刻。プロンプト、パス、セッション ID は含まない）。Claude アカウントを見分けるため、ブリッジはそのセッションを使うアカウント（セッションのトランスクリプトにある `session-owner` レコード、なければ `~/.claude.json` の `oauthAccount.accountUuid`）を読み、その SHA-256 ハッシュ 12 文字だけを書きます |
 | Claude Code のセッションログ（`~/.claude/projects`） | おじいさんのペースと山のためのトークン数、そしてリミットいっぱいを 100% と表示するための `usage_limit_reached` 拒否 |
 | `~/.codex/sessions` | Codex 自身のリミットとトークン数 |
 | `~/.gemini/tmp` | Gemini CLI のトークン数 |

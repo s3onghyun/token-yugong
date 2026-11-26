@@ -477,4 +477,46 @@ func json(_ s: String) -> Data { Data(s.utf8) }
                 && text.split(separator: "\n").count == 2)
         }
     }
+
+    /// The requester's Mac: sessions begun before a /login keep answering as the other account,
+    /// every 30 s alternating with the new sessions under the one login hash, so the menu bar
+    /// flipped between "week 65%" and "5h 13%". Each session's transcript names its own account.
+    @Test func bridgeTagsTheSessionsOwnAccountNotTheGlobalLogin() throws {
+        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
+        let config = dir.appendingPathComponent("config")
+        try FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)
+        try #"{"oauthAccount":{"accountUuid":"login-now"}}"#.write(to: config.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
+        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../bridge/statusline-bridge.sh").standardized
+        func transcript(_ name: String, owner: String) throws -> URL {
+            let u = dir.appendingPathComponent("\(name).jsonl")
+            try [#"{"type":"permission-mode"}"#,
+                 #"{"type":"session-owner","accountUuid":"\#(owner)","organizationUuid":"org","sessionId":"\#(name)"}"#,
+                 #"{"type":"assistant","message":{}}"#].joined(separator: "\n").write(to: u, atomically: true, encoding: .utf8)
+            return u
+        }
+        func run(_ session: String, _ transcript: URL, _ limits: String) throws -> Reading {
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
+            p.environment = ["TOKENPET_DIR": dir.path, "CLAUDE_CONFIG_DIR": config.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
+            let i = Pipe(); p.standardInput = i
+            try p.run()
+            i.fileHandleForWriting.write(Data(#"{"session_id":"\#(session)","transcript_path":"\#(transcript.path)","rate_limits":\#(limits)}"#.utf8))
+            try i.fileHandleForWriting.close(); p.waitUntilExit()
+            return try #require(Limits.bridge(Data(contentsOf: dir.appendingPathComponent("limits.json")), fileDate: Date()))
+        }
+        let old = try transcript("old", owner: "other-account"), new = try transcript("new", owner: "login-now")
+        let weekly = #"{"seven_day":{"used_percentage":65,"resets_at":1795978800}}"#
+        let max = #"{"five_hour":{"used_percentage":13,"resets_at":1795690800},"seven_day":{"used_percentage":5,"resets_at":1796216400}}"#
+        var accounts = AccountReadings()
+        let first = try run("new", new, max)
+        accounts.takeClaude(first)
+        for (n, (session, file, limits)) in [("old", old, weekly), ("new", new, max), ("old", old, weekly), ("new", new, max)].enumerated() {
+            var r = try run(session, file, limits)
+            r.at = first.at.addingTimeInterval(Double(n + 1) * 30)
+            accounts.takeClaude(r)
+            #expect(accounts.selectedClaude?.five?.pct == 13 && accounts.selectedClaude?.week?.pct == 5)   // never the other account's 65%
+        }
+        #expect(Set(accounts.rows().map(\.key)).count == 2)
+        let saved = try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8)
+        #expect(!saved.contains("login-now") && !saved.contains("other-account") && !saved.contains("transcript"))
+    }
 }

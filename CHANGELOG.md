@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- With Claude Code sessions open on two accounts (for example after a `/login` while older sessions
+  keep running), the menu bar no longer flips every 30 seconds between the two accounts' limits
+  under one account. The status-line bridge now tags each reading with the account that owns that
+  session (the `session-owner` record Claude Code writes into the session's transcript) instead of
+  whichever account is logged in right now.
+- After the popover had been opened once, its closed scene kept drawing 8 frames a second in the
+  background (about 15% CPU on a busy Mac). The scene now stands still while the popover is closed.
+- 두 계정으로 Claude Code 세션이 열려 있으면(예: `/login` 뒤에도 예전 세션이 계속 도는 경우) 메뉴 막대가
+  한 계정 이름으로 두 계정의 한도를 30초마다 번갈아 보여 주던 문제를 고쳤습니다. 상태 줄 브리지가 지금
+  로그인된 계정이 아니라 그 세션을 쓰는 계정(Claude Code가 세션 대화 기록에 남기는 `session-owner`)으로
+  읽기를 구분합니다.
+- 팝오버를 한 번 연 뒤에는 닫혀 있어도 장면이 뒤에서 초당 8번 계속 그려지던 문제(바쁜 Mac에서 CPU 약 15%)를
+  고쳤습니다. 이제 팝오버가 닫혀 있으면 장면이 멈춰 있습니다.
+
 ## 0.3.6 (2026-11-20)
 
 ### Changed
