@@ -17,17 +17,17 @@ Without the signing secret (`APPLE_DEVELOPER_ID_P12`, e.g. in a fork), phase 1 s
 archive, keeps it 7 days as `token-yugong-adhoc-X.Y.Z` and says **Notarization skipped**. Phase 2 then finds no signed
 artifact and publishes nothing.
 
-## Commands (next patch: 0.3.6)
+## Commands (next patch: 0.3.7)
 
-Prepare the release in a PR first, as for every patch: set `VERSION` to `0.3.6` and turn `## Unreleased` in
-`CHANGELOG.md` into `## 0.3.6 (YYYY-MM-DD)`. Phase 1 checks that the tag is `v` + `VERSION`; phase 2 takes the release
+Prepare the release in a PR first, as for every patch: set `VERSION` to `0.3.7` and turn `## Unreleased` in
+`CHANGELOG.md` into `## 0.3.7 (YYYY-MM-DD)`. Phase 1 checks that the tag is `v` + `VERSION`; phase 2 takes the release
 notes from that changelog section and `.github/release-header.md`.
 
 ```sh
 R=s3onghyun/token-yugong
 
 # Phase 1 starts when the tag is pushed (annotated, on the merged release commit of main)
-git fetch origin main && git tag -a v0.3.6 -m "Token Yugong v0.3.6" origin/main && git push origin v0.3.6
+git fetch origin main && git tag -a v0.3.7 -m "Token Yugong v0.3.7" origin/main && git push origin v0.3.7
 
 # The phase-1 run id. Its summary shows the submission id and the exact phase-2 command
 gh run list -R "$R" -w release.yml -L 5
@@ -38,10 +38,10 @@ gh workflow run release.yml -R "$R" --ref main -f run_id=<phase-1 run id>
 gh run list -R "$R" -w release.yml -L 1
 
 # After it is published: check the downloaded asset on a Mac
-gh release download v0.3.6 -R "$R" -p 'TokenYugong-0.3.6-macos-universal.zip*'
-shasum -a 256 -c TokenYugong-0.3.6-macos-universal.zip.sha256
-ditto -x -k TokenYugong-0.3.6-macos-universal.zip . && spctl -a -vv -t exec TokenYugong.app   # source=Notarized Developer ID
-gh attestation verify TokenYugong-0.3.6-macos-universal.zip -R "$R"
+gh release download v0.3.7 -R "$R" -p 'TokenYugong-0.3.7-macos-universal.zip*'
+shasum -a 256 -c TokenYugong-0.3.7-macos-universal.zip.sha256
+ditto -x -k TokenYugong-0.3.7-macos-universal.zip . && spctl -a -vv -t exec TokenYugong.app   # source=Notarized Developer ID
+gh attestation verify TokenYugong-0.3.7-macos-universal.zip -R "$R"
 ```
 
 Always run phase 2 with `--ref main` (the phase-2 jobs live in the default branch's workflow), and only after the whole

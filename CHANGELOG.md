@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.7 (2026-11-26)
 
 ### Fixed
 - With Claude Code sessions open on two accounts (for example after a `/login` while older sessions
