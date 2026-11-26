@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.8 (2026-11-26)
 
 ### Fixed
 - Claude accounts are now told apart by their own limits: the moment in the week each account's
