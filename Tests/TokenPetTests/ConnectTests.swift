@@ -226,7 +226,6 @@ import Testing
             try Data("#!/bin/sh\n: > '\(marker.path)'\nexit 1\n".utf8).write(to: plant.appendingPathComponent(tool))
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: plant.appendingPathComponent(tool).path)
         }
-        try Data(#"{"oauthAccount":{"accountUuid":"00000000-0000-0000-0000-000000000001"}}"#.utf8).write(to: h.appendingPathComponent(".claude.json"))
         let sessions = dir(h).appendingPathComponent("sessions"), stale = sessions.appendingPathComponent("0123456789abcdef01234567")
         try fm.createDirectory(at: sessions, withIntermediateDirectories: true)
         try Data("old\nold\n".utf8).write(to: stale)

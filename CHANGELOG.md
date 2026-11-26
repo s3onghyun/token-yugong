@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Claude accounts are now told apart by their own limits: the moment in the week each account's
+  weekly limit resets. 0.3.7 (and every release before it) guessed the account from local login
+  state, which running sessions do not follow at the same time, so one account's row could still
+  show another account's numbers. Saved rows move once to their reading's weekly reset, and the
+  account list names each row by it ("Claude · weekly reset Wed 22:00") unless it has a nickname.
+- An idle Claude Code session no longer puts its older numbers back over a newer answer: the
+  status-line bridge writes a reading only when a session's limits change. The bridge no longer
+  reads `~/.claude.json` or session transcripts.
+- Claude 계정을 이제 한도 데이터 자체, 곧 계정마다 주간 한도가 리셋되는 요일·시각으로 구분합니다. 0.3.7까지는
+  로컬 로그인 정보로 계정을 추측했는데, 실행 중인 세션들은 로그인 변경을 저마다 다른 때에 따라가므로 한 계정
+  행에 다른 계정 숫자가 들어갈 수 있었습니다. 저장된 행은 한 번 각 읽기의 주간 리셋으로 옮기고, 계정 목록은
+  별명이 없으면 "Claude · 주간 리셋 수 22:00"처럼 표시합니다.
+- 쉬고 있는 Claude Code 세션이 예전 숫자를 새 응답 위에 다시 덮어쓰지 않습니다. 상태 줄 브리지는 세션의
+  한도가 바뀔 때만 기록하고, 더는 `~/.claude.json`이나 세션 대화 기록을 읽지 않습니다.
+
 ## 0.3.7 (2026-11-26)
 
 ### Fixed

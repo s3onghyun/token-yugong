@@ -379,7 +379,9 @@ struct PopoverView: View {
         if row.key.isUnknownClaude {
             return L.t("Unidentified Claude reading", "확인되지 않은 Claude 읽기", "未確認の Claude 読み取り", "未识别的 Claude 读取")
         }
-        return L.t("Claude account", "Claude 계정", "Claude アカウント", "Claude 账号") + " · " + String(row.key.value.suffix(6))
+        // an account is known by when its weekly limit resets (AccountKey.claude)
+        let reset = row.reading.week?.resetsAt.map { Fmt.clock($0, now: .distantPast) } ?? "?"
+        return L.t("Claude · weekly reset \(reset)", "Claude · 주간 리셋 \(reset)", "Claude・週間リセット \(reset)", "Claude · 每周重置 \(reset)")
     }
 
     private func accountReadTime(_ row: AccountRow) -> String {

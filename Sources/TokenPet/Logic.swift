@@ -80,7 +80,6 @@ struct Reading: Equatable, Codable {
     var week: Meter?
     var at: Date            // when the tool reported these numbers
     var month: Meter? = nil // a billed API: this month's spend against the budget
-    var account: String? = nil  // Claude: the signed-in account, hashed by the bridge (short hex); nil from older bridges
 }
 
 /// A family member other than Grandpa: his reading with passed resets applied, and his meter.
@@ -93,16 +92,14 @@ enum Limits {
     static let fiveLength: TimeInterval = 5 * 3600
     static let weekLength: TimeInterval = 7 * 86400
 
-    /// The file bridge/statusline-bridge.sh writes: {"captured_at": epoch, "account": "<hash>", "rate_limits": {five_hour, seven_day}}.
-    /// nil = nothing usable (missing, corrupt, partial, or no window at all). `account` is optional (older bridges).
+    /// The file bridge/statusline-bridge.sh writes: {"captured_at": epoch, "rate_limits": {five_hour, seven_day}}.
+    /// nil = nothing usable (missing, corrupt, partial, or no window at all). An older bridge's
+    /// "account" hash is ignored: it was a guess (see `AccountKey.claude`).
     static func bridge(_ data: Data, fileDate: Date) -> Reading? {
         guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rl = o["rate_limits"] as? [String: Any] else { return nil }
         let at = epoch(o["captured_at"]) ?? fileDate
-        let account = (o["account"] as? String).flatMap { a in
-            (4...64).contains(a.count) && a.allSatisfy(\.isHexDigit) ? a.lowercased() : nil
-        }
-        let r = Reading(five: meter(rl["five_hour"], "used_percentage"), week: meter(rl["seven_day"], "used_percentage"), at: at, account: account)
+        let r = Reading(five: meter(rl["five_hour"], "used_percentage"), week: meter(rl["seven_day"], "used_percentage"), at: at)
         return r.five == nil && r.week == nil ? nil : r
     }
 
@@ -219,18 +216,24 @@ enum Limits {
     }()
 }
 
-/// A stable identity supplied by a local reader. Claude supplies a hashed bridge id; Codex has
-/// one local reader, so it never needs an account-registration step.
+/// Which account a reading belongs to. Codex has one local reader. A Claude reading names no
+/// account and no local file says which account answered (LOGIC.md "Accounts"), so a Claude
+/// account is known by its own data: the moment in the week its weekly limit resets. Each window
+/// keeps its reset time, and the next one is exactly a week later, so the key stays the same.
 struct AccountKey: Hashable, Codable {
     let value: String
 
     static let local = AccountKey(value: "local")
-    /// A bridge without an account hash is useful to inspect, but is never picked for Grandpa.
+    /// A reading without a weekly reset time is useful to inspect, but is never picked for Grandpa.
     static let unknownClaude = AccountKey(value: "claude:unknown")
 
-    static func claude(_ hash: String?) -> AccountKey {
-        hash.map { AccountKey(value: "claude:\($0)") } ?? unknownClaude
+    static func claude(weekResets reset: Date?) -> AccountKey {
+        guard let reset else { return unknownClaude }
+        let minute = Int((reset.timeIntervalSince1970 / 60).rounded())
+        return AccountKey(value: "claude:week@\(minute % (7 * 24 * 60))")
     }
+
+    static func claude(_ reading: Reading) -> AccountKey { claude(weekResets: reading.week?.resetsAt) }
 
     var isUnknownClaude: Bool { self == .unknownClaude }
     var isClaude: Bool { value.hasPrefix("claude:") && !isUnknownClaude }
@@ -262,13 +265,21 @@ struct ReadingStore: Equatable, Codable {
         nicknames.removeValue(forKey: key.value)
     }
 
-    @discardableResult mutating func migrateLegacyUnknownKey() -> Bool {
-        guard let reading = values.removeValue(forKey: "claude:untagged") else { return false }
-        values[AccountKey.unknownClaude.value] = reading
-        if let nickname = nicknames.removeValue(forKey: "claude:untagged") {
-            nicknames[AccountKey.unknownClaude.value] = nickname
+    /// Key every Claude row by its own reading. Older releases keyed rows by a guessed account
+    /// hash (or `claude:untagged`), so one row could hold another account's numbers. Returns
+    /// old key → new key for the rows that moved; when two rows meet, the newer reading stays.
+    mutating func rekeyClaudeRows() -> [String: AccountKey] {
+        var moved: [String: AccountKey] = [:]
+        for (old, reading) in values where old.hasPrefix("claude:") && AccountKey.claude(reading).value != old {
+            moved[old] = AccountKey.claude(reading)
         }
-        return true
+        let readings = moved.keys.map { ($0, values.removeValue(forKey: $0)!) }.sorted { $0.1.at < $1.1.at }
+        for (old, reading) in readings {
+            let key = moved[old]!.value
+            if values[key].map({ $0.at <= reading.at }) ?? true { values[key] = reading }
+            if let nickname = nicknames.removeValue(forKey: old), nicknames[key] == nil { nicknames[key] = nickname }
+        }
+        return moved
     }
 }
 
@@ -283,12 +294,11 @@ struct AccountReadings: Equatable, Codable {
 
     init() {}
 
-    init(migrating store: ReadingStore, selected: AccountKey?, reading: Reading?, account: String?) {
+    init(migrating store: ReadingStore, reading: Reading?) {
         self.store = store
-        _ = self.store.migrateLegacyUnknownKey()
-        if let selected, selected.isClaude, self.store[selected] != nil { self.selected = selected }
-        else if let reading {
-            let key = AccountKey.claude(account)
+        _ = self.store.rekeyClaudeRows()
+        if let reading {
+            let key = AccountKey.claude(reading)
             self.store[key] = reading
             if key.isClaude { self.selected = key }
         }
@@ -299,7 +309,7 @@ struct AccountReadings: Equatable, Codable {
     /// us, not that the old number is still true.  `captured_at` makes an out-of-order file
     /// notification harmless while equal timestamps deliberately favour the later report.
     @discardableResult mutating func takeClaude(_ reading: Reading) -> Bool {
-        let key = AccountKey.claude(reading.account)
+        let key = AccountKey.claude(reading)
         if let current = store[key], current.at > reading.at { return false }
         let wasSelected = selected
         let changed = store[key] != reading
@@ -332,12 +342,11 @@ struct AccountReadings: Equatable, Codable {
 
     func nickname(for key: AccountKey) -> String? { store.nickname(for: key) }
 
-    /// A pre-keyed build called its untagged Claude row `claude:untagged`. Move that row once
-    /// to the explicit unconfirmed key and make sure it can never remain the selected account.
+    /// Rows saved by 0.3.7 and older move to their reading's key; the selection follows its row.
     @discardableResult mutating func migrateLegacyKeys() -> Bool {
-        let migrated = store.migrateLegacyUnknownKey()
-        guard migrated else { return false }
-        if selected?.value == "claude:untagged" { selected = nil }
+        let moved = store.rekeyClaudeRows()
+        guard !moved.isEmpty else { return false }
+        if let old = selected?.value, let key = moved[old] { selected = key.isClaude ? key : nil }
         return true
     }
 

@@ -77,13 +77,13 @@ if args.contains("--scan-report") {
         model.setFixtureAccounts([
             Reading(five: Meter(pct: 100, resetsAt: now.addingTimeInterval(2 * 3600)),
                     week: Meter(pct: 36, resetsAt: now.addingTimeInterval(4 * 86400)),
-                    at: now.addingTimeInterval(-5 * 60), account: "1111aaaabbbb"),
+                    at: now.addingTimeInterval(-5 * 60)),
             Reading(five: Meter(pct: 67, resetsAt: now.addingTimeInterval(3 * 3600)),
                     week: Meter(pct: 58, resetsAt: now.addingTimeInterval(5 * 86400)),
-                    at: now.addingTimeInterval(-18 * 60), account: "2222ccccdddd"),
+                    at: now.addingTimeInterval(-18 * 60)),
             Reading(five: nil,
                     week: Meter(pct: 55, resetsAt: now.addingTimeInterval(4 * 86400)),
-                    at: now.addingTimeInterval(-3 * 60), account: "1111aaaabbbb"),
+                    at: now.addingTimeInterval(-3 * 60)),
         ])
         model.setDemo(.steady)
         let renderer = ImageRenderer(content: PopoverView(model: model, fixedT: 0.9, now: now)
