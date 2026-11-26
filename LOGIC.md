@@ -20,7 +20,7 @@ app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup
 | Output tokens with timestamps | `~/.claude/projects/**/*.jsonl` (`message.usage`), Codex `token_count` events, Gemini CLI `~/.gemini/tmp/*/chats/session-*.json` | shovel speed only |
 | Tokens: Claude input + output + cache writes; Codex input without the cached part + output; Gemini `total` | the same logs | the mountain only |
 
-Saved account readings contain only hashed keys, last readings and optional local nicknames; token
+Saved account readings contain only account keys (a weekly reset moment), last readings and optional local nicknames; token
 counts never become a limit percentage. The network is used
 only for an OpenAI or DeepSeek member you set up: the request carries your key (kept in the
 login Keychain, never in a file or the settings) and nothing else leaves the Mac. The update check
@@ -67,29 +67,40 @@ default). A used-up **weekly** limit is a long rest: a full moon instead of the 
 
 ### Accounts
 
-The bridge names every Claude reading with a 12-character SHA-256 hash of the account that owns the
-session: the newest `session-owner` record Claude Code writes into the session's transcript. A
-session begun before a `/login` keeps answering as its own account, so the login in
-`~/.claude.json` is only the fallback for a Claude Code that writes no such record. With that
-fallback, after `/login` a session whose `rate_limits` are unchanged from before the switch is an
-old redraw and is ignored; a changed response or a session begun after the login is stored under
-the current hash. Raw account and session ids are never saved.
+The status line names no account, and no local file says which account answered a session's last
+request: running sessions re-read the shared login at their own times, so the login in
+`~/.claude.json` and the account a session started with are both guesses (they mixed two accounts'
+numbers in one row in 0.2.x–0.3.7). A Claude account is therefore known by its own data: **the moment
+in the week its weekly limit resets** (`seven_day.resets_at` modulo 7 days, to the minute). A weekly
+window keeps its reset time until it ends, and the next one resets exactly a week later, so the key
+stays the same from week to week. The 5-hour window cannot name an account: it changes every 5 hours
+and is left out once it resets.
 
-Each keyed Claude reading replaces only the reading under the same key. The first identified
-Claude reading becomes the initial selection; after that the picker keeps the row the user
-explicitly selects. Switching the picker immediately changes Grandpa and the menu-bar number, and
-the selected key persists across a restart. Codex is one `local` row, not an account-registration
-flow.
+A session redraws the limits of its last response until the next one. The bridge writes a reading
+only when a session's limits differ from what that session last wrote, so an idle session's old
+numbers never come back over a newer answer. It keeps only SHA-256 hashes of session ids and limits.
+
+Each Claude reading replaces only the reading under its own key. The first identified Claude reading
+becomes the initial selection; after that the picker keeps the row the user explicitly selects.
+Switching the picker immediately changes Grandpa and the menu-bar number, and the selected key
+persists across a restart. A row is named by its weekly reset ("Claude · 주간 리셋 수 22:00") unless the
+user gives it a nickname. Codex is one `local` row, not an account-registration flow.
 
 | When | Then |
 |---|---|
-| A reading has an identified Claude hash | Store and update only `claude:<hash>`; it never changes another key's reading |
+| Two accounts answer in parallel sessions | Each reading goes to its own weekly reset's row; the shown row only ever holds its own numbers |
+| `/login` while a session stays open | Its next answer carries the other account's weekly window and goes to that row; the shown row changes only when the user picks it |
+| A weekly window ends | The next window resets exactly a week later: the same row, and the new reading replaces the old |
 | Two readings under one key report the same window | The newer capture wins, even when it is lower: a limit can be reset before its reset time. An older capture read later changes nothing |
-| `/login` while sessions remain open | Each session's readings stay under the account that owns it (its transcript's `session-owner`); without that record, ignore each unchanged pre-login redraw and store the first fresh response under the new hash |
-| A reading has no account hash | Store it as `claude:unknown`, shown as "확인되지 않은 Claude 읽기"; it is never selected automatically |
+| A session redraws limits it already reported | Not written by the bridge |
+| A reading has no weekly reset time | Store it as `claude:unknown`, shown as "확인되지 않은 Claude 읽기"; it is never selected automatically |
+| Rows saved by 0.3.7 and older (keyed by an account hash) | Moved once to their reading's key; the selection and nickname follow the row (the newer reading stays when two meet) |
 | A user chooses a row | Save that key and show its 5-hour/weekly limits immediately |
 | A Claude rejection log has no account key | Do not apply it to the selected row; show "한도 거절을 계정에 귀속할 수 없음" |
 | A row has not been updated for 30 days | Put it under "지난 계정"; keep it until the user deletes it |
+
+Limits of this rule: two accounts whose weekly limits reset at the same moment of the week share a
+row, and an account whose weekly reset moment is moved by Anthropic starts a new row.
 
 ## Family
 

@@ -11,7 +11,7 @@ enum Prefs {
 }
 
 /// What the app read from the bridge and made of it, one line per new reading, for telling later which
-/// account it showed and why. Hashed account ids, reset times and percentages only; on this Mac, in
+/// account it showed and why. Account keys (a weekly reset moment), reset times and percentages only; on this Mac, in
 /// ~/Library/Application Support/<settings domain>/, at most two files of 512 KB (a few days).
 enum ReadingLog {
     static let limit = 512 * 1024
@@ -49,7 +49,7 @@ enum ReadingLog {
     }
 
     static func line(read r: Reading, decision: String, shown: Reading?, selected: AccountKey?) -> String {
-        "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) captured=\(stamp(r.at, "HH:mm:ss")) account=\(r.account ?? "-") "
+        "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) captured=\(stamp(r.at, "HH:mm:ss")) key=\(AccountKey.claude(r).value) "
             + "\(describe(r)) -> \(decision) selected=\(selected?.value ?? "none") shown: \(describe(shown))"
     }
 
@@ -170,7 +170,6 @@ struct MountainLedger {
 
 private struct LegacyAccountState: Decodable {
     let reading: Reading?
-    let id: String?
 }
 
 /// Reads only the persisted snapshot from releases before the keyed store. It deliberately does
@@ -185,8 +184,7 @@ extension AccountReadings {
         if let data = d.data(forKey: "claude.readings") {
             if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["legacy"] != nil,
                let old = try? JSONDecoder().decode(LegacyReadingState.self, from: data) {
-                let migrated = AccountReadings(migrating: old.store ?? ReadingStore(), selected: nil,
-                                               reading: old.legacy?.reading, account: old.legacy?.id)
+                let migrated = AccountReadings(migrating: old.store ?? ReadingStore(), reading: old.legacy?.reading)
                 migrated.save(d)
                 d.removeObject(forKey: "claude.account")
                 return migrated
@@ -197,7 +195,7 @@ extension AccountReadings {
             }
         }
         if let data = d.data(forKey: "claude.account"), let old = try? JSONDecoder().decode(LegacyAccountState.self, from: data) {
-            let migrated = AccountReadings(migrating: ReadingStore(), selected: nil, reading: old.reading, account: old.id)
+            let migrated = AccountReadings(migrating: ReadingStore(), reading: old.reading)
             migrated.save(d)
             d.removeObject(forKey: "claude.account")
             return migrated

@@ -45,7 +45,7 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         let r = try #require(Limits.supplement(bridge, with: history, now: Date(timeIntervalSince1970: 1_794_000_010)))
         #expect(r.five == Meter(pct: 34, resetsAt: nil, resetUnavailable: true))
         #expect(r.week == Meter(pct: 59, resetsAt: reset))
-        #expect(r.account == nil && r.at == bridge.at)       // status line remains the account authority
+        #expect(r.at == bridge.at)       // the status line keeps the weekly window that names the account
     }
 
     @Test func absentOrStaleMaxHistoryKeepsTheClearWeeklyFallback() throws {
@@ -443,80 +443,62 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         #expect(try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8) == saved)   // kept, not wiped
     }
 
-    @Test func bridgeTagsTheCurrentLoginAndDropsAnUnchangedPreLoginRedraw() throws {
+    /// A session redraws its last response's limits until the next response. Only a change is a
+    /// reading: an idle session's old numbers never come back over a newer answer.
+    @Test func bridgeWritesOnlyWhatASessionNewlyLearned() throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let config = dir.appendingPathComponent("config")
-        try FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)
         let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../bridge/statusline-bridge.sh").standardized
-        func run(_ input: String, accountID: String) throws -> Reading {
-            try #"{"oauthAccount":{"accountUuid":"\#(accountID)"}}"#.write(to: config.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
+        func run(_ session: String, _ limits: String) throws -> Reading {
             let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
-            p.environment = ["TOKENPET_DIR": dir.path, "CLAUDE_CONFIG_DIR": config.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
+            p.environment = ["TOKENPET_DIR": dir.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
             let i = Pipe(); p.standardInput = i
-            try p.run(); i.fileHandleForWriting.write(Data(input.utf8)); try i.fileHandleForWriting.close(); p.waitUntilExit()
+            try p.run()
+            i.fileHandleForWriting.write(Data(#"{"session_id":"\#(session)","rate_limits":\#(limits)}"#.utf8))
+            try i.fileHandleForWriting.close(); p.waitUntilExit()
             return try #require(Limits.bridge(Data(contentsOf: dir.appendingPathComponent("limits.json")), fileDate: Date()))
         }
-        let oldID = "old-account-id", newID = "new-account-id"
-        let old = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":37,"resets_at":1794164400}}}"#, accountID: oldID)
-        // `/login` changes the global config while this session is idle. Its unchanged redraw is
-        // not a reading for the new account, so it cannot replace the displayed fresh response.
-        let oldRedraw = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":37,"resets_at":1794164400}}}"#, accountID: newID)
-        let fresh = try run(#"{"session_id":"new-session","rate_limits":{"seven_day":{"used_percentage":57,"resets_at":1794164400}}}"#, accountID: newID)
-        let idleAfterFresh = try run(#"{"session_id":"old-session","rate_limits":{"seven_day":{"used_percentage":37,"resets_at":1794164400}}}"#, accountID: newID)
-        #expect(old.account != nil && oldRedraw == old && fresh.account != old.account && idleAfterFresh == fresh)
-        var accounts = AccountReadings()
-        accounts.takeClaude(old)
-        accounts.takeClaude(fresh) // the proven path: a session begun after /login is current
-        accounts.select(.claude(fresh.account))
-        #expect(accounts.selectedClaude?.week?.pct == 57)
+        let idle47 = #"{"five_hour":{"used_percentage":47,"resets_at":1795690800},"seven_day":{"used_percentage":10,"resets_at":1796216400}}"#
+        let busy48 = #"{"five_hour":{"used_percentage":48,"resets_at":1795690800},"seven_day":{"used_percentage":10,"resets_at":1796216400}}"#
+        #expect(try run("idle", idle47).five?.pct == 47)
+        #expect(try run("busy", busy48).five?.pct == 48)
+        #expect(try run("idle", idle47).five?.pct == 48)       // a redraw: not written
+        #expect(try run("idle", busy48).five?.pct == 48)       // its next answer is new: written
+        let saved = try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8)
+        #expect(!saved.contains("account") && !saved.contains("idle") && !saved.contains("busy"))
         let stored = try FileManager.default.contentsOfDirectory(at: dir.appendingPathComponent("sessions"), includingPropertiesForKeys: nil)
         #expect(stored.count == 2)
         for u in stored {
             let text = try String(contentsOf: u, encoding: .utf8)
-            #expect(!u.lastPathComponent.contains("session") && !text.contains(oldID) && !text.contains(newID)
-                && text.split(separator: "\n").count == 2)
+            #expect(!u.lastPathComponent.contains("idle") && !u.lastPathComponent.contains("busy") && text.split(separator: "\n").count == 1)
         }
     }
 
-    /// The requester's Mac: sessions begun before a /login keep answering as the other account,
-    /// every 30 s alternating with the new sessions under the one login hash, so the menu bar
-    /// flipped between "week 65%" and "5h 13%". Each session's transcript names its own account.
-    @Test func bridgeTagsTheSessionsOwnAccountNotTheGlobalLogin() throws {
+    /// End to end with the requester's two accounts: whichever session writes last, the selected
+    /// account's row only ever holds its own numbers.
+    @Test func bridgeAndStoreKeepTwoParallelAccountsApart() throws {
         let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let config = dir.appendingPathComponent("config")
-        try FileManager.default.createDirectory(at: config, withIntermediateDirectories: true)
-        try #"{"oauthAccount":{"accountUuid":"login-now"}}"#.write(to: config.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
         let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../bridge/statusline-bridge.sh").standardized
-        func transcript(_ name: String, owner: String) throws -> URL {
-            let u = dir.appendingPathComponent("\(name).jsonl")
-            try [#"{"type":"permission-mode"}"#,
-                 #"{"type":"session-owner","accountUuid":"\#(owner)","organizationUuid":"org","sessionId":"\#(name)"}"#,
-                 #"{"type":"assistant","message":{}}"#].joined(separator: "\n").write(to: u, atomically: true, encoding: .utf8)
-            return u
-        }
-        func run(_ session: String, _ transcript: URL, _ limits: String) throws -> Reading {
+        func run(_ session: String, _ limits: String) throws -> Reading {
             let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
-            p.environment = ["TOKENPET_DIR": dir.path, "CLAUDE_CONFIG_DIR": config.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
+            p.environment = ["TOKENPET_DIR": dir.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
             let i = Pipe(); p.standardInput = i
             try p.run()
-            i.fileHandleForWriting.write(Data(#"{"session_id":"\#(session)","transcript_path":"\#(transcript.path)","rate_limits":\#(limits)}"#.utf8))
+            i.fileHandleForWriting.write(Data(#"{"session_id":"\#(session)","rate_limits":\#(limits)}"#.utf8))
             try i.fileHandleForWriting.close(); p.waitUntilExit()
             return try #require(Limits.bridge(Data(contentsOf: dir.appendingPathComponent("limits.json")), fileDate: Date()))
         }
-        let old = try transcript("old", owner: "other-account"), new = try transcript("new", owner: "login-now")
-        let weekly = #"{"seven_day":{"used_percentage":65,"resets_at":1795978800}}"#
-        let max = #"{"five_hour":{"used_percentage":13,"resets_at":1795690800},"seven_day":{"used_percentage":5,"resets_at":1796216400}}"#
+        func max(_ five: Int) -> String { #"{"five_hour":{"used_percentage":\#(five),"resets_at":1795690800},"seven_day":{"used_percentage":5,"resets_at":1796216400}}"# }
+        func weeklyOnly(_ week: Int) -> String { #"{"seven_day":{"used_percentage":\#(week),"resets_at":1795978800}}"# }
         var accounts = AccountReadings()
-        let first = try run("new", new, max)
+        let first = try run("new", max(13))
         accounts.takeClaude(first)
-        for (n, (session, file, limits)) in [("old", old, weekly), ("new", new, max), ("old", old, weekly), ("new", new, max)].enumerated() {
-            var r = try run(session, file, limits)
+        for (n, (session, limits)) in [("old", weeklyOnly(64)), ("new", max(14)), ("old", weeklyOnly(65)), ("new", max(15))].enumerated() {
+            var r = try run(session, limits)
             r.at = first.at.addingTimeInterval(Double(n + 1) * 30)
             accounts.takeClaude(r)
-            #expect(accounts.selectedClaude?.five?.pct == 13 && accounts.selectedClaude?.week?.pct == 5)   // never the other account's 65%
+            #expect(accounts.selectedClaude?.five != nil && accounts.selectedClaude?.week?.pct == 5)
         }
-        #expect(Set(accounts.rows().map(\.key)).count == 2)
-        let saved = try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8)
-        #expect(!saved.contains("login-now") && !saved.contains("other-account") && !saved.contains("transcript"))
+        #expect(accounts.selectedClaude?.five?.pct == 15)
+        #expect(accounts.rows().count == 2)
     }
 }

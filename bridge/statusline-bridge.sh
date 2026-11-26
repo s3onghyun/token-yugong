@@ -3,22 +3,18 @@
 # Claude Code pipes a JSON object to this script after each response. We keep ONLY the
 # documented `rate_limits` object (5-hour / 7-day used_percentage + resets_at) in
 # $TOKENPET_DIR/limits.json. No prompts, paths, session ids, or credentials are stored,
-# and nothing goes over the network. To tell Claude accounts apart, it adds a short SHA-256 hash of
-# the account that owns this session: the newest `session-owner` record Claude Code writes into the
-# session's transcript. Sessions begun before a /login keep using their own account, so the global
-# login (oauthAccount.accountUuid in .claude.json) is only the fallback for a Claude Code that writes
-# no such record. The id itself is never stored. With that fallback, an old session can redraw the
-# exact limits it had before a /login; that unchanged redraw is ignored instead of being labelled as
-# the new account.
-# Only SHA-256 hashes of session ids, account ids and rate-limit payloads are kept in $TOKENPET_DIR/sessions/.
+# and nothing goes over the network. The payload names no account, and no local file says which
+# account answered a session's last request, so the app tells accounts apart by the weekly window in
+# the limits themselves (LOGIC.md "Accounts").
+# A session redraws the limits of its last response until the next one. Only a change is a new reading:
+# each session's last limits are kept as a SHA-256 hash (file named by a hash of the session id) in
+# $TOKENPET_DIR/sessions/, and an unchanged redraw is not written.
 # `--chain '<command>'` keeps a status line you already had: it gets the same JSON and its output is shown.
 # Our own tools come only from system and Homebrew folders, not from whatever PATH Claude Code passes in;
 # a chained status line still runs with that PATH. Session files older than 30 days are removed.
 caller_path=$PATH
 PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin; export PATH
 dir="${TOKENPET_DIR:-$HOME/.claude/token-pet}"
-cfg="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
-cfg="${cfg:-$HOME/.claude.json}"
 input=$(cat)
 # jq when installed (built into macOS 15+), otherwise plutil (every macOS)
 if command -v jq >/dev/null 2>&1; then
@@ -26,8 +22,6 @@ if command -v jq >/dev/null 2>&1; then
   pct=$(printf '%s' "$rl" | jq -r '.five_hour.used_percentage // empty' 2>/dev/null)
   week=$(printf '%s' "$rl" | jq -r '.seven_day.used_percentage // empty' 2>/dev/null)
   sid=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
-  transcript=$(printf '%s' "$input" | jq -r '.transcript_path // empty' 2>/dev/null)
-  uuid=$(jq -r '.oauthAccount.accountUuid // empty' "$cfg" 2>/dev/null)
 else
   # plutil's handling of stdin (`-`) differs between supported macOS releases.
   # Use private files instead, so the no-jq path is stable on every supported macOS.
@@ -35,9 +29,8 @@ else
   limits_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-limits.XXXXXX") || exit 0
   pct_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-pct.XXXXXX") || exit 0
   sid_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-session.XXXXXX") || exit 0
-  transcript_file=$(/usr/bin/mktemp "${TMPDIR:-/tmp}/tokenpet-transcript.XXXXXX") || exit 0
-  /bin/chmod 600 "$input_file" "$limits_file" "$pct_file" "$sid_file" "$transcript_file"
-  trap '/bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file" "$transcript_file"' 0 1 2 15
+  /bin/chmod 600 "$input_file" "$limits_file" "$pct_file" "$sid_file"
+  trap '/bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file"' 0 1 2 15
   printf '%s' "$input" > "$input_file"
   plutil -extract rate_limits json -o "$limits_file" "$input_file" 2>/dev/null
   rl=$(/bin/cat "$limits_file")
@@ -48,47 +41,26 @@ else
   # do not let an optional session_id leak into a chained status line.
   case "$input" in *'"session_id"'*) plutil -extract session_id raw -o "$sid_file" "$input_file" 2>/dev/null ;; esac
   sid=$(/bin/cat "$sid_file")
-  case "$input" in *'"transcript_path"'*) plutil -extract transcript_path raw -o "$transcript_file" "$input_file" 2>/dev/null ;; esac
-  transcript=$(/bin/cat "$transcript_file")
-  uuid=$(plutil -extract oauthAccount.accountUuid raw -o - "$cfg" 2>/dev/null)
-  /bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file" "$transcript_file"
+  /bin/rm -f "$input_file" "$limits_file" "$pct_file" "$sid_file"
   trap - 0 1 2 15
 fi
-# The session's own account, read backwards from the transcript's end (Claude Code repeats the
-# record every turn, so the last 1000 lines hold it; a transcript can be hundreds of MB).
-if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-  owner=$(/usr/bin/tail -r "$transcript" 2>/dev/null | /usr/bin/head -n 1000 | /usr/bin/grep -m1 '"type":"session-owner"' |
-    /usr/bin/sed -n 's/.*"accountUuid":"\([0-9A-Za-z-]*\)".*/\1/p')
-  [ -n "$owner" ] && uuid=$owner
-fi
-account=""
-[ -n "$uuid" ] && account=$(printf '%s' "$uuid" | /usr/bin/shasum -a 256 | /usr/bin/cut -c1-12)
 write_reading=1
-# `oauthAccount` is global to Claude Code, not to the session which produced this payload.  A session
-# that reports the same limits after the login changed is therefore an old redraw, not a reading for
-# the new account. Keep its previous account and a hash of its limits only long enough to reject that
-# unchanged redraw. A changed response is a fresh reading and is tagged with the current account.
 if [ -n "$sid" ] && [ -n "$rl" ] && [ "$rl" != "null" ]; then
   session_hash=$(printf '%s' "$sid" | /usr/bin/shasum -a 256 | /usr/bin/cut -c1-24)
   session_dir="$dir/sessions"
   session_file="$session_dir/$session_hash"
   limits_hash=$(printf '%s' "$rl" | /usr/bin/shasum -a 256 | /usr/bin/cut -c1-64)
-  if [ -f "$session_file" ]; then
-    previous_account=$(/usr/bin/sed -n '1p' "$session_file" 2>/dev/null)
-    previous_limits=$(/usr/bin/sed -n '2p' "$session_file" 2>/dev/null)
-    if [ -n "$account" ] && [ "$previous_account" != "$account" ] && [ "$previous_limits" = "$limits_hash" ]; then
-      write_reading=0
-    fi
-  fi
-  if [ "$write_reading" = 1 ] && [ -n "$account" ]; then
+  # the last line: files from 0.3.7 and older also hold an account hash on the line before
+  [ -f "$session_file" ] && [ "$(/usr/bin/tail -n 1 "$session_file" 2>/dev/null)" = "$limits_hash" ] && write_reading=0
+  if [ "$write_reading" = 1 ]; then
     (umask 077; mkdir -p "$session_dir" && /bin/chmod 700 "$session_dir" &&
-      printf '%s\n%s\n' "$account" "$limits_hash" > "$session_file.tmp.$$" && mv "$session_file.tmp.$$" "$session_file") 2>/dev/null
+      printf '%s\n' "$limits_hash" > "$session_file.tmp.$$" && mv "$session_file.tmp.$$" "$session_file") 2>/dev/null
     /usr/bin/find "$session_dir" -type f -mtime +30 -exec /bin/rm -f {} + 2>/dev/null
   fi
 fi
 if [ "$write_reading" = 1 ] && [ -n "$rl" ] && [ "$rl" != "null" ]; then
   mkdir -p "$dir"
-  printf '{"captured_at":%s,%s"rate_limits":%s}\n' "$(date +%s)" "${account:+\"account\":\"$account\",}" "$rl" > "$dir/limits.json.tmp" &&
+  printf '{"captured_at":%s,"rate_limits":%s}\n' "$(date +%s)" "$rl" > "$dir/limits.json.tmp" &&
     mv "$dir/limits.json.tmp" "$dir/limits.json"
 fi
 if [ "$1" = "--chain" ] && [ -n "$2" ]; then
