@@ -23,65 +23,9 @@ func json(_ s: String) -> Data { Data(s.utf8) }
 @Suite struct Parsing {
     let fileDate = Date(timeIntervalSince1970: 1_000)
 
-    @Test func bridgeBothWindows() throws {
-        let r = try #require(Limits.bridge(json(#"{"captured_at":1793615035,"rate_limits":{"five_hour":{"used_percentage":42.5,"resets_at":1793620000},"seven_day":{"used_percentage":19,"resets_at":1794164400}}}"#), fileDate: fileDate))
-        #expect(r.five == Meter(pct: 42.5, resetsAt: Date(timeIntervalSince1970: 1_793_620_000)))
-        #expect(r.week == Meter(pct: 19, resetsAt: reset))
-        #expect(r.at == Date(timeIntervalSince1970: 1_793_615_035))
-    }
-
-    @Test func bridgeWeeklyOnly() throws {
-        let r = try #require(Limits.bridge(json(#"{"captured_at":1793615035,"rate_limits":{"seven_day":{"used_percentage":19,"resets_at":1794164400}}}"#), fileDate: fileDate))
-        #expect(r.five == nil)
-        #expect(r.week?.pct == 19)
-    }
-
-    @Test func maxPlanHistorySupplementsTheMissingFiveHourWindow() throws {
-        // Redacted shape captured on this Mac for a Claude Max x20 account.  `fh` is compact,
-        // timestamped in milliseconds, and has no reset time; the status line supplies the week.
-        let history = try #require(Limits.planUsageHistory(json(#"{"version":1,"samples":[{"t":1794000000000,"org":"<redacted>","u":{"fh":34,"sd":59}}]}"#)))
-        #expect(history.five == Meter(pct: 34, resetsAt: nil, resetUnavailable: true))
-        let bridge = try #require(Limits.bridge(json(#"{"captured_at":1794000005,"rate_limits":{"seven_day":{"used_percentage":59,"resets_at":1794164400}}}"#), fileDate: fileDate))
-        let r = try #require(Limits.supplement(bridge, with: history, now: Date(timeIntervalSince1970: 1_794_000_010)))
-        #expect(r.five == Meter(pct: 34, resetsAt: nil, resetUnavailable: true))
-        #expect(r.week == Meter(pct: 59, resetsAt: reset))
-        #expect(r.at == bridge.at)       // the status line keeps the weekly window that names the account
-    }
-
-    @Test func absentOrStaleMaxHistoryKeepsTheClearWeeklyFallback() throws {
-        let bridge = try #require(Limits.bridge(json(#"{"captured_at":1794000005,"rate_limits":{"seven_day":{"used_percentage":59,"resets_at":1794164400}}}"#), fileDate: fileDate))
-        let absent = Limits.planUsageHistory(json(#"{"version":1,"samples":[{"t":1794000000000,"u":{"fh":null,"sd":59}}]}"#))
-        #expect(absent == nil)
-        #expect(Limits.supplement(bridge, with: absent, now: Date(timeIntervalSince1970: 1_794_000_010))?.five == nil)
-        let stale = try #require(Limits.planUsageHistory(json(#"{"samples":[{"t":1793000000000,"u":{"fh":34}}]}"#)))
-        #expect(Limits.supplement(bridge, with: stale, now: Date(timeIntervalSince1970: 1_794_000_010))?.five == nil)
-    }
-
     @Test func savedMetersFromBeforeTheHistoryFallbackStillDecode() throws {
         let old = try JSONDecoder().decode(Meter.self, from: json(#"{"pct":34,"resetsAt":null}"#))
         #expect(old == Meter(pct: 34, resetsAt: nil))
-    }
-
-    @Test(arguments: [
-        "",                                                     // empty file
-        "not json",                                             // corrupt
-        #"{"captured_at":1793615035,"rate_limits":{"seven_da"#, // cut off mid-write
-        #"{"captured_at":1793615035}"#,                         // no rate_limits
-        #"{"rate_limits":{}}"#,                                 // no window at all
-        #"{"rate_limits":null}"#,
-        #"[1,2,3]"#,
-        #"{"rate_limits":{"seven_day":{"used_percentage":"19","resets_at":1794164400}}}"#,  // number as text
-        #"{"rate_limits":{"seven_day":{"used_percentage":-5,"resets_at":1794164400}}}"#,    // impossible value
-        #"{"rate_limits":{"seven_day":{"resets_at":1794164400}}}"#,                         // percent missing
-    ])
-    func bridgeNothingUsable(_ text: String) {
-        #expect(Limits.bridge(json(text), fileDate: fileDate) == nil)
-    }
-
-    @Test func bridgeClampsAndFallsBack() throws {
-        let r = try #require(Limits.bridge(json(#"{"rate_limits":{"seven_day":{"used_percentage":130}}}"#), fileDate: fileDate))
-        #expect(r.week == Meter(pct: 100, resetsAt: nil))   // over 100 is shown as 100; no reset time = unknown
-        #expect(r.at == fileDate)                            // no captured_at: the file's own time, never "now"
     }
 
     @Test func codexWeeklyOnly() throws {
@@ -422,83 +366,5 @@ func json(_ s: String) -> Data { Data(s.utf8) }
         let r = CodexReader(root: dir); r.scan()
         #expect(r.reading?.week?.pct == 12)
         #expect(r.events.map(\.tokens).reduce(0, +) == 150)
-    }
-
-    @Test func bridgeScriptKeepsOnlyRateLimits() throws {
-        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../bridge/statusline-bridge.sh").standardized
-        func run(_ input: String) throws -> String {
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
-            p.environment = ["TOKENPET_DIR": dir.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
-            let i = Pipe(), o = Pipe(); p.standardInput = i; p.standardOutput = o
-            try p.run(); i.fileHandleForWriting.write(Data(input.utf8)); try i.fileHandleForWriting.close(); p.waitUntilExit()
-            return String(decoding: o.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        }
-        let line = try run(#"{"session_id":"secret","cwd":"/x","rate_limits":{"seven_day":{"used_percentage":19,"resets_at":1794164400}}}"#)
-        #expect(line == "🐾 week 19%")
-        let saved = try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8)
-        #expect(!saved.contains("secret") && !saved.contains("cwd"))
-        #expect(Limits.bridge(Data(saved.utf8), fileDate: Date())?.week?.pct == 19)
-        _ = try run(#"{"session_id":"s"}"#)                     // before the first response: no rate_limits
-        #expect(try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8) == saved)   // kept, not wiped
-    }
-
-    /// A session redraws its last response's limits until the next response. Only a change is a
-    /// reading: an idle session's old numbers never come back over a newer answer.
-    @Test func bridgeWritesOnlyWhatASessionNewlyLearned() throws {
-        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../bridge/statusline-bridge.sh").standardized
-        func run(_ session: String, _ limits: String) throws -> Reading {
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
-            p.environment = ["TOKENPET_DIR": dir.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
-            let i = Pipe(); p.standardInput = i
-            try p.run()
-            i.fileHandleForWriting.write(Data(#"{"session_id":"\#(session)","rate_limits":\#(limits)}"#.utf8))
-            try i.fileHandleForWriting.close(); p.waitUntilExit()
-            return try #require(Limits.bridge(Data(contentsOf: dir.appendingPathComponent("limits.json")), fileDate: Date()))
-        }
-        let idle47 = #"{"five_hour":{"used_percentage":47,"resets_at":1795690800},"seven_day":{"used_percentage":10,"resets_at":1796216400}}"#
-        let busy48 = #"{"five_hour":{"used_percentage":48,"resets_at":1795690800},"seven_day":{"used_percentage":10,"resets_at":1796216400}}"#
-        #expect(try run("idle", idle47).five?.pct == 47)
-        #expect(try run("busy", busy48).five?.pct == 48)
-        #expect(try run("idle", idle47).five?.pct == 48)       // a redraw: not written
-        #expect(try run("idle", busy48).five?.pct == 48)       // its next answer is new: written
-        let saved = try String(contentsOf: dir.appendingPathComponent("limits.json"), encoding: .utf8)
-        #expect(!saved.contains("account") && !saved.contains("idle") && !saved.contains("busy"))
-        let stored = try FileManager.default.contentsOfDirectory(at: dir.appendingPathComponent("sessions"), includingPropertiesForKeys: nil)
-        #expect(stored.count == 2)
-        for u in stored {
-            let text = try String(contentsOf: u, encoding: .utf8)
-            #expect(!u.lastPathComponent.contains("idle") && !u.lastPathComponent.contains("busy") && text.split(separator: "\n").count == 1)
-        }
-    }
-
-    /// End to end with the requester's two accounts: whichever session writes last, the selected
-    /// account's row only ever holds its own numbers.
-    @Test func bridgeAndStoreKeepTwoParallelAccountsApart() throws {
-        let dir = tempDir(); defer { try? FileManager.default.removeItem(at: dir) }
-        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../bridge/statusline-bridge.sh").standardized
-        func run(_ session: String, _ limits: String) throws -> Reading {
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = [script.path]
-            p.environment = ["TOKENPET_DIR": dir.path, "PATH": "/usr/bin:/bin:/opt/homebrew/bin"]
-            let i = Pipe(); p.standardInput = i
-            try p.run()
-            i.fileHandleForWriting.write(Data(#"{"session_id":"\#(session)","rate_limits":\#(limits)}"#.utf8))
-            try i.fileHandleForWriting.close(); p.waitUntilExit()
-            return try #require(Limits.bridge(Data(contentsOf: dir.appendingPathComponent("limits.json")), fileDate: Date()))
-        }
-        func max(_ five: Int) -> String { #"{"five_hour":{"used_percentage":\#(five),"resets_at":1795690800},"seven_day":{"used_percentage":5,"resets_at":1796216400}}"# }
-        func weeklyOnly(_ week: Int) -> String { #"{"seven_day":{"used_percentage":\#(week),"resets_at":1795978800}}"# }
-        var accounts = AccountReadings()
-        let first = try run("new", max(13))
-        accounts.takeClaude(first)
-        for (n, (session, limits)) in [("old", weeklyOnly(64)), ("new", max(14)), ("old", weeklyOnly(65)), ("new", max(15))].enumerated() {
-            var r = try run(session, limits)
-            r.at = first.at.addingTimeInterval(Double(n + 1) * 30)
-            accounts.takeClaude(r)
-            #expect(accounts.selectedClaude?.five != nil && accounts.selectedClaude?.week?.pct == 5)
-        }
-        #expect(accounts.selectedClaude?.five?.pct == 15)
-        #expect(accounts.rows().count == 2)
     }
 }

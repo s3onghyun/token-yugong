@@ -102,10 +102,35 @@ open build/TokenYugong.app     # or move it to /Applications first
 
 也可以不打包直接运行：`swift run -c release TokenPet`（这样没有通知，也不能登录时打开）。
 
-## 连接 Claude Code
+## Claude 额度：愚公去问 Claude Code
 
-Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.seven_day`：已用百分比、重置时间）传给它的状态栏命令。桥接脚本只把这个对象保存到 `~/.claude/token-pet/limits.json`；不含提示词、路径或会话 ID，也不联网。
-状态栏只报告成功的响应，所以额度用完时会停在 99%；应用还会读取 Claude Code 写进自己会话日志的拒绝记录（`usage_limit_reached`，带有窗口和重置时间），从而显示 100% 并让爷爷休息。
+愚公向未经修改的 Claude Code 询问你的额度，就是你自己也能输入的那个 `/usage`：
+
+```sh
+claude -p /usage --no-session-persistence --setting-sources project --strict-mcp-config --output-format stream-json --verbose
+```
+
+它只读取 Claude Code 输出的结构化行（`usage_report.rate_limits.limits[]`：5 小时的 `session` 行和 `weekly_all` 行，各自带已用百分比和重置时间），从不解析给人看的文字。这条命令不发 AI 请求，不花钱（`total_cost_usd: 0`）；它不保留会话，不加载用户设置、hook 或 MCP 服务器，并在愚公专用的空文件夹（`~/Library/Application Support/TokenPet/claude-usage`）里运行。每次询问约耗 2 秒 CPU。愚公从不读取你的 Claude 登录令牌，也从不自己调用 Anthropic 的接口。Anthropic 的条款允许用自己的订阅登录未经修改的 Claude Code，但不允许其他工具收集或转发你的 Claude 凭据。
+
+**为什么不用状态栏。** Claude Code 的状态栏拿到的是会话最后一次响应的额度，但没有账号名，也没有时间。有两个账号时（旧会话还在运行时执行 `/login`，或两个 Max 套餐），菜单栏的一行会轮流显示两个账号的数字（0.2.x 到 0.3.8）。每一种猜账号的办法都会在某种情况下失效，0.3.8 的每周重置时间也一样，因为两个账号可能相同。一个配置文件的回答属于该配置文件登录的账号，没有什么需要猜的。
+
+**多久问一次。** 刻意少问：账号是你的，一个不停戳接口的工具可能被当成滥用。
+
+| 何时 | 愚公询问 |
+|---|---|
+| 应用启动时 | 每个配置文件一次 |
+| 打开弹出窗口时 | 最近 5 分钟内没问过的配置文件 |
+| 后台 | 每 30 分钟，前后浮动 5 分钟（随机，询问不会对齐到整点）。设置 › *每 30 分钟询问 Claude Code* 可关闭 |
+| 你在输入、会话在回复、Claude Code 正忙 | 从不 |
+| Claude Code 回答里没有新的行（429/403 限流、已退出登录、API 密钥），或输出是这个版本读不懂的 | 该配置文件暂停 1 小时，之后 2、4 小时……最长一天；在你再次打开弹出窗口前，后台刷新也会跳过它 |
+
+两次询问之间，弹出窗口显示上一次的回答及其时间（“12 分钟前询问”），所以数字最多可能是半小时前的；打开弹出窗口会再问一次。读不懂的输出就是“不知道”，绝不会显示旧数字。
+
+**多个账号。** 一个配置文件只有一个登录。默认配置文件是 `~/.claude`。如果你把另一个账号放在它自己的 `CLAUDE_CONFIG_DIR` 文件夹里（例如 `~/.claude-work`），请在 设置 › 账号 › *添加 Claude Code 配置文件夹* 中加入该文件夹。每个配置文件一行，没有昵称时用登录的邮箱（来自该配置文件的 `.claude.json`）命名；选出爷爷要看的那一行。在某个配置文件里 `/login` 之后，它的下一次回答就是新账号的，并以新名字显示。共用一个配置文件的多个账号一次只能看到一个：当前登录的那个。
+
+## Claude Code 状态栏（可选）
+
+应用不需要它。**连接** 会在 Claude Code 状态栏里显示爷爷的爪印（`🐾 5h 42%`，该会话自己的数字）：桥接脚本只是从 Claude Code 传来的 JSON 中打印这个数字，什么也不保存。
 
 **一键：** 在使用说明（或 设置 › 使用说明）里点 **连接**。应用会先展示修改前后的 `statusLine`，你同意后才写入。**一条命令**（智能体也用它）：
 
@@ -127,7 +152,7 @@ Claude Code 会把你的官方额度（`rate_limits.five_hour` 和 `rate_limits.
 
 （手动设置且已有状态栏时：`"command": "sh ~/.claude/token-pet/statusline-bridge.sh --chain '<原来的命令>'"`）
 
-**命令行。** `TokenPet status [--json]` 显示 Claude Code 是否已连接以及最近一次收到的额度；`TokenPet setup [--undo] [--dry-run] [--json]` 就是上面的连接。加 `--json` 时输出一个键名固定的 JSON 对象（`result`、`before`、`after`、`backup`；`claude.connection`、`claude.reading.five_hour.used_percentage` 等）；错误用平实的话写到 stderr，退出码 1，并输出 `{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`。
+**命令行。** `TokenPet status [--json]` 显示状态栏是否已连接，以及应用为爷爷所看配置文件保存的最近一次 `/usage` 回答（它自己不会去问 Claude Code）；`TokenPet setup [--undo] [--dry-run] [--json]` 就是上面的连接。加 `--json` 时输出一个键名固定的 JSON 对象（`result`、`before`、`after`、`backup`；`claude.connection`、`claude.reading.five_hour.used_percentage` 等）；错误用平实的话写到 stderr，退出码 1，并输出 `{"error": "no_claude" | "unreadable_settings" | "unknown_status_line" | "no_bridge" | "write_failed"}`。
 
 桥接脚本有 `jq` 时用 `jq`（macOS 15+ 自带），否则用 `plutil`。
 Codex 无需设置：它自己的日志（`~/.codex/sessions`）里就带有额度。Gemini CLI 也不需要（从 `~/.gemini/tmp` 读取它的 token）。
@@ -162,14 +187,15 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 
 | 读取的内容 | 用途 |
 |---|---|
-| `~/.claude/token-pet/limits.json` | Claude Code 的官方额度，由状态栏桥接脚本写入（已用百分比、重置时间；不含提示词、路径、会话或账号 ID）。应用按每个账号的每周额度重置时间区分 Claude 账号 |
-| Claude Code 会话日志（`~/.claude/projects`） | 用于爷爷挖土速度和大山的 token 数，以及 `usage_limit_reached` 拒绝记录，让用完的额度显示为 100% |
+| 每个配置文件运行的 `claude -p /usage`（见上文） | Claude 的官方额度：5 小时和每周的已用百分比、重置时间 |
+| 每个配置文件的 `.claude.json`（只读 `oauthAccount.emailAddress`） | 该配置文件那一行的名字 |
+| Claude Code 会话日志（`~/.claude/projects`） | 用于爷爷挖土速度和大山的 token 数 |
 | `~/.codex/sessions` | Codex 自己的额度和 token 数 |
 | `~/.gemini/tmp` | Gemini CLI 的 token 数 |
 
-- **网络：** 只有每天一次的更新检查（向 GitHub releases API 发一个 GET，可关闭）、点击 **更新** 时下载的发布 ZIP，以及仅在你粘贴了密钥时，每 15 分钟查询一次 OpenAI 的费用 API 或 DeepSeek 的余额 API。
+- **网络：** 愚公自己从不连接 Anthropic；为 `/usage` 运行的 `claude` 会像平时的 Claude Code 一样联网（若有最近的数据，也可能不问就直接回答）。除此之外只有每天一次的更新检查（向 GitHub releases API 发一个 GET，可关闭）、点击 **更新** 时下载的发布 ZIP，以及仅在你粘贴了密钥时，每 15 分钟查询一次 OpenAI 的费用 API 或 DeepSeek 的余额 API。
 - **密钥**只存在你的登录钥匙串里，别处没有。
-- **设置和历史**（大山、称号）保存在本机的 `TokenPet` UserDefaults 域中；`defaults delete TokenPet` 会清除它们。应用从桥接文件读到的内容（百分比、重置时间）记录在 `~/Library/Application Support/TokenPet/claude-readings.log`（最多两个 512 KB 文件），便于追查账号混淆；可随时删除。
+- **设置和历史**（大山、称号）保存在本机的 `TokenPet` UserDefaults 域中；`defaults delete TokenPet` 会清除它们。每次 `/usage` 回答（配置文件、百分比、重置时间；不含邮箱）都记录在 `~/Library/Application Support/TokenPet/claude-readings.log`（最多两个 512 KB 文件），便于追查奇怪的数字；可随时删除。
 - 只有在你点 **连接**（先展示改动）或运行 `TokenPet setup` 时，应用才会修改 `~/.claude/settings.json`，而且只改 `statusLine` 并留有备份；`TokenPet setup --undo` 可撤销。
 
 ## 数字如何变成宠物

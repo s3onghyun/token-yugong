@@ -1,18 +1,18 @@
 # How Grandpa reads your usage
 
-The usage rules are in `Sources/TokenPet/Logic.swift`, as pure functions of (readings, now); the
+The usage rules are in `Sources/TokenPet/Logic.swift`, as pure functions of (readings, now); asking
+Claude Code and when is in `ClaudeUsage.swift`; the
 app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup`) and the
 `MountainLedger` in `UsageModel.swift`. Every row below has a unit test (`./test.sh`,
-`Tests/TokenPetTests/LogicTests.swift` for the usage rules, `AppTests.swift` for the app rules,
+`Tests/TokenPetTests/LogicTests.swift` for the usage rules, `ClaudeUsageTests.swift` for Claude's accounts, `AppTests.swift` for the app rules,
 `FamilyTests.swift` for the family, the budgets and the connectors).
 
 ## Inputs
 
 | Input | Where it comes from | Used for |
 |---|---|---|
-| Claude `five_hour`, `seven_day`: used %, reset time | Claude Code's status line JSON, saved by `bridge/statusline-bridge.sh` with its capture time | the meter of whoever watches Claude |
-| Claude Max 5-hour fallback: `samples[].u.fh` | Claude Desktop's local `~/Library/Application Support/Claude/plan-usage-history.json`; only the newest numeric `fh`, within 5 minutes of a fresh status-line response | fills a missing 5-hour percentage; this compact history has no reset time, and is ignored when `fh` is absent or null |
-| Claude limit hits: `five_hour` or `seven_day`, reset time | the rejected request Claude Code logs in `~/.claude/projects/**/*.jsonl` (`apiError: usage_limit_reached`, `apiErrorParams.rate_limit_info`) | that window is at 100% (see "Limit reached") |
+| Claude 5-hour (`session`) and weekly (`weekly_all`) rows: used %, reset time | `claude -p /usage … --output-format stream-json --verbose`, run per profile (see "Accounts"): only `usage_report.rate_limits.limits[]`, classified by `kind`; the time is when it was asked | the meter of whoever watches Claude |
+| The profile's login: `oauthAccount.emailAddress` | the profile's `.claude.json` (`~/.claude.json`, or `<CLAUDE_CONFIG_DIR>/.claude.json`), read after each ask | the row's name only |
 | Codex 5-hour (300 min) and weekly (10080 min) windows | newest `rate_limits` line in `~/.codex/sessions/**/*.jsonl` | the meter of whoever watches Codex |
 | Gemini: nothing | Gemini CLI saves no limits or reset times on the Mac | its meter is always "don't know" |
 | OpenAI API: this month's spend in USD | `GET api.openai.com/v1/organization/costs` from the first day of the month (UTC), with an Admin key from the Keychain, every 15 minutes | its meter: spend ÷ the monthly budget typed in Settings |
@@ -20,9 +20,9 @@ app rules at the end are in `BarFit.swift`, `Onboarding.swift` (`StatusLineSetup
 | Output tokens with timestamps | `~/.claude/projects/**/*.jsonl` (`message.usage`), Codex `token_count` events, Gemini CLI `~/.gemini/tmp/*/chats/session-*.json` | shovel speed only |
 | Tokens: Claude input + output + cache writes; Codex input without the cached part + output; Gemini `total` | the same logs | the mountain only |
 
-Saved account readings contain only account keys (a weekly reset moment), last readings and optional local nicknames; token
-counts never become a limit percentage. The network is used
-only for an OpenAI or DeepSeek member you set up: the request carries your key (kept in the
+Saved account readings contain only profile keys, each profile's last answer and login, when it may be asked
+again, and optional local nicknames; token counts never become a limit percentage. Yugong itself uses the
+network only for an OpenAI or DeepSeek member you set up (the `claude` it runs for `/usage` talks to Anthropic as Claude Code always does): the request carries your key (kept in the
 login Keychain, never in a file or the settings) and nothing else leaves the Mac. The update check
 (below) is the one other request.
 
@@ -46,17 +46,8 @@ budget %. The menu bar shows the same %.
 
 ### Limit reached
 
-Claude Code's status line reports the last **successful** response, and the request that would
-reach 100% is the one that is refused, so the status line stops at 99% (or, as seen on this Mac,
-drops the 5-hour window). The refusal itself is in the session log, with the window and its reset
-time. The newest one per window (5-hour, weekly) sets that window to **100% until its reset**, so
-row 3 applies and he rests, unless:
-
-| When | Then |
-|---|---|
-| Claude answered after the refusal (another account, extra usage) | The hit is over; the reading stands |
-| The reading already shows a later window of the same kind (reset more than a minute after the hit's) | The reading stands |
-| The hit's reset was more than 5 minutes ago | Forgotten (row 2 already made the window new and row 5 gave the morning) |
+`/usage` is the server's answer at the moment it is asked, so a used-up window reads 100% and row 3
+applies: he rests until it resets.
 
 Percentages are shown as `100%` only when a window is really full: 99.5 reads `99%`.
 While he rests the popover title counts down ("쉬는 중 · 2시간 3분 뒤 다시 퍼요"), the menu bar shows
@@ -67,40 +58,48 @@ default). A used-up **weekly** limit is a long rest: a full moon instead of the 
 
 ### Accounts
 
-The status line names no account, and no local file says which account answered a session's last
-request: running sessions re-read the shared login at their own times, so the login in
-`~/.claude.json` and the account a session started with are both guesses (they mixed two accounts'
-numbers in one row in 0.2.x–0.3.7). A Claude account is therefore known by its own data: **the moment
-in the week its weekly limit resets** (`seven_day.resets_at` modulo 7 days, to the minute). A weekly
-window keeps its reset time until it ends, and the next one resets exactly a week later, so the key
-stays the same from week to week. The 5-hour window cannot name an account: it changes every 5 hours
-and is left out once it resets.
+The status line names no account and carries no time: a session redraws the limits of its last response, and
+running sessions re-read the shared login at their own times. Every way of naming the account from it was a
+guess that broke somewhere (0.2.x–0.3.8 showed two accounts' numbers in one row; 0.3.8's key, the weekly reset
+moment, is shared by two accounts that reset together). So the app no longer reads status lines. It asks the
+unmodified Claude Code, **once per profile**: `claude -p /usage --no-session-persistence --setting-sources project
+--strict-mcp-config --output-format stream-json --verbose`, in an empty folder of its own. A profile is the default
+`~/.claude` or a `CLAUDE_CONFIG_DIR` folder the user adds; it holds one login, so its answer is that login's,
+from the server, at that moment. Yugong never reads a token or calls an Anthropic endpoint itself.
 
-A session redraws the limits of its last response until the next one. The bridge writes a reading
-only when a session's limits differ from what that session last wrote, so an idle session's old
-numbers never come back over a newer answer. It keeps only SHA-256 hashes of session ids and limits.
+| Claude Code's answer | Then |
+|---|---|
+| `usage_report.rate_limits.limits[]` with a `session` and/or `weekly_all` row (percent 0-100, ISO 8601 `resets_at` or null) | That profile's reading: 5-hour = `session`, weekly = `weekly_all`, at the time of the ask; other kinds (per-model rows) are ignored. Over 100 shows as 100 |
+| `rate_limits: null`, `limits: null` (Claude Code answered from its own cached copy: 429, held back), or neither row | No fresh answer: the last reading stays with its age, **only if the profile is still signed in to the same email**; otherwise don't know |
+| Anything else (no `usage_report`, a field of another type, an unparsable date, the run failed or took over 30 s, no `claude` found) | Don't know: the reading is cleared, never guessed from the text |
 
-Each Claude reading replaces only the reading under its own key. The first identified Claude reading
-becomes the initial selection; after that the picker keeps the row the user explicitly selects.
-Switching the picker immediately changes Grandpa and the menu-bar number, and the selected key
-persists across a restart. A row is named by its weekly reset ("Claude · 주간 리셋 수 22:00") unless the
-user gives it a nickname. Codex is one `local` row, not an account-registration flow.
+When it asks (`ClaudeAsk`):
 
 | When | Then |
 |---|---|
-| Two accounts answer in parallel sessions | Each reading goes to its own weekly reset's row; the shown row only ever holds its own numbers |
-| `/login` while a session stays open | Its next answer carries the other account's weekly window and goes to that row; the shown row changes only when the user picks it |
-| A weekly window ends | The next window resets exactly a week later: the same row, and the new reading replaces the old |
-| Two readings under one key report the same window | The newer capture wins, even when it is lower: a limit can be reset before its reset time. An older capture read later changes nothing |
-| A session redraws limits it already reported | Not written by the bridge |
-| A reading has no weekly reset time | Store it as `claude:unknown`, shown as "확인되지 않은 Claude 읽기"; it is never selected automatically |
-| Rows saved by 0.3.7 and older (keyed by an account hash) | Moved once to their reading's key; the selection and nickname follow the row (the newer reading stays when two meet) |
-| A user chooses a row | Save that key and show its 5-hour/weekly limits immediately |
-| A Claude rejection log has no account key | Do not apply it to the selected row; show "한도 거절을 계정에 귀속할 수 없음" |
-| A row has not been updated for 30 days | Put it under "지난 계정"; keep it until the user deletes it |
+| The app starts | Ask every profile (unless held, or asked less than 5 minutes ago) |
+| The popover opens | Ask every profile not asked in the last 5 minutes; a stopped profile may be refreshed in the background again |
+| Background timer: 30 minutes ± 5, random each time | Ask every profile not asked in 5 minutes, not held, not stopped; Settings › *Ask Claude Code every 30 minutes* off = never |
+| Any answer but fresh rows | Hold that profile 1 h, then 2 h, 4 h … at most 24 h; it is also stopped (no background asks) until the popover opens |
+| Fresh rows | The hold and the stop end |
+| Status-line activity, a response, typing | Nothing: never a reason to ask |
 
-Limits of this rule: two accounts whose weekly limits reset at the same moment of the week share a
-row, and an account whose weekly reset moment is moved by Anthropic starts a new row.
+One `claude` runs at a time. The first profile is the default one and is selected; the user picks the row
+Grandpa watches, and the choice persists. A row is named by its nickname, else its login email, else its
+folder. Only added folders can be removed. Rows saved by 0.3.8 and older (keyed by a weekly reset moment or an
+account hash) are dropped on first start; nothing of them is carried over.
+
+| When | Then |
+|---|---|
+| Two profiles whose weekly limits reset at the same moment | Each row holds only its own answers |
+| `/login` to another account inside one profile | Its next answer is the new account's, under the new email; a no-fresh-rows answer under the new email clears the old number |
+| Several accounts in one profile | Only the one signed in can be seen, because no other login is there to ask |
+
+Codex: its rollout logs record `rate_limits` once per response with the response's own timestamp, so the newest
+line is the newest answer and nothing redraws old numbers. It reads only `~/.codex/sessions` (one `CODEX_HOME`),
+so it is one `local` row. Codex logs no account either: an old Codex session still holding a previous login's
+token could put that account's numbers in the row. That is the same blind spot, not yet seen; Codex has no
+`/usage`-like command to ask instead, so it is left as it is.
 
 ## Family
 
@@ -287,26 +286,29 @@ window is closed, minimized or fully covered (occlusion), so its 8 fps timeline 
 | Hide from screen sharing | On |
 | Notify when the limit is used up and when it resets | On |
 
-## Claude Code setup
+## Claude Code's status line (optional)
 
-"Connect" (the guide) and `TokenPet setup` write the `statusLine` into `~/.claude/settings.json`
+The app does not read status lines (see "Accounts"). The bridge only prints the session's own 5-hour (else
+weekly) % from the JSON it is given and writes no file. "Connect" (the guide) and `TokenPet setup` write the `statusLine` into `~/.claude/settings.json`
 (ClaudeConnect): only that member's text changes, inserted before the first member with the file's own
 spacing, so `setup --undo` cuts it back out byte for byte. The new file must parse and every other
 top-level key must be equal, or nothing is written. The old file goes to `settings.json.<time>.bak`
-next to `limits.json` (created 0600, never over an existing file; the newest three are kept); a symlink is written through; the permissions stay. An existing command `X`
+in `~/.claude/token-pet/` (created 0600, never over an existing file; the newest three are kept); a symlink is written through; the permissions stay. An existing command `X`
 becomes `<bridge> --chain 'X'` (the bridge pipes its input to `sh -c X` and shows its output and exit
 status); undo unquotes `X` back. A command that mentions the bridge in another form is the user's own
 chain: left alone. No `~/.claude` = Claude Code is not set up: an error, nothing made. A command `X`
 written with escapes such as `\/` comes back with the same value, not the same bytes.
 
-"Copy snippet" copies the bridge script into the
-folder that holds `limits.json` and puts this on the clipboard, to paste into the top-level object:
+"Copy snippet" copies the bridge script into
+`~/.claude/token-pet/` and puts this on the clipboard, to paste into the top-level object:
 `"statusLine": {"type": "command", "command": "sh ~/.claude/token-pet/statusline-bridge.sh"}`
 (another folder gets `TOKENPET_DIR='…' sh '…/statusline-bridge.sh'`, quoted). The bridge reads the
-JSON with `jq`, or with `plutil` on Macs without `jq` (before macOS 15); both save the same file.
+JSON with `jq`, or with `plutil` on Macs without `jq` (before macOS 15); both print the same line.
 
 ## Not used (on purpose)
 
 - Token budgets and "learned" 5-hour ceilings: a guess, wrong on a Mac with several accounts.
-- Claude Code's "limit reached · resets 10pm" log messages: they mix accounts; the status line already says 100%.
-- The separate Fable weekly limit: the status line does not report it.
+- Claude Code's "limit reached · resets 10pm" log messages: they name no account; `/usage` already says 100%.
+- The separate per-model weekly rows (`weekly_scoped`, e.g. Fable): not part of Grandpa's two windows.
+- Claude Code's status-line numbers: no account and no time (see "Accounts").
+- The `/usage` human-readable text: only its structured `usage_report` rows are read.

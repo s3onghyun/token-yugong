@@ -11,8 +11,6 @@ final class LogScanner {
     private var offsets: [String: UInt64] = [:]
     private var seen = Set<String>()
     private(set) var events: [Event] = []
-    /// The newest logged limit hit per window (5-hour, weekly).
-    private(set) var hits: [Bool: Limits.Hit] = [:]
     private(set) var lastScanSeconds: Double = 0
     private(set) var bytesRead: UInt64 = 0
 
@@ -20,7 +18,6 @@ final class LogScanner {
 
     private static let assistantNeedle = Array(#""type":"assistant""#.utf8)
     private static let usageNeedle = Array(#""usage":{"#.utf8)
-    private static let hitNeedle = Array(#""usage_limit_reached""#.utf8)
 
     func scan(now: Date = Date()) {
         let started = Date()
@@ -37,7 +34,6 @@ final class LogScanner {
             offsets[url.path] = read(url, from: off)
         }
         events.removeAll { $0.time < cutoff }
-        hits = hits.filter { $0.value.time >= cutoff }
         events.sort { $0.time < $1.time }
         lastScanSeconds = Date().timeIntervalSince(started)
     }
@@ -84,7 +80,6 @@ final class LogScanner {
     private func handleLine(_ line: UnsafeRawBufferPointer) {
         guard Self.contains(line, Self.assistantNeedle), Self.contains(line, Self.usageNeedle),
               let obj = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else { return }
-        if Self.contains(line, Self.hitNeedle), let h = Limits.hit(obj), h.time > (hits[h.week]?.time ?? .distantPast) { hits[h.week] = h }
         guard (obj["isApiErrorMessage"] as? Bool) != true,
               let ts = obj["timestamp"] as? String, let time = Limits.iso.date(from: ts),
               let msg = obj["message"] as? [String: Any], let usage = msg["usage"] as? [String: Any] else { return }

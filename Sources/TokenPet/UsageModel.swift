@@ -10,9 +10,9 @@ enum Prefs {
     static let store = UserDefaults(suiteName: domain) ?? .standard
 }
 
-/// What the app read from the bridge and made of it, one line per new reading, for telling later which
-/// account it showed and why. Account keys (a weekly reset moment), reset times and percentages only; on this Mac, in
-/// ~/Library/Application Support/<settings domain>/, at most two files of 512 KB (a few days).
+/// Every answer Claude Code gave to `/usage` and what the app showed, one line per ask, for telling later which
+/// profile it showed and why. Profile keys, reset times and percentages only (no login); on this Mac, in
+/// ~/Library/Application Support/<settings domain>/, at most two files of 512 KB.
 enum ReadingLog {
     static let limit = 512 * 1024
     static var url: URL {
@@ -48,9 +48,14 @@ enum ReadingLog {
         return "5h=\(m(r.five, "HH:mm")) week=\(m(r.week, "MM-dd HH:mm"))"
     }
 
-    static func line(read r: Reading, decision: String, shown: Reading?, selected: AccountKey?) -> String {
-        "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) captured=\(stamp(r.at, "HH:mm:ss")) key=\(AccountKey.claude(r).value) "
-            + "\(describe(r)) -> \(decision) selected=\(selected?.value ?? "none") shown: \(describe(shown))"
+    static func line(key: AccountKey, answer: ClaudeUsage.Answer, shown: Reading?, selected: AccountKey) -> String {
+        let said: String
+        switch answer {
+        case .limits(let r): said = describe(r)
+        case .noLimits: said = "no-limits"
+        case .unreadable: said = "unreadable"
+        }
+        return "\(stamp(Date(), "yyyy-MM-dd'T'HH:mm:ssZ")) asked key=\(key.value) -> \(said) selected=\(selected.value) shown: \(describe(shown))"
     }
 
     private static func stamp(_ d: Date, _ format: String) -> String {
@@ -168,42 +173,16 @@ struct MountainLedger {
     }
 }
 
-private struct LegacyAccountState: Decodable {
-    let reading: Reading?
-}
-
-/// Reads only the persisted snapshot from releases before the keyed store. It deliberately does
-/// not retain their account-switch inference: a later bridge write supplies the authoritative key.
-private struct LegacyReadingState: Decodable {
-    let legacy: LegacyAccountState?
-    let store: ReadingStore?
-}
-
-extension AccountReadings {
-    static func load(_ d: UserDefaults = Prefs.store) -> AccountReadings {
-        if let data = d.data(forKey: "claude.readings") {
-            if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any], object["legacy"] != nil,
-               let old = try? JSONDecoder().decode(LegacyReadingState.self, from: data) {
-                let migrated = AccountReadings(migrating: old.store ?? ReadingStore(), reading: old.legacy?.reading)
-                migrated.save(d)
-                d.removeObject(forKey: "claude.account")
-                return migrated
-            }
-            if var current = try? JSONDecoder().decode(AccountReadings.self, from: data) {
-                if current.migrateLegacyKeys() { current.save(d) }
-                return current
-            }
-        }
-        if let data = d.data(forKey: "claude.account"), let old = try? JSONDecoder().decode(LegacyAccountState.self, from: data) {
-            let migrated = AccountReadings(migrating: ReadingStore(), reading: old.reading)
-            migrated.save(d)
-            d.removeObject(forKey: "claude.account")
-            return migrated
-        }
-        return AccountReadings()
+extension ClaudeAccounts {
+    /// Rows saved by 0.3.8 and older (`claude.readings`, `claude.account`) were keyed by a guess about the
+    /// account; they are dropped, not carried over, and each profile is asked afresh.
+    static func load(_ d: UserDefaults = Prefs.store) -> ClaudeAccounts {
+        d.removeObject(forKey: "claude.readings")
+        d.removeObject(forKey: "claude.account")
+        return d.data(forKey: "claude.accounts").flatMap { try? JSONDecoder().decode(ClaudeAccounts.self, from: $0) } ?? ClaudeAccounts()
     }
 
-    func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.readings") }
+    func save(_ d: UserDefaults = Prefs.store) { d.set(try? JSONEncoder().encode(self), forKey: "claude.accounts") }
 }
 
 // MARK: - Model
@@ -240,14 +219,18 @@ final class UsageModel: ObservableObject {
     var demo: PetState?
     var demoCycle = false
     let bridgeURL: URL
-    let planUsageURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/Claude/plan-usage-history.json")
+    let home = FileManager.default.homeDirectoryForCurrentUser
     let scanner: LogScanner
     let codexReader = CodexReader(root: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/sessions"))
     let geminiReader = GeminiReader(root: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/tmp"))
     let budgets = BudgetClient()
     private let queue = DispatchQueue(label: "tokenpet.scan", qos: .utility)
-    private var accountReadings = AccountReadings.load()
+    private var claudeAccounts = ClaudeAccounts.load()
+    private(set) var codexReading: Reading?
+    private let claudeQueue = DispatchQueue(label: "tokenpet.claude", qos: .utility)
+    private var asking: Set<String> = []
+    @Published private(set) var claudeAsking = false
+    private var backgroundAskTimer: Timer?
     private var timer: Timer?
     private var refreshWork: DispatchWorkItem?
     private var fileWatchers: [FileChangeWatcher] = []
@@ -262,15 +245,16 @@ final class UsageModel: ObservableObject {
         StatusLineSetup.refreshInstalled(in: bridgeURL.deletingLastPathComponent())
         watchUsageFiles()
         refresh()
+        askClaude(.start)
+        scheduleBackgroundAsk()
         timer = Timer.scheduledTimer(withTimeInterval: UsageRefreshPolicy.fallbackInterval, repeats: true) { [weak self] _ in self?.refresh() }
         timer?.tolerance = 5
     }
 
-    /// A response from one of the local CLIs changes a bridge or log directory. Refresh soon,
+    /// A response from one of the local CLIs changes a log directory. Refresh soon,
     /// but coalesce bursts so a streamed response does not turn into repeated full scans.
     private func watchUsageFiles() {
-        let paths = [bridgeURL.deletingLastPathComponent(), scanner.root, codexReader.root, geminiReader.root,
-                     planUsageURL.deletingLastPathComponent()]
+        let paths = [scanner.root, codexReader.root, geminiReader.root]
         fileWatchers = paths.compactMap { path in
             FileChangeWatcher(path: path) { [weak self] in
                 DispatchQueue.main.async { self?.refreshAfterFileChange() }
@@ -300,32 +284,13 @@ final class UsageModel: ObservableObject {
             scanner.scan()
             codexReader.scan()
             geminiReader.scan()
-            let b = Self.readBridge(bridgeURL)
-            let plan = Self.readPlanUsage(planUsageURL)
+            let codex = codexReader.reading
             DispatchQueue.main.async { [self] in
-                take(Limits.supplement(b, with: plan, now: Date()))
+                codexReading = codex
                 scanning = false
                 mountain.absorb(allEvents)
                 recompute()
                 budgets.refresh(Array(family.roles.values)) { [weak self] in self?.recompute() }
-            }
-        }
-    }
-
-    /// Re-read only Claude's local account and usage files. A fresh number still requires a
-    /// Claude response to have reached the status-line bridge; this never contacts a service.
-    func checkAccountNow() {
-        guard !scanning else { return }
-        scanning = true
-        queue.async { [self] in
-            scanner.scan()
-            let b = Self.readBridge(bridgeURL)
-            let plan = Self.readPlanUsage(planUsageURL)
-            DispatchQueue.main.async { [self] in
-                take(Limits.supplement(b, with: plan, now: Date()))
-                scanning = false
-                mountain.absorb(allEvents)
-                recompute()
             }
         }
     }
@@ -339,13 +304,9 @@ final class UsageModel: ObservableObject {
     func reading(_ p: Provider) -> Reading? {
         switch p {
         case .claude:
-            // The log records a rejection but not its account. It is deliberately not applied to
-            // the selected account; see `unattributedClaudeLimitHit` in the popover.
-            return ClaudeLimitHits.apply(Array(scanner.hits.values), to: accountReadings.selectedClaude,
-                                         hitAccount: nil, selected: accountReadings.selected,
-                                         lastAnswer: scanner.events.last?.time, now: Date())
+            return claudeAccounts.selectedReading
         case .codex:
-            return accountReadings.codex
+            return codexReading
         case .gemini, .deepseek: return nil
         case .openai: return budgets.state[.openai].flatMap { st in st.spent.flatMap { Budget.reading(spent: $0, budget: openAIBudget, at: st.at) } }
         }
@@ -356,7 +317,7 @@ final class UsageModel: ObservableObject {
         scanner.scan()
         codexReader.scan()
         geminiReader.scan()
-        take(Limits.supplement(Self.readBridge(bridgeURL), with: Self.readPlanUsage(planUsageURL), now: Date()))
+        codexReading = codexReader.reading
         mountain.absorb(allEvents)
         recompute()
     }
@@ -401,63 +362,94 @@ final class UsageModel: ObservableObject {
     /// Opens the big scene in a window of its own (SceneWindow).
     var openWindow: (() -> Void)?
 
-    /// Every scanner feeds the same persisted keyed store before display selection. A Claude
-    /// snapshot belongs only to its bridge key; a Codex snapshot has one local key. There is no
-    /// weekly-reset or account-selection inference in either update.
-    private func take(_ b: Reading?) {
-        var changed = accountReadings.takeCodex(codexReader.reading)
-        if let b { changed = accountReadings.takeClaude(b) || changed }
-        if changed { accountReadings.save() }
-        if let b, b != lastLogged {
-            lastLogged = b
-            ReadingLog.append(ReadingLog.line(read: b, decision: "stored", shown: accountReadings.selectedClaude,
-                                               selected: accountReadings.selected))
+    /// Asks each Claude profile that `ClaudeAsk` allows now, one `claude -p /usage` at a time, off the main thread.
+    func askClaude(_ reason: ClaudeAsk.Reason, now: Date = Date()) {
+        if demo != nil || demoCycle { return }
+        let due = claudeAccounts.keys.filter {
+            !asking.contains($0.value) && claudeAccounts.ask($0).allows(reason, backgroundOn: backgroundAsk, now: now)
+        }
+        guard !due.isEmpty else { return }
+        due.forEach { asking.insert($0.value) }
+        claudeAsking = true
+        let home = self.home, cwd = Self.askFolder
+        for key in due {
+            claudeQueue.async { [weak self] in
+                let answer = ClaudeUsage.ask(dir: key.dir, home: home, cwd: cwd)
+                let login = ClaudeUsage.login(config: try? Data(contentsOf: ClaudeUsage.configURL(dir: key.dir, home: home)))
+                DispatchQueue.main.async { self?.took(answer, login: login, for: key) }
+            }
         }
     }
 
-    private var lastLogged: Reading?
-    var accountRows: [AccountRow] { accountReadings.rows() }
-    var selectedClaudeAccount: AccountKey? { accountReadings.selected }
-    var unattributedClaudeLimitHit: Bool { accountReadings.selected != nil && !scanner.hits.isEmpty }
+    private func took(_ answer: ClaudeUsage.Answer, login: String?, for key: AccountKey) {
+        asking.remove(key.value)
+        claudeAsking = !asking.isEmpty
+        claudeAccounts.take(answer, login: login, for: key, now: Date())
+        claudeAccounts.save()
+        ReadingLog.append(ReadingLog.line(key: key, answer: answer, shown: claudeAccounts.selectedReading, selected: claudeAccounts.selected))
+        recompute()
+    }
+
+    /// The empty folder `claude -p /usage` runs in, next to the readings log.
+    static var askFolder: URL { ReadingLog.url.deletingLastPathComponent().appendingPathComponent("claude-usage") }
+
+    /// The slow background refresh: 30 minutes ± 5, so asks never line up on the clock.
+    private func scheduleBackgroundAsk() {
+        backgroundAskTimer?.invalidate()
+        backgroundAskTimer = Timer.scheduledTimer(withTimeInterval: ClaudeAsk.nextBackground(random: .random(in: 0...1)), repeats: false) { [weak self] _ in
+            self?.askClaude(.background)
+            self?.scheduleBackgroundAsk()
+        }
+        backgroundAskTimer?.tolerance = 30
+    }
+
+    /// The popover opened: ask (at most once per 5 minutes per profile) and let stopped profiles be refreshed again.
+    func popoverOpened() {
+        claudeAccounts.popoverOpened()
+        askClaude(.popover)
+    }
+
+    var accountRows: [AccountRow] { claudeAccounts.rows(codex: codexReading) }
+    var selectedClaudeAccount: AccountKey { claudeAccounts.selected }
 
     func selectClaudeAccount(_ key: AccountKey) {
-        accountReadings.select(key)
-        accountReadings.save()
+        claudeAccounts.select(key)
+        claudeAccounts.save()
         recompute()
     }
 
-    func accountNickname(_ key: AccountKey) -> String { accountReadings.nickname(for: key) ?? "" }
+    func accountNickname(_ key: AccountKey) -> String { claudeAccounts.nickname(for: key) ?? "" }
 
     func setAccountNickname(_ nickname: String, for key: AccountKey) {
-        accountReadings.setNickname(nickname, for: key)
-        accountReadings.save()
+        claudeAccounts.setNickname(nickname, for: key)
+        claudeAccounts.save()
         objectWillChange.send()
     }
 
-    func deleteAccount(_ key: AccountKey) {
-        accountReadings.remove(key)
-        accountReadings.save()
+    /// Adds a CLAUDE_CONFIG_DIR folder and asks it right away.
+    func addClaudeProfile(_ dir: String) {
+        guard claudeAccounts.add(dir: dir, home: home) != nil else { return }
+        claudeAccounts.save()
+        askClaude(.popover)
+        objectWillChange.send()
+    }
+
+    func removeClaudeProfile(_ key: AccountKey) {
+        claudeAccounts.remove(key)
+        claudeAccounts.save()
         recompute()
     }
 
-    /// Screenshot fixtures only: the renderer calls this with invented bridge hashes and never
-    /// saves them. It keeps review images free of the requester's account data.
-    func setFixtureAccounts(_ readings: [Reading]) {
-        var fixture = AccountReadings()
-        readings.forEach { fixture.takeClaude($0) }
-        accountReadings = fixture
+    /// Screenshot fixtures only: invented profiles and logins, never saved, so review images hold none of the
+    /// requester's account data.
+    func setFixtureAccounts(_ profiles: [(dir: String?, login: String, reading: Reading)]) {
+        var fixture = ClaudeAccounts()
+        for p in profiles {
+            if let d = p.dir { fixture.add(dir: d, home: home) }
+            fixture.take(.limits(p.reading), login: p.login, for: .claude(dir: p.dir), now: p.reading.at)
+        }
+        claudeAccounts = fixture
         objectWillChange.send()
-    }
-
-    static func readBridge(_ url: URL) -> Reading? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
-        return Limits.bridge(data, fileDate: mtime)
-    }
-
-    static func readPlanUsage(_ url: URL) -> Reading? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return Limits.planUsageHistory(data)
     }
 
     func setDemo(_ s: PetState?) { demo = s; recompute() }
@@ -604,6 +596,11 @@ final class UsageModel: ObservableObject {
     }
 
     /// A notification when Grandpa's limit is used up and when it resets. On by default.
+    /// Ask Claude Code every 30 minutes (± 5) in the background. Off: only at start and when the popover opens.
+    @Published var backgroundAsk: Bool = Prefs.store.object(forKey: "claude.backgroundAsk") as? Bool ?? true {
+        didSet { Prefs.store.set(backgroundAsk, forKey: "claude.backgroundAsk") }
+    }
+
     @Published var notifyLimits: Bool = Prefs.store.object(forKey: "limit.notify") as? Bool ?? true {
         didSet { Prefs.store.set(notifyLimits, forKey: "limit.notify") }
     }

@@ -137,12 +137,6 @@ struct PopoverView: View {
                     .font(.caption).foregroundColor(p >= 100 ? Color(red: 0.8, green: 0.3, blue: 0.2) : .secondary)
             }
             if !s.demo && !s.known { note(source(main, nil)) }   // how to connect: never folded away
-            if !s.demo && main == .claude && model.unattributedClaudeLimitHit {
-                note(L.t("Couldn't attribute the limit rejection to an account",
-                         "한도 거절을 계정에 귀속할 수 없음",
-                         "上限拒否をアカウントに紐付けられません",
-                         "无法将额度拒绝归属到账号"))
-            }
             ForEach([Role.son, .grandson, .boy].filter { model.family.roles[$0] != nil }) { role in
                 // one row each: his headline window (5-hour, else weekly, else the month's budget)
                 let p = model.family.roles[role]!, r = s.members[role]?.reading
@@ -316,19 +310,31 @@ struct PopoverView: View {
     }
 
     @ViewBuilder private var accountSettings: some View {
-        let rows = model.accountRows
-        if !rows.isEmpty {
-            Divider()
-            Text(L.t("Accounts", "계정", "アカウント", "账号"))
-                .font(.caption.weight(.bold)).foregroundColor(.secondary)
-            accountRows(rows.filter { !$0.stale })
-            let old = rows.filter(\.stale)
-            if !old.isEmpty {
-                Text(L.t("Past accounts", "지난 계정", "過去のアカウント", "过去的账号"))
-                    .font(.caption.weight(.semibold)).foregroundColor(.secondary)
-                accountRows(old)
-            }
-        }
+        Divider()
+        Text(L.t("Accounts", "계정", "アカウント", "账号"))
+            .font(.caption.weight(.bold)).foregroundColor(.secondary)
+        accountRows(model.accountRows)
+        Button(L.t("Add a Claude Code profile folder (CLAUDE_CONFIG_DIR)…", "Claude Code 프로필 폴더 추가 (CLAUDE_CONFIG_DIR)…",
+                   "Claude Code のプロファイルフォルダを追加（CLAUDE_CONFIG_DIR）…", "添加 Claude Code 配置文件夹（CLAUDE_CONFIG_DIR）…")) { addProfile() }
+            .buttonStyle(.link).font(.caption)
+        Toggle(L.t("Ask Claude Code every 30 minutes", "30분마다 Claude Code에 묻기", "30分ごとに Claude Code に尋ねる", "每 30 分钟询问 Claude Code"),
+               isOn: $model.backgroundAsk)
+        Text(L.t("Off: only when the app starts and when you open this window (at most every 5 minutes).",
+                 "끄면 앱을 켤 때와 이 창을 열 때만 물어요 (5분에 한 번까지).",
+                 "オフ：アプリ起動時とこのウィンドウを開いたときだけ（5分に1回まで）。",
+                 "关闭后：只在应用启动和打开此窗口时询问（最多每 5 分钟一次）。"))
+            .font(.caption).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// A CLAUDE_CONFIG_DIR folder holds its own Claude Code login; usually hidden (~/.claude-work), so show those.
+    private func addProfile() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.showsHiddenFiles = true
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.addClaudeProfile(url.path)
     }
 
     @ViewBuilder private func accountRows(_ rows: [AccountRow]) -> some View {
@@ -342,31 +348,39 @@ struct PopoverView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .foregroundColor(row.key.isUnknownClaude ? .secondary : .primary)
-                    .disabled(row.key.isUnknownClaude || row.key == .local)
+                    .disabled(row.key == .local)
                     Spacer(minLength: 0)
                     Text(accountMeters(row.reading)).font(.caption.monospacedDigit()).foregroundColor(.secondary)
                 }
                 Text(accountReadTime(row))
                     .font(.caption2).foregroundColor(.secondary)
-                if editingNickname == row.id {
-                    TextField(L.t("Nickname", "별명", "ニックネーム", "昵称"), text: Binding(
-                        get: { model.accountNickname(row.key) },
-                        set: { model.setAccountNickname($0, for: row.key) }))
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit { editingNickname = nil }
-                } else {
-                    Button { editingNickname = row.id } label: {
-                        Label(row.nickname ?? L.t("Add nickname", "별명 추가", "ニックネームを追加", "添加昵称"),
-                              systemImage: "pencil")
-                    }
-                    .buttonStyle(.plain).font(.caption).foregroundColor(.accentColor)
+                if let held = row.heldUntil, held > clockNow {
+                    Text(L.t("Claude Code gave no limits; Yugong waits until \(Fmt.clock(held, now: clockNow)) before asking again.",
+                             "Claude Code가 한도를 주지 않았어요. \(Fmt.clock(held, now: clockNow))까지 다시 묻지 않아요.",
+                             "Claude Code がリミットを返しませんでした。\(Fmt.clock(held, now: clockNow)) まで尋ねません。",
+                             "Claude Code 没有给出额度；\(Fmt.clock(held, now: clockNow)) 之前不会再问。"))
+                        .font(.caption2).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
-                if row.stale && row.key != .local {
-                    Button(role: .destructive) { model.deleteAccount(row.key) } label: {
-                        Text(L.t("Delete", "삭제", "削除", "删除"))
+                HStack(spacing: 10) {
+                    if editingNickname == row.id {
+                        TextField(L.t("Nickname", "별명", "ニックネーム", "昵称"), text: Binding(
+                            get: { model.accountNickname(row.key) },
+                            set: { model.setAccountNickname($0, for: row.key) }))
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { editingNickname = nil }
+                    } else {
+                        Button { editingNickname = row.id } label: {
+                            Label(row.nickname ?? L.t("Add nickname", "별명 추가", "ニックネームを追加", "添加昵称"),
+                                  systemImage: "pencil")
+                        }
+                        .buttonStyle(.plain).font(.caption).foregroundColor(.accentColor)
                     }
-                    .buttonStyle(.link)
+                    if row.key.dir != nil {
+                        Button(role: .destructive) { model.removeClaudeProfile(row.key) } label: {
+                            Text(L.t("Remove", "빼기", "外す", "移除"))
+                        }
+                        .buttonStyle(.link).font(.caption)
+                    }
                 }
             }
             .padding(.vertical, 2)
@@ -376,24 +390,26 @@ struct PopoverView: View {
     private func accountLabel(_ row: AccountRow) -> String {
         if let nickname = row.nickname { return nickname }
         if row.key == .local { return L.t("Codex · this Mac", "Codex · 이 Mac", "Codex · この Mac", "Codex · 此 Mac") }
-        if row.key.isUnknownClaude {
-            return L.t("Unidentified Claude reading", "확인되지 않은 Claude 읽기", "未確認の Claude 読み取り", "未识别的 Claude 读取")
-        }
-        // an account is known by when its weekly limit resets (AccountKey.claude)
-        let reset = row.reading.week?.resetsAt.map { Fmt.clock($0, now: .distantPast) } ?? "?"
-        return L.t("Claude · weekly reset \(reset)", "Claude · 주간 리셋 \(reset)", "Claude・週間リセット \(reset)", "Claude · 每周重置 \(reset)")
+        return "Claude · " + (row.login ?? profileName(row.key))
+    }
+
+    /// The profile a Claude row asks: ~/.claude for the default, else the folder's name.
+    private func profileName(_ key: AccountKey) -> String {
+        key.dir.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? "~/.claude"
     }
 
     private func accountReadTime(_ row: AccountRow) -> String {
-        let age = Fmt.ago(row.reading.at, now: clockNow)
-        if row.selected {
-            return L.t("Current · read \(age)", "현재 · \(age) 읽음", "現在・\(age) に読み取り", "当前 · \(age)读取")
+        let profile = row.key.isClaude ? profileName(row.key) + " · " : ""
+        guard let at = row.answeredAt else {
+            return profile + L.t("Not asked yet", "아직 묻지 않음", "まだ尋ねていません", "尚未询问")
         }
-        return L.t("Last read \(age)", "마지막 읽기 · \(age) 읽음", "最終読み取り \(age)", "最后读取 \(age)")
+        let age = Fmt.ago(at, now: clockNow)
+        return profile + L.t("Asked \(age)", "\(age) 물어봄", "\(age) に確認", "\(age)询问")
     }
 
-    private func accountMeters(_ reading: Reading) -> String {
-        [reading.five.map { "5h \(Fmt.pct($0.pct))" }, reading.week.map { "W \(Fmt.pct($0.pct))" }]
+    private func accountMeters(_ reading: Reading?) -> String {
+        guard let reading else { return L.t("don't know", "모름", "不明", "不知道") }
+        return [reading.five.map { "5h \(Fmt.pct($0.pct))" }, reading.week.map { "W \(Fmt.pct($0.pct))" }]
             .compactMap { $0 }.joined(separator: " · ")
     }
 
@@ -755,14 +771,14 @@ struct PopoverView: View {
         let budget = model.budgets.state[p]
         switch p {
         case .claude:
-            return at != nil ? L.t("Limits from Claude Code's status line, as of \(when) (they can only have grown since).",
-                                   "Claude Code 상태줄의 공식 한도 · \(when) 기준 (그 뒤로는 늘었을 수만 있어요)",
-                                   "Claude Code のステータスラインの公式リミット・\(when)時点（その後は増えることはあっても減りません）",
-                                   "来自 Claude Code 状态栏的官方额度，截至 \(when)（之后只可能增加）。")
-                             : L.t("No limits from Claude Code yet. Connect its status line (Settings › How it works); until then he says he doesn't know.",
-                                   "아직 Claude Code 한도 정보가 없어요. 상태줄을 연결하면 보여요(설정 › 사용법과 Claude Code 연결). 그 전에는 모른다고 말해요.",
-                                   "Claude Code のリミットはまだありません。ステータスラインを接続すると表示されます（設定 › 使い方）。それまでは「わからない」と言います。",
-                                   "还没有来自 Claude Code 的额度。连接它的状态栏后就会显示（设置 › 使用说明）；在那之前他会说不知道。")
+            return at != nil ? L.t("Claude Code's /usage, asked \(when) (it can only have grown since).",
+                                   "Claude Code /usage · \(when)에 물어봄 (그 뒤로는 늘었을 수만 있어요)",
+                                   "Claude Code の /usage・\(when)に確認（その後は増えることはあっても減りません）",
+                                   "Claude Code 的 /usage，\(when)询问（之后只可能增加）。")
+                             : L.t("No answer from Claude Code's /usage yet. Yugong asks it when the app starts, when you open this window, and every 30 minutes; it needs Claude Code installed and signed in. Until then he says he doesn't know.",
+                                   "아직 Claude Code /usage의 답이 없어요. 앱을 켤 때, 이 창을 열 때, 30분마다 물어봐요. Claude Code가 설치되어 로그인돼 있어야 해요. 그 전에는 모른다고 말해요.",
+                                   "Claude Code の /usage からまだ答えがありません。アプリ起動時、このウィンドウを開いたとき、30分ごとに尋ねます。Claude Code のインストールとログインが必要です。それまでは「わからない」と言います。",
+                                   "还没有 Claude Code /usage 的回答。应用启动、打开此窗口时以及每 30 分钟会询问一次；需要已安装并登录 Claude Code。在那之前他会说不知道。")
         case .codex:
             return at != nil ? L.t("From Codex CLI logs, as of \(when).",
                                    "Codex CLI 기록 · \(when) 기준",
