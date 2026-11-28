@@ -316,7 +316,11 @@ Token Yugong は Mac 上のファイルを読み、すべてをその Mac の中
 `--social` は `docs/social-preview.png` を描き、`--hero` は `docs/hero.gif` のフレームを描きます。そのあと：
 `ffmpeg -framerate 10 -i <dir>/hero-%03d.png -vf "split[a][b];[a]palettegen=max_colors=128:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 docs/hero.gif`。
 
-コントリビュートについては [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+コントリビュート：[good first issue](https://github.com/s3onghyun/token-yugong/issues?q=is%3Aopen+label%3A%22good+first+issue%22) から選び、コメントで担当を申し出るとメンテナーがアサインします。
+テスト：`./test.sh`（macOS）、`cargo test --manifest-path desktop/core/Cargo.toml`（デスクトップベータ）。
+Mac がなくても翻訳、ドキュメント、デスクトップベータはどの OS でも作業でき、CI がフォークを含むすべての
+プルリクエストで macOS のテストを実行します（初めてのコントリビューターの実行はメンテナーの承認後に始まります）。
+詳しくは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
 メニューからフィードバック：ポップオーバーの吹き出しボタン（またはミニウィンドウの右クリック）›「**フィードバックを送る…**」で、内容が入力済みの GitHub Issue（ブラウザー）か、s3onghyun.hong@gmail.com 宛てのメールが開きます。アプリ自身は何も送信しません。
 
