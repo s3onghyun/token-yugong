@@ -371,7 +371,11 @@ Character sheets: `swift run -c release YugongSheet <dir> [--scenes] [--family] 
 `--social` draws `docs/social-preview.png`; `--hero` draws the frames of `docs/hero.gif`, then:
 `ffmpeg -framerate 10 -i <dir>/hero-%03d.png -vf "split[a][b];[a]palettegen=max_colors=128:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 docs/hero.gif`.
 
-Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions: start with a [good first issue](https://github.com/s3onghyun/token-yugong/issues?q=is%3Aopen+label%3A%22good+first+issue%22) and comment on it to claim it; the maintainer
+assigns it to you. Tests: `./test.sh` (macOS) and `cargo test --manifest-path desktop/core/Cargo.toml` (desktop beta).
+No Mac? Translations, docs and the desktop beta work from any OS, and CI runs the macOS tests on every
+pull request, forks included (a first-time contributor's run starts after the maintainer approves it).
+More in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Send feedback from the menu: the speech-bubble button in the popover (or right-click the mini window) › **Send feedback…** opens a prefilled GitHub issue in your browser, or a prefilled email to s3onghyun.hong@gmail.com; the app sends nothing itself.
 

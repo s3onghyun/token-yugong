@@ -300,7 +300,10 @@ Token Yugong은 이 Mac의 파일을 읽고, 모든 것을 이 Mac에만 둡니�
 `--social`은 `docs/social-preview.png`를, `--hero`는 `docs/hero.gif`의 프레임을 그립니다(GIF로 묶는
 ffmpeg 명령은 [README.md](README.md#for-development)).
 
-기여 방법: [CONTRIBUTING.md](CONTRIBUTING.md).
+기여 방법: [good first issue](https://github.com/s3onghyun/token-yugong/issues?q=is%3Aopen+label%3A%22good+first+issue%22)에서 하나 골라 댓글로 맡겠다고 남기면 메인테이너가 배정해 드려요.
+테스트: `./test.sh`(macOS), `cargo test --manifest-path desktop/core/Cargo.toml`(데스크톱 베타).
+Mac이 없어도 번역, 문서, 데스크톱 베타는 어느 OS에서나 할 수 있고, CI가 포크를 포함한 모든 PR에서
+macOS 테스트를 돌려요(처음 기여하는 분의 CI는 메인테이너 승인 후 시작). 자세한 내용은 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 메뉴에서 의견 보내기: 팝오버의 말풍선 버튼(또는 작은 창 오른쪽 클릭) › **의견 보내기…**를 누르면 브라우저에 내용이 채워진 GitHub 이슈나 s3onghyun.hong@gmail.com 앞 이메일이 열려요. 앱이 직접 보내는 것은 없어요.
 

@@ -217,7 +217,10 @@ Token Yugong 读取你 Mac 上的文件，所有数据都留在本机。无需�
 `--social` 绘制 `docs/social-preview.png`；`--hero` 绘制 `docs/hero.gif` 的各帧，然后执行：
 `ffmpeg -framerate 10 -i <dir>/hero-%03d.png -vf "split[a][b];[a]palettegen=max_colors=128:stats_mode=full[p];[b][p]paletteuse=dither=none" -loop 0 docs/hero.gif`。
 
-参与贡献：见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+参与贡献：从 [good first issue](https://github.com/s3onghyun/token-yugong/issues?q=is%3Aopen+label%3A%22good+first+issue%22) 中挑一个，留言认领，维护者会把它分配给你。
+测试：`./test.sh`（macOS）、`cargo test --manifest-path desktop/core/Cargo.toml`（桌面测试版）。
+没有 Mac 也可以在任何系统上做翻译、文档和桌面测试版；CI 会在每个拉取请求（包括来自 fork 的）上运行 macOS 测试
+（首次贡献者的运行需等维护者批准后开始）。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 从菜单发送反馈：点击弹出窗口中的对话气泡按钮（或右键点击小窗口）›「**发送反馈…**」，会在浏览器中打开预填好的 GitHub Issue，或打开发往 s3onghyun.hong@gmail.com 的预填邮件；应用本身不会发送任何内容。
 
